@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -7,19 +8,14 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
-  Code2,
-  MapPin,
   Maximize2,
   Megaphone,
-  Rocket,
   Search,
-  Sparkles,
-  Target,
   Trophy,
-  UsersRound,
 } from "lucide-react";
 
 import { NavAuthLink } from "@/components/nav-auth-link";
+import { HeroTypewriterSpan } from "@/components/hero-typewriter-span";
 
 const navItems = [
   { label: "About", href: "#about" },
@@ -60,6 +56,51 @@ const audienceCards = [
   },
 ];
 
+const heroCommunityMembers = [
+  {
+    id: 1,
+    name: "John Doe",
+    designation: "Software Engineer",
+    image:
+      "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=3387&q=80",
+  },
+  {
+    id: 2,
+    name: "Robert Johnson",
+    designation: "Product Manager",
+    image:
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60",
+  },
+  {
+    id: 3,
+    name: "Jane Smith",
+    designation: "Data Scientist",
+    image:
+      "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60",
+  },
+  {
+    id: 4,
+    name: "Emily Davis",
+    designation: "UX Designer",
+    image:
+      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fGF2YXRhcnxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60",
+  },
+  {
+    id: 5,
+    name: "Tyler Durden",
+    designation: "Soap Developer",
+    image:
+      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=3540&q=80",
+  },
+  {
+    id: 6,
+    name: "Dora",
+    designation: "The Explorer",
+    image:
+      "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=3534&q=80",
+  },
+];
+
 type HeroDecoration = {
   name: string;
   Icon: LucideIcon;
@@ -75,36 +116,11 @@ const heroDecorations: HeroDecoration[] = [
   {
     name: "deadline calendar",
     Icon: CalendarDays,
-    className: "-left-3 -top-10 rotate-[-12deg] xl:-left-[4.75rem]",
+    className: "-left-3 -top-4 rotate-[-12deg] xl:-left-[4.75rem]",
     badgeClassName: "bg-[#FFD166]",
     sizeClassName: "size-16",
     notification: "3",
     marks: "arc",
-  },
-  {
-    name: "team match",
-    Icon: UsersRound,
-    className: "left-[15%] -top-8 rotate-[7deg]",
-    badgeClassName: "bg-[#F4F1EA]",
-    sizeClassName: "size-11",
-    iconClassName: "text-[#3F3E3B]",
-    marks: "spark",
-  },
-  {
-    name: "location",
-    Icon: MapPin,
-    className: "-left-14 top-[23%] rotate-[10deg] xl:-left-[5.75rem]",
-    badgeClassName: "bg-[#9EDCF3]",
-    sizeClassName: "size-14",
-  },
-  {
-    name: "project code",
-    Icon: Code2,
-    className: "-left-8 top-[47%] rotate-[-7deg] xl:-left-[4.5rem]",
-    badgeClassName: "bg-[#FF7B67]",
-    sizeClassName: "size-12",
-    notification: "8",
-    marks: "bits",
   },
   {
     name: "winner",
@@ -123,17 +139,9 @@ const heroDecorations: HeroDecoration[] = [
     notification: "1",
   },
   {
-    name: "launch",
-    Icon: Rocket,
-    className: "right-[14%] -top-12 rotate-[13deg]",
-    badgeClassName: "bg-[#B78CFF]",
-    sizeClassName: "size-14",
-    marks: "spark",
-  },
-  {
     name: "submission checklist",
     Icon: ClipboardCheck,
-    className: "-right-4 -top-6 rotate-[3deg] xl:-right-[5rem]",
+    className: "-right-4 top-0 rotate-[3deg] xl:-right-[5rem]",
     badgeClassName: "bg-[#C99BFF]",
     sizeClassName: "size-16",
     notification: "2",
@@ -141,19 +149,10 @@ const heroDecorations: HeroDecoration[] = [
   {
     name: "event search",
     Icon: Search,
-    className: "-right-14 top-[24%] rotate-[-11deg] xl:-right-[5.75rem]",
+    className: "-right-14 top-[29%] rotate-[-11deg] xl:-right-[5.75rem]",
     badgeClassName: "bg-[#F4F1EA]",
     sizeClassName: "size-12",
     iconClassName: "text-[#3F3E3B]",
-  },
-  {
-    name: "goal",
-    Icon: Target,
-    className: "-right-6 top-[51%] rotate-[9deg] xl:-right-[4.75rem]",
-    badgeClassName: "bg-[#FF9F43]",
-    sizeClassName: "size-16",
-    notification: "5",
-    marks: "zigzag",
   },
   {
     name: "sponsor call",
@@ -161,13 +160,6 @@ const heroDecorations: HeroDecoration[] = [
     className: "right-[3%] bottom-[6%] rotate-[-8deg] xl:-right-[4.25rem]",
     badgeClassName: "bg-[#F178CE]",
     sizeClassName: "size-14",
-  },
-  {
-    name: "featured",
-    Icon: Sparkles,
-    className: "bottom-[-8%] right-[24%] rotate-[8deg]",
-    badgeClassName: "bg-[#86D9A4]",
-    sizeClassName: "size-10",
   },
 ];
 
@@ -295,6 +287,34 @@ function HeroIconCloud() {
   );
 }
 
+function HeroCommunityInlineStack() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mx-2 inline-flex translate-y-[0.08em] items-center align-middle sm:mx-3"
+    >
+      {heroCommunityMembers.map((person, index) => (
+        <span
+          className="relative -mr-[0.45rem] inline-flex last:mr-0 sm:-mr-[0.6rem]"
+          key={person.id}
+          style={{ zIndex: heroCommunityMembers.length - index }}
+        >
+          <span className="relative block size-[1.8rem] overflow-hidden rounded-full border-2 border-white bg-[#F8F8F4] shadow-[0_8px_18px_rgba(0,0,0,0.16)] sm:size-[2.1rem]">
+            <Image
+              alt=""
+              className="h-full w-full object-cover"
+              height={34}
+              sizes="(min-width: 640px) 34px, 29px"
+              src={person.image}
+              width={34}
+            />
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function CompanyLogoStrip({ hidden = false }: { hidden?: boolean }) {
   return (
     <svg
@@ -405,9 +425,23 @@ export default function Home() {
         <div className="relative z-10 mx-auto max-w-[1120px]">
           <div className="grid items-end gap-8 md:grid-cols-[minmax(0,1fr)_auto]">
             <div>
-              <h1 className="max-w-[1120px] text-[2.55rem] font-semibold leading-[1.02] tracking-normal text-black sm:text-[3rem] lg:text-[3.2rem]">
-                Search hundreds of upcoming hackathons, build your hacker
-                profile, and never miss another application deadline.
+              <h1
+                aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
+                className="max-w-[1120px] text-[2.15rem] font-semibold leading-[1.08] tracking-normal text-black sm:text-[2.65rem] lg:text-[2.75rem]"
+              >
+                <span className="block">Search hundreds of upcoming</span>{" "}
+                <span className="block">
+                  <span className="inline-flex items-baseline">
+                    <span>hackathons</span>
+                    <HeroCommunityInlineStack />
+                    <span>,</span>
+                  </span>
+                  {" "}
+                  build your profile,
+                </span>{" "}
+                <span className="block">
+                  and <HeroTypewriterSpan />
+                </span>
               </h1>
               <p className="mt-8 max-w-[640px] text-base leading-6 text-[#706F6B]">
                 Filter for hackathons by location, date, and category, track
@@ -514,25 +548,11 @@ export default function Home() {
       </section>
 
       <section
-        aria-labelledby="company-network-heading"
+        aria-labelledby="platform-audience-heading"
         className="bg-white px-8 pb-16 pt-20 text-left sm:px-14 sm:pb-20 sm:pt-24 lg:px-20"
       >
         <div className="mx-auto max-w-[1120px]">
-          <h2
-            id="company-network-heading"
-            className="text-sm font-medium tracking-normal text-[#706F6B]"
-          >
-            Companies we&apos;ve worked with
-          </h2>
-
-          <div className="company-marquee mt-7 overflow-hidden py-1">
-            <div className="company-marquee-track flex w-max items-center">
-              <CompanyLogoStrip />
-              <CompanyLogoStrip hidden />
-            </div>
-          </div>
-
-          <div className="mt-7">
+          <div>
             <h2 className="text-sm font-medium tracking-normal text-[#706F6B]">
               Hackathons we track
             </h2>
@@ -545,7 +565,10 @@ export default function Home() {
           </div>
 
           <div className="mt-24 text-left">
-            <h2 className="max-w-[760px] text-[0.9375rem] font-semibold leading-[1.25] tracking-normal text-black sm:text-lg lg:text-[1.325rem]">
+            <h2
+              id="platform-audience-heading"
+              className="max-w-[760px] text-[0.9375rem] font-semibold leading-[1.25] tracking-normal text-black sm:text-lg lg:text-[1.325rem]"
+            >
               Built for hackers, organizers, and sponsors alike. Discover
               hackathons, grow your hacker profile, organize better events with
               proven resources, and connect companies with the next generation
@@ -692,6 +715,27 @@ export default function Home() {
                   )}
                 </div>
               </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="company-network-heading"
+        className="bg-white px-8 pb-16 pt-4 text-left sm:px-14 sm:pb-20 lg:px-20"
+      >
+        <div className="mx-auto max-w-[1120px]">
+          <h2
+            id="company-network-heading"
+            className="text-sm font-medium tracking-normal text-[#706F6B]"
+          >
+            Companies we&apos;ve worked with
+          </h2>
+
+          <div className="company-marquee mt-7 overflow-hidden py-1">
+            <div className="company-marquee-track flex w-max items-center">
+              <CompanyLogoStrip />
+              <CompanyLogoStrip hidden />
             </div>
           </div>
         </div>

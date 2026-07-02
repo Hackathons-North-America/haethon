@@ -12,7 +12,7 @@ test("loads the home page shell", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Login", exact: true })).toHaveAttribute("href", "/sign-in");
   await expect(
     page.getByRole("heading", {
-      name: "Search hundreds of upcoming hackathons, build your hacker profile, and never miss another application deadline.",
+      name: "Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline.",
     })
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Companies we've worked with" })).toBeVisible();

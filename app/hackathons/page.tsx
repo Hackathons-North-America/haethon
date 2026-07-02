@@ -1,20 +1,23 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import {
   Code2,
-  Heart,
   MapPin,
   Minus,
   Plus,
   Search,
   Sparkles,
-  Star,
   Trophy,
   Users,
 } from "lucide-react";
 
+import { HackathonCard } from "@/components/hackathon-card";
+import type { HackathonCardData } from "@/components/hackathon-card";
 import { NavAuthLink } from "@/components/nav-auth-link";
+import { getCurrentUserRecord } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { hackathonDates, hackathonLocations, hackathons, userHackathons, userHackathonVotes } from "@/lib/db/schema";
 
 export const metadata: Metadata = {
   title: "Hackathons | Hackathons North America",
@@ -109,206 +112,163 @@ const teamRows = [
   },
 ];
 
-const hackathons = [
-  {
-    name: "Hack the North",
-    description: "Canada's flagship student hackathon for hardware, software, and ambitious weekend builds.",
-    location: "Waterloo, ON",
-    date: "Sep 13-15, 2026",
-    rating: "5.0",
-    reviews: "142",
-    image:
-      "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "ETHGlobal New York",
-    description: "A high-energy web3 builder weekend with protocol sponsors, workshops, and demo day.",
-    location: "New York, NY",
-    date: "Aug 21-23, 2026",
-    rating: "4.98",
-    reviews: "88",
-    image:
-      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "AI Builders Weekend",
-    description: "Prototype agent workflows, eval harnesses, and product-ready AI features with mentors.",
-    location: "San Francisco, CA",
-    date: "Jul 24-26, 2026",
-    rating: "4.96",
-    reviews: "73",
-    image:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Climate Code Sprint",
-    description: "Build practical climate data tools for cities, nonprofits, and community organizers.",
-    location: "Vancouver, BC",
-    date: "Oct 3-4, 2026",
-    rating: "4.92",
-    reviews: "51",
-    image:
-      "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "HealthTech Jam",
-    description: "A focused hackathon for patient tools, clinical workflow ideas, and responsible prototypes.",
-    location: "Boston, MA",
-    date: "Nov 7-8, 2026",
-    rating: "4.89",
-    reviews: "64",
-    image:
-      "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Open Source Launchpad",
-    description: "Contribute to maintained projects, ship pull requests, and learn with senior maintainers.",
-    location: "Austin, TX",
-    date: "Aug 8-9, 2026",
-    rating: "4.94",
-    reviews: "39",
-    image:
-      "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Fintech Forge",
-    description: "Teams build secure payment, budgeting, and risk analysis products for real-world use cases.",
-    location: "Chicago, IL",
-    date: "Sep 26-27, 2026",
-    rating: "4.87",
-    reviews: "46",
-    image:
-      "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "GameDev Night Market",
-    description: "A playful weekend for indie game prototypes, custom controllers, and local multiplayer demos.",
-    location: "Montreal, QC",
-    date: "Jul 31-Aug 2, 2026",
-    rating: "4.91",
-    reviews: "58",
-    image:
-      "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Civic Data Hack",
-    description: "Create transparent data tools for housing, transit, public budgets, and community services.",
-    location: "Washington, DC",
-    date: "Oct 17-18, 2026",
-    rating: "4.85",
-    reviews: "33",
-    image:
-      "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Robotics Sprint",
-    description: "Prototype robotics software, sensing workflows, and human-in-the-loop interfaces.",
-    location: "Pittsburgh, PA",
-    date: "Sep 5-7, 2026",
-    rating: "4.93",
-    reviews: "44",
-    image:
-      "https://images.unsplash.com/photo-1581092795360-fd1ca04f0952?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "Design Systems Hack",
-    description: "Build UI libraries, accessibility tooling, and polished product surfaces in a fast sprint.",
-    location: "Seattle, WA",
-    date: "Nov 14-15, 2026",
-    rating: "4.9",
-    reviews: "27",
-    image:
-      "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Student Startup Weekend",
-    description: "A founder-focused hackathon for MVPs, customer discovery, pitch coaching, and demos.",
-    location: "Atlanta, GA",
-    date: "Aug 29-30, 2026",
-    rating: "4.88",
-    reviews: "61",
-    image:
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Data Viz Derby",
-    description: "Turn public datasets into clear visual stories, dashboards, and interactive reporting tools.",
-    location: "Denver, CO",
-    date: "Oct 24-25, 2026",
-    rating: "4.86",
-    reviews: "29",
-    image:
-      "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "Secure by Design",
-    description: "A security-first event for threat modeling, privacy tooling, and safer developer workflows.",
-    location: "Portland, OR",
-    date: "Dec 5-6, 2026",
-    rating: "4.95",
-    reviews: "35",
-    image:
-      "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Hardware House",
-    description: "Weekend builds around sensors, embedded systems, rapid prototyping, and physical computing.",
-    location: "San Jose, CA",
-    date: "Sep 19-20, 2026",
-    rating: "4.84",
-    reviews: "48",
-    image:
-      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Education Apps Lab",
-    description: "Build learning tools, classroom workflows, and student support products with educators.",
-    location: "Philadelphia, PA",
-    date: "Nov 21-22, 2026",
-    rating: "4.82",
-    reviews: "31",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-  {
-    name: "Cloud Native Challenge",
-    description: "Ship scalable services, observability dashboards, and deployment automation in teams.",
-    location: "Raleigh, NC",
-    date: "Oct 10-11, 2026",
-    rating: "4.9",
-    reviews: "52",
-    image:
-      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=900&q=80",
-    featured: true,
-  },
-  {
-    name: "Creative Coding Camp",
-    description: "A mixed media hackathon for interactive visuals, audio tools, generative art, and web demos.",
-    location: "Los Angeles, CA",
-    date: "Dec 12-13, 2026",
-    rating: "4.87",
-    reviews: "42",
-    image:
-      "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=900&q=80",
-    featured: false,
-  },
-];
+const publicStatuses = ["upcoming", "live"] as const;
+const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatDateRange(startsAt: Date | null, endsAt: Date | null) {
+  if (!startsAt) {
+    return "Dates TBA";
+  }
+
+  const start = {
+    day: startsAt.getUTCDate(),
+    month: monthNames[startsAt.getUTCMonth()],
+    year: startsAt.getUTCFullYear(),
+  };
+
+  if (!endsAt) {
+    return `${start.month} ${start.day}, ${start.year}`;
+  }
+
+  const end = {
+    day: endsAt.getUTCDate(),
+    month: monthNames[endsAt.getUTCMonth()],
+    year: endsAt.getUTCFullYear(),
+  };
+
+  if (start.year === end.year && start.month === end.month && start.day === end.day) {
+    return `${start.month} ${start.day}, ${start.year}`;
+  }
+
+  if (start.year === end.year && start.month === end.month) {
+    return `${start.month} ${start.day}-${end.day}, ${start.year}`;
+  }
+
+  if (start.year === end.year) {
+    return `${start.month} ${start.day}-${end.month} ${end.day}, ${start.year}`;
+  }
+
+  return `${start.month} ${start.day}, ${start.year}-${end.month} ${end.day}, ${end.year}`;
+}
+
+function formatDuration(startsAt: Date | null, endsAt: Date | null, format: string) {
+  const formatLabel = format.replace("_", " ");
+
+  if (!startsAt || !endsAt) {
+    return `Duration TBA · ${formatLabel}`;
+  }
+
+  const hours = Math.max(1, Math.round((endsAt.getTime() - startsAt.getTime()) / 3_600_000));
+  const duration = hours <= 96 ? `${hours} hours` : `${Math.ceil(hours / 24)} days`;
+
+  return `${duration} · ${formatLabel}`;
+}
+
+function formatLocation({
+  city,
+  country,
+  format,
+  region,
+  venue,
+}: {
+  city: string | null;
+  country: string | null;
+  format: string;
+  region: string | null;
+  venue: string | null;
+}) {
+  if (format === "online") {
+    return "Online";
+  }
+
+  const locality = [city, region].filter(Boolean).join(", ");
+
+  return locality || venue || country || "Location TBA";
+}
+
+function buildBadges({
+  beginnerFriendly,
+  format,
+  status,
+  travelReimbursement,
+}: {
+  beginnerFriendly: boolean;
+  format: string;
+  status: string;
+  travelReimbursement: boolean;
+}) {
+  return [
+    status === "live" ? "Live now" : "Upcoming",
+    format.replace("_", " "),
+    beginnerFriendly ? "Beginner friendly" : null,
+    travelReimbursement ? "Travel support" : null,
+  ].filter(Boolean) as string[];
+}
+
+async function getHackathonCards(): Promise<HackathonCardData[]> {
+  const user = await getCurrentUserRecord();
+  const rows = await db
+    .select({
+      id: hackathons.id,
+      name: hackathons.name,
+      shortDescription: hackathons.shortDescription,
+      venue: hackathons.venue,
+      format: hackathons.format,
+      status: hackathons.status,
+      beginnerFriendly: hackathons.beginnerFriendly,
+      travelReimbursement: hackathons.travelReimbursement,
+      voteScore: hackathons.voteScore,
+      city: hackathonLocations.city,
+      region: hackathonLocations.region,
+      country: hackathonLocations.country,
+      startsAt: hackathonDates.startsAt,
+      endsAt: hackathonDates.endsAt,
+    })
+    .from(hackathons)
+    .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
+    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, publicStatuses)))
+    .orderBy(asc(hackathonDates.startsAt))
+    .limit(48);
+
+  const hackathonIds = rows.map((row) => row.id);
+  const [savedRows, voteRows] =
+    user && hackathonIds.length
+      ? await Promise.all([
+          db
+            .select({
+              hackathonId: userHackathons.hackathonId,
+              isSaved: userHackathons.isSaved,
+            })
+            .from(userHackathons)
+            .where(and(eq(userHackathons.userId, user.id), inArray(userHackathons.hackathonId, hackathonIds))),
+          db
+            .select({
+              hackathonId: userHackathonVotes.hackathonId,
+              vote: userHackathonVotes.vote,
+            })
+            .from(userHackathonVotes)
+            .where(and(eq(userHackathonVotes.userId, user.id), inArray(userHackathonVotes.hackathonId, hackathonIds))),
+        ])
+      : [[], []];
+
+  const savedByHackathon = new Map(savedRows.map((row) => [row.hackathonId, row.isSaved]));
+  const voteByHackathon = new Map(voteRows.map((row) => [row.hackathonId, row.vote]));
+
+  return rows.map((row) => ({
+    badges: buildBadges(row),
+    date: formatDateRange(row.startsAt, row.endsAt),
+    description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
+    duration: formatDuration(row.startsAt, row.endsAt, row.format),
+    id: row.id,
+    image: null,
+    isSaved: savedByHackathon.get(row.id) ?? false,
+    location: formatLocation(row),
+    name: row.name,
+    userVote: (voteByHackathon.get(row.id) ?? 0) as -1 | 0 | 1,
+    voteScore: row.voteScore,
+  }));
+}
 
 type SearchFieldProps = {
   children: React.ReactNode;
@@ -519,9 +479,12 @@ function TeamDropdown() {
 
 function SearchNavigation() {
   return (
-    <section aria-label="Hackathon filters" className="bg-white px-5 py-5">
+    <section
+      aria-label="Hackathon filters"
+      className="bg-white px-5 pb-7 pt-14 sm:pt-16"
+    >
       <div className="mx-auto max-w-[1080px]">
-        <div className="relative z-30 flex flex-col rounded-[2.35rem] border border-black/10 bg-white p-2 shadow-[0_10px_36px_rgba(0,0,0,0.14)] md:flex-row md:items-stretch md:divide-x md:divide-black/10">
+        <div className="relative z-30 flex flex-col rounded-[2.35rem] border border-black/10 bg-white p-2 shadow-[0_10px_36px_rgba(0,0,0,0.14)] md:flex-row md:items-stretch">
           <SearchField
             label="Where"
             panelClassName="md:left-0"
@@ -570,84 +533,15 @@ function SearchNavigation() {
   );
 }
 
-function HackathonCard({
-  hackathon,
-  index,
-}: {
-  hackathon: (typeof hackathons)[number];
-  index: number;
-}) {
-  return (
-    <article className="group min-w-0">
-      <div className="relative aspect-[1.08] overflow-hidden rounded-[1.35rem] bg-[#F7F7F4]">
-        <Image
-          alt={`${hackathon.name} venue preview`}
-          className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          fill
-          priority={index < 3}
-          sizes="(min-width: 1024px) 347px, (min-width: 640px) 50vw, 100vw"
-          src={hackathon.image}
-        />
-        {hackathon.featured ? (
-          <div className="absolute left-3 top-3 inline-flex max-w-[calc(100%-4.75rem)] items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold text-black shadow-sm">
-            <Trophy
-              aria-hidden="true"
-              className="size-4 shrink-0 text-[#B8860B]"
-              strokeWidth={2.25}
-            />
-            <span className="truncate">Hacker favourite</span>
-          </div>
-        ) : null}
-        <button
-          aria-label={`Save ${hackathon.name}`}
-          className="absolute right-3 top-3 grid size-9 place-items-center rounded-full text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.45)] hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-          type="button"
-        >
-          <Heart
-            aria-hidden="true"
-            className="size-6 fill-black/15"
-            strokeWidth={2.25}
-          />
-        </button>
-        <div
-          aria-hidden="true"
-          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5"
-        >
-          <span className="size-1.5 rounded-full bg-white" />
-          <span className="size-1.5 rounded-full bg-white/70" />
-          <span className="size-1.5 rounded-full bg-white/70" />
-        </div>
-      </div>
+export default async function HackathonsPage() {
+  const hackathonCards = await getHackathonCards();
 
-      <div className="mt-3 space-y-1 text-[15px] leading-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="min-w-0 truncate font-semibold text-black">
-            {hackathon.name}
-          </h2>
-          <div className="flex shrink-0 items-center gap-1 text-sm text-black">
-            <Star aria-hidden="true" className="size-3 fill-black" />
-            <span>
-              {hackathon.rating} ({hackathon.reviews})
-            </span>
-          </div>
-        </div>
-        <p className="line-clamp-2 text-[#706F6B]">{hackathon.description}</p>
-        <p className="text-[#706F6B]">48 hours · mentors · demo day</p>
-        <p className="pt-1 font-semibold text-black underline underline-offset-2">
-          {hackathon.location} · {hackathon.date}
-        </p>
-      </div>
-    </article>
-  );
-}
-
-export default function HackathonsPage() {
   return (
     <main className="min-h-screen bg-white text-black">
-      <header className="sticky top-0 z-40 border-b border-black/10 bg-white">
+      <header className="sticky top-0 z-40 bg-white">
         <nav
           aria-label="Primary navigation"
-          className="px-8 font-mono text-xs font-medium uppercase tracking-[0.14em] text-[#706F6B] sm:px-14 lg:px-20"
+          className="border-b border-black/10 bg-white px-8 font-mono text-xs font-medium uppercase tracking-[0.14em] text-[#706F6B] sm:px-14 lg:px-20"
         >
           <div className="mx-auto flex min-h-20 max-w-[1120px] flex-col items-start justify-center gap-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:py-0">
             <Link
@@ -674,35 +568,32 @@ export default function HackathonsPage() {
             </div>
           </div>
         </nav>
-
-        <SearchNavigation />
       </header>
 
-      <section className="px-5 pb-16 pt-9 sm:px-8 sm:pb-20 lg:px-12">
+      <SearchNavigation />
+
+      <section className="px-5 pb-16 pt-10 sm:px-8 sm:pb-20 lg:px-12">
         <div className="mx-auto max-w-[1120px]">
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <p className="font-mono text-xs font-medium uppercase tracking-[0.14em] text-[#706F6B]">
-                Upcoming hackathons
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-normal text-black sm:text-3xl">
-                Browse events
-              </h1>
-            </div>
-            <p className="hidden text-sm text-[#706F6B] sm:block">
-              {hackathons.length} test events
-            </p>
+          <div className="mb-7">
+            <h1 className="text-3xl font-semibold tracking-normal text-black sm:text-4xl">
+              Upcoming hackathons
+            </h1>
           </div>
 
-          <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            {hackathons.map((hackathon, index) => (
-              <HackathonCard
-                hackathon={hackathon}
-                index={index}
-                key={`${hackathon.name}-${hackathon.date}`}
-              />
-            ))}
-          </div>
+          {hackathonCards.length ? (
+            <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              {hackathonCards.map((hackathon, index) => (
+                <HackathonCard hackathon={hackathon} index={index} key={hackathon.id} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-black/10 bg-[#F7F7F4] p-8 text-center">
+              <h2 className="text-xl font-semibold text-black">No published hackathons yet</h2>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#706F6B]">
+                Approved hackathons from the database will appear here as soon as they are published.
+              </p>
+            </div>
+          )}
         </div>
       </section>
     </main>

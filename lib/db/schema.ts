@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   customType,
+  date as pgDate,
   index,
   integer,
   jsonb,
@@ -44,6 +45,11 @@ export const notificationChannelEnum = pgEnum("notification_channel", ["email", 
 export const importStatusEnum = pgEnum("import_status", ["pending", "approved", "rejected", "merged"]);
 export const sourceTypeEnum = pgEnum("source_type", ["devpost", "mlh", "organizer_site", "manual", "other"]);
 export const leadStatusEnum = pgEnum("lead_status", ["new", "contacted", "qualified", "closed"]);
+export const attendanceSourceEnum = pgEnum("attendance_source", ["inferred", "manual", "organizer_verified", "admin_verified"]);
+export const organizationMembershipRoleEnum = pgEnum("organization_membership_role", ["owner", "admin", "editor"]);
+export const organizationMembershipStatusEnum = pgEnum("organization_membership_status", ["pending", "approved", "rejected"]);
+export const submissionStatusEnum = pgEnum("submission_status", ["pending", "approved", "rejected", "merged", "withdrawn"]);
+export const submitterTypeEnum = pgEnum("submitter_type", ["organizer", "community"]);
 
 export const users = pgTable(
   "users",
@@ -75,6 +81,9 @@ export const userProfiles = pgTable("user_profiles", {
   school: varchar("school", { length: 160 }),
   githubUrl: text("github_url"),
   linkedinUrl: text("linkedin_url"),
+  instagramUrl: text("instagram_url"),
+  xUrl: text("x_url"),
+  devpostUrl: text("devpost_url"),
   portfolioUrl: text("portfolio_url"),
   skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   isPublic: boolean("is_public").notNull().default(true),
@@ -93,6 +102,27 @@ export const organizations = pgTable("organizations", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const organizationMemberships = pgTable(
+  "organization_memberships",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: organizationMembershipRoleEnum("role").notNull().default("editor"),
+    status: organizationMembershipStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.userId] }),
+    index("organization_memberships_user_idx").on(table.userId),
+    index("organization_memberships_status_idx").on(table.status),
+  ]
+);
 
 export const hackathons = pgTable(
   "hackathons",
@@ -113,6 +143,7 @@ export const hackathons = pgTable(
     beginnerFriendly: boolean("beginner_friendly").notNull().default(false),
     travelReimbursement: boolean("travel_reimbursement").notNull().default(false),
     prizeAmountUsd: integer("prize_amount_usd"),
+    voteScore: integer("vote_score").notNull().default(0),
     lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
     dataConfidenceScore: numeric("data_confidence_score", { precision: 5, scale: 2 }).default("0"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -206,6 +237,46 @@ export const userHackathons = pgTable(
   (table) => [uniqueIndex("user_hackathons_user_event_idx").on(table.userId, table.hackathonId)]
 );
 
+export const userHackathonAttendanceDays = pgTable(
+  "user_hackathon_attendance_days",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    attendedOn: pgDate("attended_on", { mode: "date" }).notNull(),
+    source: attendanceSourceEnum("source").notNull().default("inferred"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_hackathon_attendance_unique_idx").on(table.userId, table.hackathonId, table.attendedOn),
+    index("user_hackathon_attendance_user_day_idx").on(table.userId, table.attendedOn),
+  ]
+);
+
+export const userHackathonVotes = pgTable(
+  "user_hackathon_votes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    vote: integer("vote").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_hackathon_votes_user_event_idx").on(table.userId, table.hackathonId),
+    index("user_hackathon_votes_hackathon_idx").on(table.hackathonId),
+  ]
+);
+
 export const reminders = pgTable(
   "reminders",
   {
@@ -276,6 +347,37 @@ export const importItems = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("import_items_batch_idx").on(table.importBatchId)]
+);
+
+export const hackathonSubmissions = pgTable(
+  "hackathon_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    submittedByUserId: uuid("submitted_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    submitterType: submitterTypeEnum("submitter_type").notNull(),
+    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+    matchedHackathonId: uuid("matched_hackathon_id").references(() => hackathons.id, { onDelete: "set null" }),
+    approvedHackathonId: uuid("approved_hackathon_id").references(() => hackathons.id, { onDelete: "set null" }),
+    status: submissionStatusEnum("status").notNull().default("pending"),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    normalizedName: varchar("normalized_name", { length: 180 }).notNull(),
+    websiteUrl: text("website_url").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    duplicateScore: numeric("duplicate_score", { precision: 5, scale: 2 }).default("0"),
+    reviewerNotes: text("reviewer_notes"),
+    rejectionReason: text("rejection_reason"),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("hackathon_submissions_status_idx").on(table.status),
+    index("hackathon_submissions_submitter_idx").on(table.submittedByUserId),
+    index("hackathon_submissions_organization_idx").on(table.organizationId),
+  ]
 );
 
 export const organizerClaims = pgTable("organizer_claims", {
@@ -384,6 +486,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   notifications: many(notifications),
   projects: many(projects),
   achievements: many(achievements),
+  organizationMemberships: many(organizationMemberships),
+  hackathonSubmissions: many(hackathonSubmissions),
+  attendanceDays: many(userHackathonAttendanceDays),
+  hackathonVotes: many(userHackathonVotes),
 }));
 
 export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
@@ -401,7 +507,16 @@ export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
   }),
   sources: many(sources),
   tags: many(hackathonTags),
+  attendanceDays: many(userHackathonAttendanceDays),
+  votes: many(userHackathonVotes),
+}));
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  memberships: many(organizationMemberships),
+  submissions: many(hackathonSubmissions),
 }));
 
 export type InsertUser = typeof users.$inferInsert;
 export type SelectHackathon = typeof hackathons.$inferSelect;
+export type SelectUser = typeof users.$inferSelect;
+export type SelectHackathonSubmission = typeof hackathonSubmissions.$inferSelect;

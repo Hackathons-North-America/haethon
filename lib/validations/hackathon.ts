@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+const emptyToUndefined = (value: unknown) => (typeof value === "string" && value.trim() === "" ? undefined : value);
+
+const optionalUrl = z.preprocess(emptyToUndefined, z.string().trim().url().optional());
+const optionalString = (max: number) => z.preprocess(emptyToUndefined, z.string().trim().max(max).optional());
+const requiredDate = z.coerce.date();
+const optionalDate = z.preprocess(emptyToUndefined, z.coerce.date().optional());
+
+const dateRangeRefinement = <T extends { startDate: Date; endDate: Date }>(data: T, ctx: z.RefinementCtx) => {
+  if (data.endDate < data.startDate) {
+    ctx.addIssue({
+      code: "custom",
+      message: "End date must be on or after the start date.",
+      path: ["endDate"],
+    });
+  }
+};
+
 export const hackathonSearchSchema = z.object({
   q: z.string().trim().max(120).optional(),
   city: z.string().trim().max(120).optional(),
@@ -11,17 +28,113 @@ export const hackathonSearchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(12),
 });
 
-export const hackathonSubmissionSchema = z.object({
-  name: z.string().min(3).max(180),
-  websiteUrl: z.string().url(),
-  applicationUrl: z.string().url().optional().or(z.literal("")),
-  city: z.string().max(120).optional(),
-  region: z.string().max(120).optional(),
-  country: z.string().min(2).max(120),
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
-  format: z.enum(["online", "in_person", "hybrid"]),
-  shortDescription: z.string().min(20).max(500),
+const normalizedHackathonPayloadBaseSchema = z.object({
+    name: z.string().trim().min(3).max(180),
+    organizationId: optionalString(80),
+    organizationName: optionalString(160),
+    websiteUrl: z.string().trim().url(),
+    sourceUrl: optionalUrl,
+    applicationUrl: optionalUrl,
+    city: optionalString(120),
+    region: optionalString(120),
+    country: z.string().trim().min(2).max(120),
+    venue: optionalString(160),
+    startDate: requiredDate,
+    endDate: requiredDate,
+    applicationOpensAt: optionalDate,
+    applicationClosesAt: optionalDate,
+    acceptanceAt: optionalDate,
+    submissionDeadlineAt: optionalDate,
+    format: z.enum(["online", "in_person", "hybrid"]),
+    shortDescription: optionalString(500),
+    discordUrl: optionalUrl,
+    devpostUrl: optionalUrl,
+    eligibility: optionalString(2000),
+    beginnerFriendly: z.coerce.boolean().optional().default(false),
+    travelReimbursement: z.coerce.boolean().optional().default(false),
+    prizeAmountUsd: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).optional()),
+    timeNote: optionalString(160),
+});
+
+export const normalizedHackathonPayloadSchema = normalizedHackathonPayloadBaseSchema.superRefine(dateRangeRefinement);
+
+export const organizerSubmissionSchema = normalizedHackathonPayloadBaseSchema
+  .extend({
+    submitterType: z.literal("organizer"),
+    organizationName: z.string().trim().min(2).max(160),
+    shortDescription: z.string().trim().min(20).max(500),
+  })
+  .superRefine(dateRangeRefinement);
+
+export const communitySubmissionSchema = z
+  .object({
+    submitterType: z.literal("community"),
+    name: z.string().trim().min(3).max(180),
+    sourceUrl: z.string().trim().url(),
+    websiteUrl: optionalUrl,
+    applicationUrl: optionalUrl,
+    city: optionalString(120),
+    region: optionalString(120),
+    country: z.string().trim().min(2).max(120),
+    startDate: requiredDate,
+    endDate: requiredDate,
+    format: z.enum(["online", "in_person", "hybrid"]),
+    timeNote: optionalString(160),
+    shortDescription: optionalString(500),
+  })
+  .superRefine(dateRangeRefinement);
+
+export const hackathonSubmissionSchema = z.discriminatedUnion("submitterType", [
+  organizerSubmissionSchema,
+  communitySubmissionSchema,
+]);
+
+export const reviewActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("approve_new"),
+    reviewerNotes: optionalString(2000),
+    normalizedPayload: normalizedHackathonPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("merge"),
+    targetHackathonId: z.string().uuid(),
+    reviewerNotes: optionalString(2000),
+    normalizedPayload: normalizedHackathonPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("reject"),
+    rejectionReason: z.string().trim().min(3).max(1000),
+    reviewerNotes: optionalString(2000),
+  }),
+]);
+
+export const profileUpdateSchema = z.object({
+  headline: optionalString(160),
+  bio: optionalString(2000),
+  locationCity: optionalString(120),
+  locationRegion: optionalString(120),
+  countryCode: optionalString(2),
+  school: optionalString(160),
+  githubUrl: optionalUrl,
+  linkedinUrl: optionalUrl,
+  instagramUrl: optionalUrl,
+  xUrl: optionalUrl,
+  devpostUrl: optionalUrl,
+  portfolioUrl: optionalUrl,
+});
+
+export const userHackathonUpdateSchema = z.object({
+  applicationStatus: z.enum(["interested", "applied", "accepted", "attending", "attended", "won"]).optional(),
+  isSaved: z.boolean().optional(),
+  notes: optionalString(2000),
+});
+
+export const hackathonSaveSchema = z.object({
+  isSaved: z.boolean(),
+});
+
+export const hackathonVoteSchema = z.object({
+  vote: z.union([z.literal(-1), z.literal(0), z.literal(1)]),
 });
 
 export const sponsorLeadSchema = z.object({

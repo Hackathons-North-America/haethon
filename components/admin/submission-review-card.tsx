@@ -1,0 +1,305 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import { Check, GitMerge, X } from "lucide-react";
+
+type SubmissionReviewItem = {
+  id: string;
+  submitterEmail: string | null;
+  submitterType: "organizer" | "community";
+  organizationName: string | null;
+  matchedHackathonId: string | null;
+  status: "pending" | "approved" | "rejected" | "merged" | "withdrawn";
+  payload: Record<string, unknown>;
+  normalizedName: string;
+  websiteUrl: string;
+  sourceUrl: string;
+  duplicateScore: string | null;
+  createdAt: Date | string;
+};
+
+function value(payload: Record<string, unknown>, key: string, fallback = "") {
+  const raw = payload[key];
+
+  return typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean" ? String(raw) : fallback;
+}
+
+function dateValue(payload: Record<string, unknown>, key: string) {
+  const raw = value(payload, key);
+
+  if (!raw) {
+    return "";
+  }
+
+  const date = new Date(raw);
+
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+const inputClassName =
+  "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black outline-none focus:border-[#660000] focus:ring-2 focus:ring-[#660000]/15";
+const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[#706F6B]";
+
+export function SubmissionReviewCard({ endpointBase, submission }: { endpointBase: string; submission: SubmissionReviewItem }) {
+  const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const disabled = status === "submitting" || submission.status !== "pending";
+
+  async function submitReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const intent = formData.get("intent")?.toString();
+
+    setStatus("submitting");
+    setMessage(null);
+
+    const normalizedPayload = {
+      name: formData.get("name")?.toString() ?? submission.normalizedName,
+      organizationName: formData.get("organizationName")?.toString() ?? "",
+      websiteUrl: formData.get("websiteUrl")?.toString() ?? submission.websiteUrl,
+      sourceUrl: formData.get("sourceUrl")?.toString() ?? submission.sourceUrl,
+      applicationUrl: formData.get("applicationUrl")?.toString() ?? "",
+      city: formData.get("city")?.toString() ?? "",
+      region: formData.get("region")?.toString() ?? "",
+      country: formData.get("country")?.toString() ?? "",
+      venue: formData.get("venue")?.toString() ?? "",
+      startDate: formData.get("startDate")?.toString() ?? "",
+      endDate: formData.get("endDate")?.toString() ?? "",
+      applicationOpensAt: formData.get("applicationOpensAt")?.toString() ?? "",
+      applicationClosesAt: formData.get("applicationClosesAt")?.toString() ?? "",
+      acceptanceAt: formData.get("acceptanceAt")?.toString() ?? "",
+      submissionDeadlineAt: formData.get("submissionDeadlineAt")?.toString() ?? "",
+      format: formData.get("format")?.toString() ?? "in_person",
+      shortDescription: formData.get("shortDescription")?.toString() ?? "",
+      discordUrl: formData.get("discordUrl")?.toString() ?? "",
+      devpostUrl: formData.get("devpostUrl")?.toString() ?? "",
+      eligibility: formData.get("eligibility")?.toString() ?? "",
+      beginnerFriendly: formData.get("beginnerFriendly") === "on",
+      travelReimbursement: formData.get("travelReimbursement") === "on",
+      prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
+    };
+    const reviewerNotes = formData.get("reviewerNotes")?.toString() ?? "";
+    const body =
+      intent === "reject"
+        ? {
+            action: "reject",
+            rejectionReason: formData.get("rejectionReason")?.toString() ?? "",
+            reviewerNotes,
+          }
+        : intent === "merge"
+          ? {
+              action: "merge",
+              targetHackathonId: formData.get("targetHackathonId")?.toString() ?? "",
+              reviewerNotes,
+              normalizedPayload,
+            }
+          : {
+              action: "approve_new",
+              reviewerNotes,
+              normalizedPayload,
+            };
+
+    const response = await fetch(`${endpointBase}/${submission.id}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setStatus("error");
+      setMessage(result.error ?? "Review action failed.");
+      return;
+    }
+
+    setStatus("done");
+    setMessage("Review action saved. Refresh to see the updated queue.");
+  }
+
+  return (
+    <article className="rounded-lg border border-black/10 bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-xl font-semibold text-black">{submission.normalizedName}</h3>
+            <span className="rounded-full bg-[#F7F7F4] px-2.5 py-1 text-xs font-semibold capitalize text-[#660000]">
+              {submission.submitterType}
+            </span>
+            <span className="rounded-full bg-[#F7F7F4] px-2.5 py-1 text-xs font-semibold capitalize text-[#706F6B]">
+              {submission.status}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-[#706F6B]">
+            {submission.submitterEmail ?? "Unknown submitter"} · {submission.organizationName ?? value(submission.payload, "organizationName", "No organization")}
+          </p>
+        </div>
+        <div className="text-right text-sm text-[#706F6B]">
+          <p>Duplicate score</p>
+          <p className="text-lg font-semibold text-black">{submission.duplicateScore ?? "0.00"}</p>
+        </div>
+      </div>
+
+      <form onSubmit={submitReview} className="mt-5 space-y-5">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="md:col-span-2">
+            <label className={labelClassName} htmlFor={`${submission.id}-name`}>
+              Event name
+            </label>
+            <input id={`${submission.id}-name`} name="name" defaultValue={submission.normalizedName} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-organizationName`}>
+              Organization
+            </label>
+            <input
+              id={`${submission.id}-organizationName`}
+              name="organizationName"
+              defaultValue={submission.organizationName ?? value(submission.payload, "organizationName")}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-websiteUrl`}>
+              Website
+            </label>
+            <input id={`${submission.id}-websiteUrl`} name="websiteUrl" defaultValue={submission.websiteUrl} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-sourceUrl`}>
+              Source
+            </label>
+            <input id={`${submission.id}-sourceUrl`} name="sourceUrl" defaultValue={submission.sourceUrl} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-applicationUrl`}>
+              Application
+            </label>
+            <input
+              id={`${submission.id}-applicationUrl`}
+              name="applicationUrl"
+              defaultValue={value(submission.payload, "applicationUrl")}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-startDate`}>
+              Start
+            </label>
+            <input id={`${submission.id}-startDate`} name="startDate" type="date" defaultValue={dateValue(submission.payload, "startDate")} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-endDate`}>
+              End
+            </label>
+            <input id={`${submission.id}-endDate`} name="endDate" type="date" defaultValue={dateValue(submission.payload, "endDate")} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-format`}>
+              Format
+            </label>
+            <select id={`${submission.id}-format`} name="format" defaultValue={value(submission.payload, "format", "in_person")} className={inputClassName}>
+              <option value="in_person">In person</option>
+              <option value="online">Online</option>
+              <option value="hybrid">Hybrid</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-city`}>
+              City
+            </label>
+            <input id={`${submission.id}-city`} name="city" defaultValue={value(submission.payload, "city")} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-region`}>
+              Region
+            </label>
+            <input id={`${submission.id}-region`} name="region" defaultValue={value(submission.payload, "region")} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-country`}>
+              Country
+            </label>
+            <input id={`${submission.id}-country`} name="country" defaultValue={value(submission.payload, "country")} className={inputClassName} />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-targetHackathonId`}>
+              Merge target ID
+            </label>
+            <input
+              id={`${submission.id}-targetHackathonId`}
+              name="targetHackathonId"
+              defaultValue={submission.matchedHackathonId ?? ""}
+              className={inputClassName}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className={labelClassName} htmlFor={`${submission.id}-shortDescription`}>
+              Description
+            </label>
+            <textarea
+              id={`${submission.id}-shortDescription`}
+              name="shortDescription"
+              rows={3}
+              defaultValue={value(submission.payload, "shortDescription")}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-rejectionReason`}>
+              Rejection reason
+            </label>
+            <textarea id={`${submission.id}-rejectionReason`} name="rejectionReason" rows={3} className={inputClassName} />
+          </div>
+        </div>
+
+        <details className="rounded-lg border border-black/10 bg-[#F7F7F4] p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-black">Raw submission payload</summary>
+          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-[#3F3E3B]">
+            {JSON.stringify(submission.payload, null, 2)}
+          </pre>
+        </details>
+
+        <div>
+          <label className={labelClassName} htmlFor={`${submission.id}-reviewerNotes`}>
+            Reviewer notes
+          </label>
+          <textarea id={`${submission.id}-reviewerNotes`} name="reviewerNotes" rows={2} className={inputClassName} />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#027A48] px-4 text-sm font-semibold text-white disabled:opacity-50"
+            disabled={disabled}
+            name="intent"
+            type="submit"
+            value="approve_new"
+          >
+            <Check aria-hidden="true" className="size-4" />
+            Approve new
+          </button>
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-black px-4 text-sm font-semibold text-white disabled:opacity-50"
+            disabled={disabled}
+            name="intent"
+            type="submit"
+            value="merge"
+          >
+            <GitMerge aria-hidden="true" className="size-4" />
+            Merge
+          </button>
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+            disabled={disabled}
+            name="intent"
+            type="submit"
+            value="reject"
+          >
+            <X aria-hidden="true" className="size-4" />
+            Reject
+          </button>
+          {message ? <p className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#027A48]"}`}>{message}</p> : null}
+        </div>
+      </form>
+    </article>
+  );
+}
