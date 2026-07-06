@@ -4,7 +4,13 @@ import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userHackathons } from "@/lib/db/schema";
-import { syncInferredAttendanceDays } from "@/lib/hackathons/attendance";
+import {
+  evaluateAttendanceClaimForHackathon,
+  evaluateAttendancePlausibilityForClaim,
+  syncInferredAttendanceDays,
+} from "@/lib/hackathons/attendance";
+import { applyPassiveAttendanceVerification } from "@/lib/hackathons/passive-verification";
+import { statusShouldInferAttendance } from "@/lib/hackathons/utils";
 import { userHackathonUpdateSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -31,6 +37,35 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
   const values = stripUndefined(parsed.data);
 
+  const [existing] = await db
+    .select({ hackathonId: userHackathons.hackathonId })
+    .from(userHackathons)
+    .where(and(eq(userHackathons.id, id), eq(userHackathons.userId, userContext.user.id)))
+    .limit(1);
+
+  if (!existing) {
+    return NextResponse.json({ error: "Saved hackathon not found." }, { status: 404 });
+  }
+
+  const claim = await evaluateAttendanceClaimForHackathon({
+    hackathonId: existing.hackathonId,
+    applicationStatus: parsed.data.applicationStatus,
+  });
+
+  if (!claim.allowed) {
+    return NextResponse.json({ error: claim.error }, { status: 422 });
+  }
+
+  const plausibility = await evaluateAttendancePlausibilityForClaim({
+    userId: userContext.user.id,
+    hackathonId: existing.hackathonId,
+    applicationStatus: parsed.data.applicationStatus,
+  });
+
+  if (!plausibility.plausible) {
+    return NextResponse.json({ error: plausibility.error }, { status: 409 });
+  }
+
   const [updated] = await db
     .update(userHackathons)
     .set({
@@ -49,7 +84,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       userId: userContext.user.id,
       hackathonId: updated.hackathonId,
       applicationStatus: parsed.data.applicationStatus,
+      source: claim.source,
     });
+
+    // After the self-report rows are re-synced, let existing hard evidence
+    // (submitted project, recorded win) upgrade them to system_verified.
+    if (statusShouldInferAttendance(parsed.data.applicationStatus)) {
+      await applyPassiveAttendanceVerification({
+        userId: userContext.user.id,
+        hackathonId: updated.hackathonId,
+      });
+    }
   }
 
   return NextResponse.json({ data: updated });

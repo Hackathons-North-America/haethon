@@ -24,75 +24,54 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const result = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`${userContext.user.id}:${id}`}))`);
+  const [hackathon] = await db
+    .select({ id: hackathons.id })
+    .from(hackathons)
+    .where(eq(hackathons.id, id))
+    .limit(1);
 
-    const [hackathon] = await tx
-      .select({ voteScore: hackathons.voteScore })
-      .from(hackathons)
-      .where(eq(hackathons.id, id))
-      .limit(1);
-
-    if (!hackathon) {
-      return null;
-    }
-
-    const [existingVote] = await tx
-      .select({ vote: userHackathonVotes.vote })
-      .from(userHackathonVotes)
-      .where(and(eq(userHackathonVotes.userId, userContext.user.id), eq(userHackathonVotes.hackathonId, id)))
-      .limit(1);
-
-    const previousVote = existingVote?.vote ?? 0;
-    const nextVote = parsed.data.vote;
-    const delta = nextVote - previousVote;
-
-    if (delta === 0) {
-      return {
-        score: hackathon.voteScore,
-        vote: nextVote,
-      };
-    }
-
-    if (nextVote === 0) {
-      await tx
-        .delete(userHackathonVotes)
-        .where(and(eq(userHackathonVotes.userId, userContext.user.id), eq(userHackathonVotes.hackathonId, id)));
-    } else {
-      await tx
-        .insert(userHackathonVotes)
-        .values({
-          userId: userContext.user.id,
-          hackathonId: id,
-          vote: nextVote,
-        })
-        .onConflictDoUpdate({
-          target: [userHackathonVotes.userId, userHackathonVotes.hackathonId],
-          set: {
-            vote: nextVote,
-            updatedAt: new Date(),
-          },
-        });
-    }
-
-    const [updatedHackathon] = await tx
-      .update(hackathons)
-      .set({
-        voteScore: sql`${hackathons.voteScore} + ${delta}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(hackathons.id, id))
-      .returning({ voteScore: hackathons.voteScore });
-
-    return {
-      score: updatedHackathon.voteScore,
-      vote: nextVote,
-    };
-  });
-
-  if (!result) {
+  if (!hackathon) {
     return NextResponse.json({ error: "Hackathon not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ data: result });
+  const nextVote = parsed.data.vote;
+
+  if (nextVote === 0) {
+    await db
+      .delete(userHackathonVotes)
+      .where(and(eq(userHackathonVotes.userId, userContext.user.id), eq(userHackathonVotes.hackathonId, id)));
+  } else {
+    await db
+      .insert(userHackathonVotes)
+      .values({
+        userId: userContext.user.id,
+        hackathonId: id,
+        vote: nextVote,
+      })
+      .onConflictDoUpdate({
+        target: [userHackathonVotes.userId, userHackathonVotes.hackathonId],
+        set: {
+          vote: nextVote,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  // The neon-http driver has no transaction support, so recompute the score
+  // from the votes table instead of applying a delta that could race.
+  const [updatedHackathon] = await db
+    .update(hackathons)
+    .set({
+      voteScore: sql`(select coalesce(sum(${userHackathonVotes.vote}), 0) from ${userHackathonVotes} where ${userHackathonVotes.hackathonId} = ${hackathons.id})`,
+      updatedAt: new Date(),
+    })
+    .where(eq(hackathons.id, id))
+    .returning({ voteScore: hackathons.voteScore });
+
+  return NextResponse.json({
+    data: {
+      score: updatedHackathon.voteScore,
+      vote: nextVote,
+    },
+  });
 }

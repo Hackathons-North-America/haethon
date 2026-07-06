@@ -94,7 +94,7 @@ const aboutSections = [
   },
 ] as const;
 
-const NAME_ROW_REM = 9;
+const NAME_ROW_REM = 7;
 
 export function AboutScrollShowcase() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -182,10 +182,10 @@ export function AboutScrollShowcase() {
           data-about-stage
           data-active-section={activeSection.id}
         >
-          <div className="mx-auto grid w-full max-w-[1180px] items-center gap-10 lg:grid-cols-[0.42fr_1fr] lg:gap-16">
+          <div className="mx-auto grid w-full max-w-[1240px] items-center gap-10 lg:grid-cols-[0.36fr_1fr] lg:gap-16">
             <aside className="hidden lg:block">
               <nav aria-label="About sections">
-                <div className="h-[9rem]">
+                <div className="h-[7rem]">
                   <div
                     className="about-name-track transition-transform duration-500 ease-out"
                     style={{
@@ -199,7 +199,7 @@ export function AboutScrollShowcase() {
                       return (
                         <button
                           aria-current={isActive ? "true" : undefined}
-                          className="about-section-link flex h-[9rem] w-full items-center text-left font-serif text-[3.1rem] font-semibold leading-[0.95] transition duration-300 xl:text-[3.6rem]"
+                          className="about-section-link flex h-[7rem] w-full items-center text-left font-serif text-[2.3rem] font-semibold leading-[0.95] transition duration-300 xl:text-[2.7rem]"
                           data-active={isActive ? "true" : "false"}
                           key={section.id}
                           onClick={() => scrollToSection(index)}
@@ -225,7 +225,10 @@ export function AboutScrollShowcase() {
                 } as CSSProperties
               }
             >
-              <span className="about-showcase-folder-tab font-mono text-xs font-medium uppercase tracking-[0.14em]">
+              <span
+                className="about-showcase-folder-tab font-mono text-xs font-medium uppercase tracking-[0.14em]"
+                key={activeSection.id}
+              >
                 {activeSection.tabLabel}
               </span>
 
@@ -236,12 +239,15 @@ export function AboutScrollShowcase() {
                     data-active={index === activeIndex ? "true" : "false"}
                     key={section.id}
                   >
-                    <div className="pointer-events-none absolute -left-6 top-20 select-none font-serif text-[5.5rem] font-semibold leading-none text-white/10 sm:text-[8rem]">
+                    <div className="about-layer-watermark pointer-events-none absolute -left-6 top-20 select-none font-serif text-[5.5rem] font-semibold leading-none text-white/10 sm:text-[8rem]">
                       {section.watermark}
                     </div>
 
                     <div className="relative z-10 flex h-full flex-col justify-between gap-6 p-6 sm:p-8 lg:p-10">
-                      <div>
+                      <div
+                        className="about-layer-item"
+                        style={{ "--stagger": 0 } as CSSProperties}
+                      >
                         <p className="font-mono text-xs font-medium uppercase tracking-[0.14em] text-white/70">
                           {section.eyebrow}
                         </p>
@@ -254,7 +260,10 @@ export function AboutScrollShowcase() {
                       </div>
 
                       <div>
-                        <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                        <div
+                          className="about-layer-item grid grid-cols-3 gap-3 sm:gap-4"
+                          style={{ "--stagger": 1 } as CSSProperties}
+                        >
                           {section.photos.map((photo) => (
                             <div
                               className="relative aspect-[4/3] overflow-hidden rounded-xl border border-white/25"
@@ -271,7 +280,10 @@ export function AboutScrollShowcase() {
                           ))}
                         </div>
 
-                        <div className="mt-5 grid grid-cols-3 gap-3 sm:mt-6 sm:gap-4">
+                        <div
+                          className="about-layer-item mt-5 grid grid-cols-3 gap-3 sm:mt-6 sm:gap-4"
+                          style={{ "--stagger": 2 } as CSSProperties}
+                        >
                           {section.stats.map((stat) => (
                             <div key={`${section.id}-${stat.label}`}>
                               <p className="text-3xl font-semibold leading-none text-white sm:text-4xl lg:text-[3.2rem]">

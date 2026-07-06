@@ -107,3 +107,99 @@ export function HackathonCardPreview({
 }) {
   return <HackathonCard hackathon={previewPayloadToCard(payload, previewId)} index={0} preview />;
 }
+
+const knownFieldLabels: Record<string, string> = {
+  name: "Name",
+  organizationName: "Organization",
+  organizationId: "Organization ID",
+  websiteUrl: "Website",
+  sourceUrl: "Source",
+  applicationUrl: "Application",
+  imageUrl: "Image",
+  externalId: "External ID",
+  format: "Format",
+  venue: "Venue",
+  city: "City",
+  region: "Region",
+  country: "Country",
+  startDate: "Start date",
+  endDate: "End date",
+  applicationOpensAt: "Applications open",
+  applicationClosesAt: "Applications close",
+  acceptanceAt: "Acceptances",
+  timeNote: "Time note",
+  beginnerFriendly: "Beginner friendly",
+  travelReimbursement: "Travel reimbursement",
+  prizeAmountUsd: "Prizes",
+  shortDescription: "Description",
+};
+
+const dateFields = new Set(["startDate", "endDate", "applicationOpensAt", "applicationClosesAt", "acceptanceAt"]);
+
+function labelForField(key: string) {
+  return knownFieldLabels[key] ?? key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+}
+
+function detailValue(key: string, value: unknown) {
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (key === "prizeAmountUsd") {
+    return `$${text(value)}`;
+  }
+
+  if (key === "format") {
+    return text(value) === "online" ? "Online" : "In person";
+  }
+
+  if (dateFields.has(key)) {
+    return dateText(value);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return JSON.stringify(value);
+  }
+
+  return text(value);
+}
+
+function isUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+
+export function HackathonPayloadDetails({ payload }: { payload: PreviewPayload }) {
+  const orderedKeys = [
+    ...Object.keys(knownFieldLabels).filter((key) => key in payload),
+    ...Object.keys(payload).filter((key) => !(key in knownFieldLabels)),
+  ];
+  const entries = orderedKeys
+    .map((key) => [key, detailValue(key, payload[key])] as const)
+    .filter(([, value]) => value !== "");
+
+  if (!entries.length) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border border-black/10 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#706F6B]">Collected data</p>
+      <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
+        {entries.map(([key, value]) => (
+          <div className="contents" key={key}>
+            <dt className="font-semibold text-black">{labelForField(key)}</dt>
+            <dd className="break-words text-[#3F3E3A]">
+              {isUrl(value) ? (
+                <a className="text-[#660000] underline underline-offset-2 hover:no-underline" href={value} rel="noreferrer" target="_blank">
+                  {value}
+                </a>
+              ) : (
+                value
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}

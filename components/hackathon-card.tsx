@@ -20,6 +20,7 @@ export type HackathonCardData = {
   name: string;
   userVote: Vote;
   voteScore: number;
+  websiteUrl?: string | null;
 };
 
 function handleUnauthenticated() {
@@ -296,7 +297,7 @@ function VoteControl({
   return (
     <div
       aria-label={`${name} community score`}
-      className="flex h-9 shrink-0 items-center gap-1 text-black"
+      className="relative z-10 flex h-9 shrink-0 items-center gap-1 text-black"
     >
       <button
         aria-label={`Upvote ${name}`}
@@ -398,9 +399,18 @@ export function HackathonCard({
 
   return (
     <article
-      className="group relative min-w-0 overflow-hidden border border-black/10 p-5 shadow-[0_18px_45px_rgb(0_0_0/0.06)] sm:p-6"
+      className="group relative min-w-0 overflow-hidden border border-black/10 p-5 shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out hover:z-10 hover:scale-110 sm:p-6"
       style={gradientStyle}
     >
+      {hackathon.websiteUrl && !preview ? (
+        <a
+          aria-label={`Visit ${hackathon.name} website`}
+          className="absolute inset-0 z-[1]"
+          href={hackathon.websiteUrl}
+          rel="noopener noreferrer"
+          target="_blank"
+        />
+      ) : null}
       <CardAccentEdges />
 
       <div className="flex items-start gap-4">

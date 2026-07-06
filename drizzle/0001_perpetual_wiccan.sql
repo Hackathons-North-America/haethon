@@ -1,0 +1,1 @@
+ALTER TYPE "public"."attendance_source" ADD VALUE 'system_verified' BEFORE 'organizer_verified';

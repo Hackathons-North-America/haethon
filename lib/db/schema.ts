@@ -45,7 +45,13 @@ export const notificationChannelEnum = pgEnum("notification_channel", ["email", 
 export const importStatusEnum = pgEnum("import_status", ["pending", "approved", "rejected", "merged"]);
 export const sourceTypeEnum = pgEnum("source_type", ["devpost", "mlh", "organizer_site", "manual", "other"]);
 export const leadStatusEnum = pgEnum("lead_status", ["new", "contacted", "qualified", "closed"]);
-export const attendanceSourceEnum = pgEnum("attendance_source", ["inferred", "manual", "organizer_verified", "admin_verified"]);
+export const attendanceSourceEnum = pgEnum("attendance_source", [
+  "inferred",
+  "manual",
+  "system_verified",
+  "organizer_verified",
+  "admin_verified",
+]);
 export const organizationMembershipRoleEnum = pgEnum("organization_membership_role", ["owner", "admin", "editor"]);
 export const organizationMembershipStatusEnum = pgEnum("organization_membership_status", ["pending", "approved", "rejected"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["pending", "approved", "rejected", "merged", "withdrawn"]);
@@ -252,6 +258,22 @@ export const userHackathonAttendanceDays = pgTable(
     uniqueIndex("user_hackathon_attendance_unique_idx").on(table.userId, table.hackathonId, table.attendedOn),
     index("user_hackathon_attendance_user_day_idx").on(table.userId, table.attendedOn),
   ]
+);
+
+export const hackathonCheckinCodes = pgTable(
+  "hackathon_checkin_codes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    code: varchar("code", { length: 20 }).notNull().unique(),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("hackathon_checkin_codes_hackathon_idx").on(table.hackathonId)]
 );
 
 export const userHackathonVotes = pgTable(

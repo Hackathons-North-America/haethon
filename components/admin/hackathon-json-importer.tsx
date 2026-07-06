@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, RotateCcw, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { HackathonCardPreview, type PreviewPayload } from "@/components/admin/hackathon-card-preview";
+import { HackathonCardPreview, HackathonPayloadDetails, type PreviewPayload } from "@/components/admin/hackathon-card-preview";
 
 type ImportResult = {
   duplicateScore: number;
@@ -173,7 +173,10 @@ export function HackathonJsonImporter() {
 
         {activePayload ? (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
-            <HackathonCardPreview payload={activePayload} previewId={`import-preview-${currentIndex}`} />
+            <div className="space-y-5">
+              <HackathonCardPreview payload={activePayload} previewId={`import-preview-${currentIndex}`} />
+              <HackathonPayloadDetails payload={activePayload} />
+            </div>
             <div className="flex flex-col justify-between rounded-lg border border-black/10 bg-[#F7F7F4] p-4">
               <div>
                 <p className="text-sm font-semibold text-black">Does this card look right?</p>

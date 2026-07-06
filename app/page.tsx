@@ -1,16 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
-import {
-  ArrowRight,
-  Building2,
-  ClipboardList,
-  Maximize2,
-  Search,
-} from "lucide-react";
+import { Building2, ClipboardList, Maximize2, Search } from "lucide-react";
 
 import { AdminNavLink } from "@/components/admin-nav-link";
 import { NavAuthLink } from "@/components/nav-auth-link";
-import { HeroEtchTrail } from "@/components/hero-etch-trail";
 import { HeroTypewriterSpan } from "@/components/hero-typewriter-span";
 
 const navItems = [
@@ -51,79 +43,6 @@ const audienceCards = [
     icon: Building2,
   },
 ];
-
-const heroCommunityMembers = [
-  {
-    id: 1,
-    name: "John Doe",
-    designation: "Software Engineer",
-    image:
-      "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=3387&q=80",
-  },
-  {
-    id: 2,
-    name: "Robert Johnson",
-    designation: "Product Manager",
-    image:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60",
-  },
-  {
-    id: 3,
-    name: "Jane Smith",
-    designation: "Data Scientist",
-    image:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8YXZhdGFyfGVufDB8fDB8fHww&auto=format&fit=crop&w=800&q=60",
-  },
-  {
-    id: 4,
-    name: "Emily Davis",
-    designation: "UX Designer",
-    image:
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fGF2YXRhcnxlbnwwfHwwfHx8MA%3D%3D&auto=format&fit=crop&w=800&q=60",
-  },
-  {
-    id: 5,
-    name: "Tyler Durden",
-    designation: "Soap Developer",
-    image:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=3540&q=80",
-  },
-  {
-    id: 6,
-    name: "Dora",
-    designation: "The Explorer",
-    image:
-      "https://images.unsplash.com/photo-1544725176-7c40e5a71c5e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=3534&q=80",
-  },
-];
-
-function HeroCommunityInlineStack() {
-  return (
-    <span
-      aria-hidden="true"
-      className="mx-2 inline-flex translate-y-[0.08em] items-center align-middle sm:mx-3"
-    >
-      {heroCommunityMembers.map((person, index) => (
-        <span
-          className="relative -mr-[0.45rem] inline-flex last:mr-0 sm:-mr-[0.6rem]"
-          key={person.id}
-          style={{ zIndex: heroCommunityMembers.length - index }}
-        >
-          <span className="relative block size-[1.8rem] overflow-hidden rounded-full border-2 border-white bg-[#F8F8F4] shadow-[0_8px_18px_rgba(0,0,0,0.16)] sm:size-[2.1rem]">
-            <Image
-              alt=""
-              className="h-full w-full object-cover"
-              height={34}
-              sizes="(min-width: 640px) 34px, 29px"
-              src={person.image}
-              width={34}
-            />
-          </span>
-        </span>
-      ))}
-    </span>
-  );
-}
 
 function CompanyLogoStrip({ hidden = false }: { hidden?: boolean }) {
   return (
@@ -232,56 +151,20 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="relative isolate min-h-[calc(100vh-68px)] overflow-hidden border-b border-black/10 bg-[#cbd8e6] px-8 pb-[4.5rem] pt-24 sm:px-14 sm:pb-[5.5rem] sm:pt-32 md:pb-28 md:pt-44 lg:px-20">
-        <HeroEtchTrail />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 z-[1] bg-[linear-gradient(90deg,_rgba(255,255,255,0.86)_0%,_rgba(255,255,255,0.64)_38%,_rgba(255,255,255,0.18)_68%,_rgba(255,255,255,0)_100%)]"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 z-[1] h-36 bg-[linear-gradient(180deg,_rgba(255,255,255,0.72),_rgba(255,255,255,0))]"
-        />
-        <div className="relative z-10 mx-auto max-w-[1120px]">
-          <div className="grid items-end gap-8 md:grid-cols-[minmax(0,1fr)_auto]">
-            <div>
-              <h1
-                aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
-                className="max-w-[1120px] text-[2.15rem] font-semibold leading-[1.08] tracking-normal text-black [text-shadow:0_1px_0_rgba(255,255,255,0.72)] sm:text-[2.65rem] lg:text-[2.75rem]"
-              >
-                <span className="block">Search hundreds of upcoming</span>{" "}
-                <span className="block">
-                  <span className="inline-flex items-baseline">
-                    <span>hackathons</span>
-                    <HeroCommunityInlineStack />
-                    <span>,</span>
-                  </span>
-                  {" "}
-                  build your profile,
-                </span>{" "}
-                <span className="block">
-                  and <HeroTypewriterSpan />
-                </span>
-              </h1>
-              <p className="mt-8 max-w-[640px] text-base font-medium leading-6 text-[#3F3E3B] [text-shadow:0_1px_0_rgba(255,255,255,0.72)]">
-                Filter for hackathons by location, date, and category, track
-                your achievements, and stay informed with reminders for
-                deadlines and upcoming events.
-              </p>
-            </div>
-
-            <Link
-              href="/hackathons"
-              className="inline-flex w-fit items-center gap-3 justify-self-start text-sm font-medium text-[#3F3E3B] hover:text-[#660000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]/35 md:mb-1 md:justify-self-end"
-            >
-              <span>Browse events</span>
-              <ArrowRight
-                aria-hidden="true"
-                className="h-4 w-4"
-                strokeWidth={1.75}
-              />
-            </Link>
-          </div>
+      <section className="border-b border-black/10 bg-white px-8 pb-[4.5rem] pt-24 sm:px-14 sm:pb-[5.5rem] sm:pt-32 md:pb-28 md:pt-44 lg:px-20">
+        <div className="mx-auto max-w-[1120px]">
+          <h1
+            aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
+            className="max-w-[720px] text-[1.6rem] font-semibold leading-[1.2] tracking-normal text-black sm:text-[1.9rem] lg:text-[2rem]"
+          >
+            Search hundreds of upcoming hackathons, build your profile, and{" "}
+            <HeroTypewriterSpan />
+          </h1>
+          <p className="mt-8 max-w-[640px] text-base font-medium leading-6 text-[#3F3E3B]">
+            Filter for hackathons by location, date, and category, track your
+            achievements, and stay informed with reminders for deadlines and
+            upcoming events.
+          </p>
         </div>
       </section>
 

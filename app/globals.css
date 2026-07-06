@@ -132,44 +132,65 @@ select {
 }
 
 .about-showcase-folder {
-  filter: drop-shadow(0 30px 72px rgb(0 0 0 / 0.16));
-  margin-top: 2.25rem;
+  filter: drop-shadow(0 30px 72px rgb(0 0 0 / 0.18));
+  margin-top: 3rem;
   position: relative;
   transition: --folder-color 0.6s ease;
 }
 
+/* Folder tab: rounded rect tilted in perspective so the sides slope like a
+   real manila-folder tab; slightly darkened so it reads as the back panel.
+   It overlaps the body by 0.5rem so the two always join seamlessly. */
 .about-showcase-folder::before {
-  background: var(--folder-color);
+  background: color-mix(in srgb, var(--folder-color) 86%, #000);
   border-radius: 16px 16px 0 0;
   content: "";
-  height: 2.45rem;
-  left: clamp(1.25rem, 8vw, 3.5rem);
+  height: 3.4rem;
+  left: clamp(1.5rem, 8vw, 3.75rem);
   position: absolute;
-  top: -2.1rem;
-  width: clamp(8.5rem, 24vw, 14rem);
+  top: -2.9rem;
+  transform: perspective(3.5rem) rotateX(5deg);
+  transform-origin: bottom center;
+  width: clamp(10rem, 27vw, 16.5rem);
+  z-index: 0;
+}
+
+/* Sheet of paper peeking out of the folder, tucked behind the front cover. */
+.about-showcase-folder::after {
+  background: linear-gradient(180deg, #fffef8 0%, #ebe4d4 100%);
+  border-radius: 10px 10px 0 0;
+  content: "";
+  height: 2.1rem;
+  left: 55%;
+  position: absolute;
+  right: 2.25rem;
+  top: -0.9rem;
+  z-index: 0;
 }
 
 .about-showcase-folder-tab {
+  animation: about-tab-label-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   color: rgb(255 255 255 / 0.85);
-  left: calc(clamp(1.25rem, 8vw, 3.5rem) + 1.1rem);
+  left: calc(clamp(1.5rem, 8vw, 3.75rem) + 1.35rem);
   position: absolute;
-  top: -1.6rem;
+  top: -2.05rem;
   z-index: 1;
 }
 
 .about-showcase-folder-body {
   background:
-    linear-gradient(145deg, rgb(255 255 255 / 0.16), transparent 34%),
+    linear-gradient(150deg, rgb(255 255 255 / 0.16), transparent 36%),
     var(--folder-color);
-  border-radius: 18px;
-  height: min(74vh, 44rem);
-  min-height: 30rem;
+  border-radius: 20px;
+  height: min(80vh, 48rem);
+  min-height: 32rem;
   overflow: hidden;
   position: relative;
+  z-index: 1;
 }
 
 .about-showcase-folder-body::after {
-  border: 1px solid rgb(255 255 255 / 0.18);
+  border: 1px solid rgb(255 255 255 / 0.14);
   border-radius: inherit;
   content: "";
   inset: 0;
@@ -190,6 +211,7 @@ select {
 }
 
 .about-folder-layer[data-active="true"] {
+  animation: about-paper-in 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   opacity: 1;
   transform: translateY(0);
   transition:
@@ -197,6 +219,43 @@ select {
     transform 0.45s ease,
     visibility 0s;
   visibility: visible;
+}
+
+.about-folder-layer[data-active="true"] .about-layer-item {
+  animation: about-item-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(90ms + var(--stagger, 0) * 90ms);
+}
+
+.about-folder-layer[data-active="true"] .about-layer-watermark {
+  animation: about-watermark-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes about-paper-in {
+  from {
+    opacity: 0;
+    transform: translateY(56px) scale(0.98) rotate(0.6deg);
+  }
+}
+
+@keyframes about-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@keyframes about-watermark-in {
+  from {
+    opacity: 0;
+    transform: translateX(-36px);
+  }
+}
+
+@keyframes about-tab-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 @keyframes company-marquee {
@@ -319,6 +378,10 @@ select {
 
   .company-marquee-track,
   .about-showcase-folder,
+  .about-showcase-folder-tab,
+  .about-folder-layer,
+  .about-folder-layer .about-layer-item,
+  .about-folder-layer .about-layer-watermark,
   .world-map-image,
   .world-map-land-dot,
   .world-map-location-core,

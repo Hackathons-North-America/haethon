@@ -99,6 +99,12 @@ export const adminHackathonImportSchema = z.preprocess(
   }).strip()
 );
 
+export const adminHackathonUpdateSchema = normalizedHackathonPayloadBaseSchema
+  .omit({ organizationId: true, organizationName: true, sourceUrl: true, timeNote: true })
+  .strip()
+  .superRefine(dateRangeRefinement)
+  .transform((payload) => normalizeLocationPayload(payload));
+
 export const adminHackathonFixImportItemSchema = z.object({
   source: optionalString(80),
   reason: z.string().trim().min(1).max(1000),
@@ -187,6 +193,20 @@ export const userHackathonUpdateSchema = z.object({
 
 export const hackathonSaveSchema = z.object({
   isSaved: z.boolean(),
+});
+
+export const hackathonCheckinRedeemSchema = z.object({
+  code: z.string().trim().min(4).max(20),
+});
+
+export const attendeeVerifySchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
+export const attendanceAnomalyResolveSchema = z.object({
+  userId: z.string().uuid(),
+  hackathonId: z.string().uuid(),
+  action: z.enum(["verify", "revoke"]),
 });
 
 export const hackathonVoteSchema = z.object({

@@ -139,6 +139,7 @@ async function getHackathonCards(filters: HackathonSearchFilters): Promise<Hacka
       id: hackathons.id,
       name: hackathons.name,
       shortDescription: hackathons.shortDescription,
+      websiteUrl: hackathons.websiteUrl,
       imageUrl: hackathons.imageUrl,
       venue: hackathons.venue,
       format: hackathons.format,
@@ -207,6 +208,7 @@ async function getHackathonCards(filters: HackathonSearchFilters): Promise<Hacka
     name: row.name,
     userVote: (voteByHackathon.get(row.id) ?? 0) as -1 | 0 | 1,
     voteScore: row.voteScore,
+    websiteUrl: row.websiteUrl,
   }));
 }
 

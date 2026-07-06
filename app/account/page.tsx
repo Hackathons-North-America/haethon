@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
-import { CalendarDays, MapPin, Trophy } from "lucide-react";
+import { BadgeCheck, CalendarDays, MapPin, Trophy } from "lucide-react";
 
 import { AccountSignOutButton } from "@/components/account-sign-out-button";
 import { AccountProfileForm } from "@/components/forms/account-profile-form";
+import { HackathonCheckinForm } from "@/components/hackathon-checkin-form";
 import { getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
@@ -16,6 +17,7 @@ import {
   userHackathons,
   userProfiles,
 } from "@/lib/db/schema";
+import { deriveAttendanceTrustTier, type AttendanceSource, type AttendanceTrustTier } from "@/lib/hackathons/attendance-rules";
 import { dateToInputValue } from "@/lib/hackathons/utils";
 
 function startOfWeek(date: Date) {
@@ -60,6 +62,27 @@ function formatChartDate(value: string | undefined) {
 
 const sectionHeadingClassName = "text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]";
 
+function AttendanceTierBadge({ tier }: { tier: AttendanceTrustTier | null }) {
+  if (tier === "verified") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#660000]/25 bg-[#660000]/5 px-2 py-0.5 text-xs font-semibold text-[#660000]">
+        <BadgeCheck aria-hidden="true" className="size-3.5" />
+        Verified
+      </span>
+    );
+  }
+
+  if (tier === "self_reported") {
+    return (
+      <span className="shrink-0 rounded-full border border-black/10 px-2 py-0.5 text-xs font-semibold text-[#706F6B]">
+        Self-reported
+      </span>
+    );
+  }
+
+  return null;
+}
+
 export default async function AccountPage() {
   const context = await getCurrentUserContext();
 
@@ -72,6 +95,7 @@ export default async function AccountPage() {
     db
       .select({
         id: userHackathons.id,
+        hackathonId: hackathons.id,
         applicationStatus: userHackathons.applicationStatus,
         hackathonName: hackathons.name,
         city: hackathonLocations.city,
@@ -118,6 +142,7 @@ export default async function AccountPage() {
         country: hackathonLocations.country,
         startsAt: hackathonDates.startsAt,
         attendedDays: sql<number>`count(${userHackathonAttendanceDays.id})::int`,
+        sources: sql<AttendanceSource[]>`array_agg(${userHackathonAttendanceDays.source})::text[]`,
       })
       .from(userHackathonAttendanceDays)
       .innerJoin(hackathons, eq(hackathons.id, userHackathonAttendanceDays.hackathonId))
@@ -233,24 +258,32 @@ export default async function AccountPage() {
                 <h2 className={sectionHeadingClassName}>Hackathons attended</h2>
                 <div className="mt-4 space-y-3">
                   {attendedHackathons.length ? (
-                    attendedHackathons.map((hackathon) => (
-                      <article className="rounded-lg border border-black/10 bg-white p-4" key={hackathon.id}>
-                        <div className="flex items-start gap-2">
-                          <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#660000]" />
-                          <div className="min-w-0">
-                            <p className="font-semibold text-black">{hackathon.hackathonName}</p>
-                            <p className="mt-1 text-sm text-[#706F6B]">
-                              {hackathon.attendedDays} attended day{hackathon.attendedDays === 1 ? "" : "s"}
-                              {hackathon.startsAt ? ` · ${dateToInputValue(hackathon.startsAt)}` : ""}
-                            </p>
-                            <p className="mt-1 flex items-center gap-1 text-sm text-[#706F6B]">
-                              <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-                              <span>{[hackathon.city, hackathon.region, hackathon.country].filter(Boolean).join(", ") || "Location TBD"}</span>
-                            </p>
+                    attendedHackathons.map((hackathon) => {
+                      const tier = deriveAttendanceTrustTier(hackathon.sources ?? []);
+
+                      return (
+                        <article className="rounded-lg border border-black/10 bg-white p-4" key={hackathon.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-start gap-2">
+                              <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#660000]" />
+                              <div className="min-w-0">
+                                <p className="font-semibold text-black">{hackathon.hackathonName}</p>
+                                <p className="mt-1 text-sm text-[#706F6B]">
+                                  {hackathon.attendedDays} attended day{hackathon.attendedDays === 1 ? "" : "s"}
+                                  {hackathon.startsAt ? ` · ${dateToInputValue(hackathon.startsAt)}` : ""}
+                                </p>
+                                <p className="mt-1 flex items-center gap-1 text-sm text-[#706F6B]">
+                                  <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
+                                  <span>{[hackathon.city, hackathon.region, hackathon.country].filter(Boolean).join(", ") || "Location TBD"}</span>
+                                </p>
+                              </div>
+                            </div>
+                            <AttendanceTierBadge tier={tier} />
                           </div>
-                        </div>
-                      </article>
-                    ))
+                          {tier !== "verified" ? <HackathonCheckinForm hackathonId={hackathon.id} /> : null}
+                        </article>
+                      );
+                    })
                   ) : (
                     <p className="text-sm text-[#706F6B]">Hackathons attended will appear here.</p>
                   )}
@@ -271,6 +304,7 @@ export default async function AccountPage() {
                         <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#660000]">
                           {hackathon.applicationStatus}
                         </p>
+                        <HackathonCheckinForm hackathonId={hackathon.hackathonId} />
                       </article>
                     ))
                   ) : (

@@ -126,6 +126,7 @@ export async function GET(request: Request) {
       name: hackathons.name,
       slug: hackathons.slug,
       shortDescription: hackathons.shortDescription,
+      websiteUrl: hackathons.websiteUrl,
       imageUrl: hackathons.imageUrl,
       venue: hackathons.venue,
       format: hackathons.format,
@@ -196,6 +197,7 @@ export async function GET(request: Request) {
       name: row.name,
       userVote: (voteByHackathon.get(row.id) ?? 0) as -1 | 0 | 1,
       voteScore: row.voteScore,
+      websiteUrl: row.websiteUrl,
     })),
   });
 }
