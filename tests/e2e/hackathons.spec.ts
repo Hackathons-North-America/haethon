@@ -32,11 +32,10 @@ test("opens the hackathons browse page from the home nav", async ({ page }) => {
     has: page.getByRole("heading", { name: "Hack the North" }),
   });
 
-  await expect(hackTheNorth.getByText("MLH approved")).toBeVisible();
-  await expect(hackTheNorth.getByText("Hackathon H&N approved")).toBeVisible();
-  await expect(
-    hackTheNorth.getByText("Waterloo, ON · Sep 13-15, 2026")
-  ).toBeVisible();
+  await expect(hackTheNorth.getByText("MLH approved")).toHaveCount(0);
+  await expect(hackTheNorth.getByText("Hackathon H&N approved")).toHaveCount(0);
+  await expect(hackTheNorth.getByText("Sep 13-15, 2026")).toBeVisible();
+  await expect(hackTheNorth.getByText("Waterloo, ON")).toBeVisible();
   await expect(
     hackTheNorth.getByText("Canada's flagship student hackathon")
   ).toBeVisible();

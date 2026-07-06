@@ -128,6 +128,7 @@ async function getHackathonCards(filters: HackathonSearchFilters): Promise<Hacka
   const dateRange = dateRangeForPeriod(filters.datePeriod);
   const name = filters.name.trim();
   const countries = filters.countries;
+  const format = filters.format === "any" ? undefined : filters.format;
   const beginnerFriendly =
     filters.beginnerFriendly === "any" ? undefined : filters.beginnerFriendly === "on";
   const travelReimbursement =
@@ -160,6 +161,7 @@ async function getHackathonCards(filters: HackathonSearchFilters): Promise<Hacka
         inArray(hackathons.status, publicStatuses),
         name ? ilike(hackathons.name, `%${name}%`) : undefined,
         countries.length ? inArray(hackathonLocations.country, countries) : undefined,
+        format ? eq(hackathons.format, format) : undefined,
         beginnerFriendly === undefined ? undefined : eq(hackathons.beginnerFriendly, beginnerFriendly),
         travelReimbursement === undefined ? undefined : eq(hackathons.travelReimbursement, travelReimbursement),
         dateRange ? gte(hackathonDates.startsAt, dateRange.startsAfter) : undefined,

@@ -1,13 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, Globe2, Search, Settings2, X } from "lucide-react";
+import { CalendarDays, Globe2, MapPin, Search, Settings2, X } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
 import { countryOptions } from "@/lib/hackathons/countries";
 import { datePeriodOptions, dateRangeForPeriod } from "@/lib/hackathons/search-filters";
-import type { DatePeriod, FeatureFilter, HackathonSearchFilters } from "@/lib/hackathons/search-filters";
+import type {
+  DatePeriod,
+  FeatureFilter,
+  HackathonFormatFilter,
+  HackathonSearchFilters,
+} from "@/lib/hackathons/search-filters";
 
 type HackathonSearchResponse = {
   data?: HackathonCardData[];
@@ -20,6 +25,7 @@ function buildSearchParams({
   beginnerFriendly,
   countries,
   datePeriod,
+  format,
   name,
   travelReimbursement,
 }: HackathonSearchFilters) {
@@ -38,6 +44,10 @@ function buildSearchParams({
     params.set("startsBefore", range.startsBefore.toISOString());
   }
 
+  if (format !== "any") {
+    params.set("format", format);
+  }
+
   if (beginnerFriendly !== "any") {
     params.set("beginnerFriendly", beginnerFriendly === "on" ? "true" : "false");
   }
@@ -53,6 +63,7 @@ function hasActiveFilters({
   beginnerFriendly,
   countries,
   datePeriod,
+  format,
   name,
   travelReimbursement,
 }: HackathonSearchFilters) {
@@ -60,12 +71,20 @@ function hasActiveFilters({
     name.trim() ||
       countries.length ||
       datePeriod !== "any" ||
+      format !== "any" ||
       beginnerFriendly !== "any" ||
       travelReimbursement !== "any"
   );
 }
 
-function replaceSearchUrl({ beginnerFriendly, countries, datePeriod, name, travelReimbursement }: HackathonSearchFilters) {
+function replaceSearchUrl({
+  beginnerFriendly,
+  countries,
+  datePeriod,
+  format,
+  name,
+  travelReimbursement,
+}: HackathonSearchFilters) {
   const params = new URLSearchParams();
 
   if (name.trim()) {
@@ -76,6 +95,10 @@ function replaceSearchUrl({ beginnerFriendly, countries, datePeriod, name, trave
 
   if (datePeriod !== "any") {
     params.set("datePeriod", datePeriod);
+  }
+
+  if (format !== "any") {
+    params.set("format", format);
   }
 
   if (beginnerFriendly !== "any") {
@@ -101,6 +124,7 @@ export function HackathonSearch({
   const [countries, setCountries] = useState(initialFilters.countries);
   const [countryQuery, setCountryQuery] = useState("");
   const [datePeriod, setDatePeriod] = useState<DatePeriod>(initialFilters.datePeriod);
+  const [format, setFormat] = useState<HackathonFormatFilter>(initialFilters.format);
   const [beginnerFriendly, setBeginnerFriendly] = useState<FeatureFilter>(initialFilters.beginnerFriendly);
   const [travelReimbursement, setTravelReimbursement] = useState<FeatureFilter>(initialFilters.travelReimbursement);
   const [hackathons, setHackathons] = useState(initialHackathons);
@@ -109,8 +133,8 @@ export function HackathonSearch({
   const [error, setError] = useState<string | null>(null);
 
   const currentFilters = useMemo(
-    () => ({ beginnerFriendly, countries, datePeriod, name, travelReimbursement }),
-    [beginnerFriendly, countries, datePeriod, name, travelReimbursement]
+    () => ({ beginnerFriendly, countries, datePeriod, format, name, travelReimbursement }),
+    [beginnerFriendly, countries, datePeriod, format, name, travelReimbursement]
   );
   const activeFilters = useMemo(() => hasActiveFilters(currentFilters), [currentFilters]);
   const countrySuggestions = useMemo(() => {
@@ -171,12 +195,13 @@ export function HackathonSearch({
     setCountries([]);
     setCountryQuery("");
     setDatePeriod("any");
+    setFormat("any");
     setBeginnerFriendly("any");
     setTravelReimbursement("any");
     setHasSearched(false);
     setError(null);
     void runSearch(
-      { beginnerFriendly: "any", countries: [], datePeriod: "any", name: "", travelReimbursement: "any" },
+      { beginnerFriendly: "any", countries: [], datePeriod: "any", format: "any", name: "", travelReimbursement: "any" },
       { markSearched: false }
     );
   }
@@ -193,7 +218,7 @@ export function HackathonSearch({
               void runSearch();
             }}
           >
-            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-center rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
+            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
               <span className="text-xs font-semibold leading-5 text-black">Name</span>
               <input
                 className="min-w-0 bg-transparent text-sm leading-5 text-[#706F6B] outline-none placeholder:text-[#706F6B]"
@@ -205,7 +230,7 @@ export function HackathonSearch({
               />
             </label>
 
-            <div className="relative flex min-h-[4.2rem] min-w-0 flex-[1.2] flex-col justify-center rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
+            <div className="relative flex min-h-[4.2rem] min-w-0 flex-[1.2] flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
               <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
                 <Globe2 aria-hidden="true" className="size-3.5" />
                 Countries
@@ -276,7 +301,7 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-center rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
+            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
               <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
                 <CalendarDays aria-hidden="true" className="size-3.5" />
                 Date
@@ -295,11 +320,35 @@ export function HackathonSearch({
               </select>
             </label>
 
-            <fieldset className="flex min-h-[4.2rem] min-w-0 flex-[1.25] flex-col justify-center rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
-              <legend className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
+            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
+              <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
+                <MapPin aria-hidden="true" className="size-3.5" />
+                Format
+              </span>
+              <select
+                className="min-w-0 cursor-pointer bg-transparent text-sm leading-5 text-[#706F6B] outline-none"
+                name="format"
+                onChange={(event) => setFormat(event.target.value as HackathonFormatFilter)}
+                value={format}
+              >
+                <option value="any">Any format</option>
+                <option value="online">Online</option>
+                <option value="in_person">In person</option>
+              </select>
+            </label>
+
+            <div
+              aria-labelledby="hackathon-feature-filters-label"
+              className="flex min-h-[4.2rem] min-w-0 flex-[1.6] flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]"
+              role="group"
+            >
+              <span
+                className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black"
+                id="hackathon-feature-filters-label"
+              >
                 <Settings2 aria-hidden="true" className="size-3.5" />
                 Features
-              </legend>
+              </span>
               <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-2">
                 <label className="min-w-0">
                   <span className="sr-only">Beginner friendly</span>
@@ -330,7 +379,7 @@ export function HackathonSearch({
                   </select>
                 </label>
               </div>
-            </fieldset>
+            </div>
 
             <div className="flex items-center gap-2 px-2 py-2 md:px-3">
               {activeFilters ? (
@@ -363,7 +412,7 @@ export function HackathonSearch({
                 Showing {hackathons.length} {hackathons.length === 1 ? "hackathon" : "hackathons"} matching your search.
               </span>
             ) : (
-              <span>Search by name, countries, date, or features.</span>
+              <span>Search by name, countries, date, format, or features.</span>
             )}
           </div>
         </div>

@@ -217,7 +217,6 @@ export function HackathonSubmissionForm() {
             <select id="format" name="format" defaultValue="in_person" className={inputClassName}>
               <option value="in_person">In person</option>
               <option value="online">Online</option>
-              <option value="hybrid">Hybrid</option>
             </select>
           </div>
           <div>

@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { Check, GitMerge, X } from "lucide-react";
 
+import { HackathonCardPreview } from "@/components/admin/hackathon-card-preview";
+
 export type SubmissionReviewItem = {
   id: string;
   submitterEmail: string | null;
@@ -42,7 +44,18 @@ function importReason(payload: Record<string, unknown>) {
 
 const inputClassName =
   "w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black outline-none focus:border-[#660000] focus:ring-2 focus:ring-[#660000]/15";
+const checkboxClassName = "size-4 rounded border-black/20 text-[#660000] focus:ring-[#660000]/20";
 const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[#706F6B]";
+
+function initialPreviewPayload(submission: SubmissionReviewItem) {
+  return {
+    ...submission.payload,
+    name: submission.normalizedName,
+    organizationName: submission.organizationName ?? value(submission.payload, "organizationName"),
+    sourceUrl: submission.sourceUrl,
+    websiteUrl: submission.websiteUrl,
+  };
+}
 
 export function SubmissionReviewCard({
   endpointBase,
@@ -55,8 +68,17 @@ export function SubmissionReviewCard({
 }) {
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [previewPayload, setPreviewPayload] = useState<Record<string, unknown>>(() => initialPreviewPayload(submission));
   const disabled = status === "submitting" || submission.status !== "pending";
   const fixReason = importReason(submission.payload);
+
+  function updatePreview(key: string, nextValue: unknown) {
+    if (!key) {
+      return;
+    }
+
+    setPreviewPayload((current) => ({ ...current, [key]: nextValue }));
+  }
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -158,7 +180,18 @@ export function SubmissionReviewCard({
           </div>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-5 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.1fr)]">
+          <div className="xl:sticky xl:top-6 xl:self-start">
+            <HackathonCardPreview payload={previewPayload} previewId={`review-preview-${submission.id}`} />
+          </div>
+
+          <div
+            className="grid gap-4 md:grid-cols-3"
+            onChange={(event) => {
+              const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+              updatePreview(target.name, target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value);
+            }}
+          >
           <div className="md:col-span-2">
             <label className={labelClassName} htmlFor={`${submission.id}-name`}>
               Event name
@@ -252,6 +285,12 @@ export function SubmissionReviewCard({
             <input id={`${submission.id}-country`} name="country" defaultValue={value(submission.payload, "country")} className={inputClassName} />
           </div>
           <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-venue`}>
+              Venue
+            </label>
+            <input id={`${submission.id}-venue`} name="venue" defaultValue={value(submission.payload, "venue")} className={inputClassName} />
+          </div>
+          <div>
             <label className={labelClassName} htmlFor={`${submission.id}-targetHackathonId`}>
               Merge target ID
             </label>
@@ -275,10 +314,78 @@ export function SubmissionReviewCard({
             />
           </div>
           <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-applicationOpensAt`}>
+              Applications open
+            </label>
+            <input
+              id={`${submission.id}-applicationOpensAt`}
+              name="applicationOpensAt"
+              type="date"
+              defaultValue={dateValue(submission.payload, "applicationOpensAt")}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-applicationClosesAt`}>
+              Applications close
+            </label>
+            <input
+              id={`${submission.id}-applicationClosesAt`}
+              name="applicationClosesAt"
+              type="date"
+              defaultValue={dateValue(submission.payload, "applicationClosesAt")}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-acceptanceAt`}>
+              Acceptance
+            </label>
+            <input
+              id={`${submission.id}-acceptanceAt`}
+              name="acceptanceAt"
+              type="date"
+              defaultValue={dateValue(submission.payload, "acceptanceAt")}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-prizeAmountUsd`}>
+              Prize USD
+            </label>
+            <input
+              id={`${submission.id}-prizeAmountUsd`}
+              name="prizeAmountUsd"
+              type="number"
+              min="0"
+              defaultValue={value(submission.payload, "prizeAmountUsd")}
+              className={inputClassName}
+            />
+          </div>
+          <label className="flex items-center gap-2 rounded-lg border border-black/10 bg-[#F7F7F4] px-3 py-2 text-sm font-semibold text-black">
+            <input
+              className={checkboxClassName}
+              defaultChecked={value(submission.payload, "beginnerFriendly") === "true" || submission.payload.beginnerFriendly === true}
+              name="beginnerFriendly"
+              type="checkbox"
+            />
+            Beginner friendly
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-black/10 bg-[#F7F7F4] px-3 py-2 text-sm font-semibold text-black">
+            <input
+              className={checkboxClassName}
+              defaultChecked={value(submission.payload, "travelReimbursement") === "true" || submission.payload.travelReimbursement === true}
+              name="travelReimbursement"
+              type="checkbox"
+            />
+            Travel support
+          </label>
+          <div>
             <label className={labelClassName} htmlFor={`${submission.id}-rejectionReason`}>
               Rejection reason
             </label>
             <textarea id={`${submission.id}-rejectionReason`} name="rejectionReason" rows={3} className={inputClassName} />
+          </div>
           </div>
         </div>
 

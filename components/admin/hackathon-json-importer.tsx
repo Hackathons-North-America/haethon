@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, RotateCcw, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+import { HackathonCardPreview, type PreviewPayload } from "@/components/admin/hackathon-card-preview";
 
 type ImportResult = {
   duplicateScore: number;
@@ -49,13 +51,33 @@ export function HackathonJsonImporter() {
   const [jsonText, setJsonText] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [queue, setQueue] = useState<PreviewPayload[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<ImportResult[]>([]);
+  const [skippedCount, setSkippedCount] = useState(0);
+
+  const activePayload = queue[currentIndex];
+  const remainingCount = Math.max(queue.length - currentIndex, 0);
+
+  function payloadsFromJson(value: unknown) {
+    if (Array.isArray(value)) {
+      return value as PreviewPayload[];
+    }
+
+    if (value && typeof value === "object" && Array.isArray((value as Record<string, unknown>).hackathons)) {
+      return (value as { hackathons: PreviewPayload[] }).hackathons;
+    }
+
+    return [];
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus("submitting");
+    setStatus("idle");
     setMessage(null);
     setResults([]);
+    setSkippedCount(0);
+    setCurrentIndex(0);
 
     let parsed: unknown;
 
@@ -67,10 +89,30 @@ export function HackathonJsonImporter() {
       return;
     }
 
+    const payloads = payloadsFromJson(parsed);
+
+    if (!payloads.length) {
+      setStatus("error");
+      setMessage("JSON must be an array of hackathons or an object with a hackathons array.");
+      return;
+    }
+
+    setQueue(payloads);
+    setMessage(`${payloads.length} cards ready to review.`);
+  }
+
+  async function approveActive() {
+    if (!activePayload) {
+      return;
+    }
+
+    setStatus("submitting");
+    setMessage(null);
+
     const response = await fetch("/api/admin/hackathon-imports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsed),
+      body: JSON.stringify([activePayload]),
     });
     const body = (await response.json()) as ImportResponse;
 
@@ -80,10 +122,107 @@ export function HackathonJsonImporter() {
       return;
     }
 
+    const data = body.data;
     setStatus("success");
-    setMessage(`${body.data.importedCount} imported, ${body.data.duplicateCount} queued for review.`);
-    setResults(body.data.results);
+    setMessage(data.duplicateCount ? "Queued as a duplicate for later review." : "Imported.");
+    setResults((current) => [...current, ...data.results]);
+    setCurrentIndex((current) => current + 1);
     router.refresh();
+  }
+
+  function skipActive() {
+    setSkippedCount((current) => current + 1);
+    setCurrentIndex((current) => current + 1);
+    setStatus("idle");
+    setMessage("Skipped.");
+  }
+
+  function resetImport() {
+    setQueue([]);
+    setCurrentIndex(0);
+    setResults([]);
+    setSkippedCount(0);
+    setStatus("idle");
+    setMessage(null);
+  }
+
+  if (queue.length) {
+    const complete = !activePayload;
+
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]">Bulk import</p>
+            <h2 className="mt-2 text-2xl font-semibold text-black">{complete ? "Import review complete" : "Approve imported card"}</h2>
+            <p className="mt-2 text-sm text-[#706F6B]">
+              {complete
+                ? `${results.length} approved, ${skippedCount} skipped.`
+                : `${remainingCount} remaining · ${results.length} approved · ${skippedCount} skipped`}
+            </p>
+          </div>
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 px-4 text-sm font-semibold text-black hover:bg-[#F7F7F4]"
+            onClick={resetImport}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" className="size-4" />
+            New import
+          </button>
+        </div>
+
+        {activePayload ? (
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
+            <HackathonCardPreview payload={activePayload} previewId={`import-preview-${currentIndex}`} />
+            <div className="flex flex-col justify-between rounded-lg border border-black/10 bg-[#F7F7F4] p-4">
+              <div>
+                <p className="text-sm font-semibold text-black">Does this card look right?</p>
+                <p className="mt-2 text-sm leading-6 text-[#706F6B]">
+                  Yes imports this record. No skips it and shows the next card.
+                </p>
+              </div>
+              <div className="mt-5 grid gap-3">
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#027A48] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={status === "submitting"}
+                  onClick={approveActive}
+                  type="button"
+                >
+                  <Check aria-hidden="true" className="size-4" />
+                  Yes
+                </button>
+                <button
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+                  disabled={status === "submitting"}
+                  onClick={skipActive}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-4" />
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {message ? (
+          <div
+            className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm font-semibold ${
+              status === "error"
+                ? "border-[#B42318]/30 bg-[#FEF3F2] text-[#B42318]"
+                : "border-[#027A48]/25 bg-[#ECFDF3] text-[#027A48]"
+            }`}
+          >
+            {status === "error" ? (
+              <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            ) : (
+              <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            )}
+            <pre className="whitespace-pre-wrap font-sans">{message}</pre>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   return (

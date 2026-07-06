@@ -27,7 +27,7 @@ const geographyPoint = customType<{ data: { lat: number; lng: number }; driverDa
 });
 
 export const roleEnum = pgEnum("role", ["user", "admin", "organizer", "sponsor"]);
-export const hackathonFormatEnum = pgEnum("hackathon_format", ["online", "in_person", "hybrid"]);
+export const hackathonFormatEnum = pgEnum("hackathon_format", ["online", "in_person"]);
 export const hackathonStatusEnum = pgEnum("hackathon_status", ["draft", "upcoming", "live", "completed", "archived"]);
 export const applicationStatusEnum = pgEnum("application_status", ["interested", "applied", "accepted", "attending", "attended", "won"]);
 export const reminderTypeEnum = pgEnum("reminder_type", [

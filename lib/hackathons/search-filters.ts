@@ -10,11 +10,13 @@ export type DatePeriod =
   | "next-year";
 
 export type FeatureFilter = "any" | "on" | "off";
+export type HackathonFormatFilter = "any" | "online" | "in_person";
 
 export type HackathonSearchFilters = {
   beginnerFriendly: FeatureFilter;
   countries: string[];
   datePeriod: DatePeriod;
+  format: HackathonFormatFilter;
   name: string;
   travelReimbursement: FeatureFilter;
 };
@@ -31,6 +33,7 @@ export const datePeriodOptions: { label: string; value: DatePeriod }[] = [
 
 const datePeriodValues = new Set<DatePeriod>(datePeriodOptions.map((option) => option.value));
 const featureFilterValues = new Set<FeatureFilter>(["any", "on", "off"]);
+const hackathonFormatFilterValues = new Set<HackathonFormatFilter>(["any", "online", "in_person"]);
 
 function addDays(date: Date, days: number) {
   const nextDate = new Date(date);
@@ -52,6 +55,10 @@ export function isFeatureFilter(value: string): value is FeatureFilter {
   return featureFilterValues.has(value as FeatureFilter);
 }
 
+export function isHackathonFormatFilter(value: string): value is HackathonFormatFilter {
+  return hackathonFormatFilterValues.has(value as HackathonFormatFilter);
+}
+
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -70,6 +77,7 @@ function splitCountryParam(value: string) {
 export function normalizeSearchFilters(searchParams: Record<string, string | string[] | undefined>): HackathonSearchFilters {
   const rawName = firstParam(searchParams.q);
   const datePeriodValue = firstParam(searchParams.datePeriod);
+  const formatValue = firstParam(searchParams.format);
   const beginnerFriendlyValue = firstParam(searchParams.beginnerFriendly);
   const travelReimbursementValue = firstParam(searchParams.travelReimbursement);
   const countries = normalizeCountrySelections(
@@ -81,6 +89,7 @@ export function normalizeSearchFilters(searchParams: Record<string, string | str
       beginnerFriendlyValue && isFeatureFilter(beginnerFriendlyValue) ? beginnerFriendlyValue : "any",
     countries,
     datePeriod: datePeriodValue && isDatePeriod(datePeriodValue) ? datePeriodValue : "any",
+    format: formatValue && isHackathonFormatFilter(formatValue) ? formatValue : "any",
     name: rawName?.trim() ?? "",
     travelReimbursement:
       travelReimbursementValue && isFeatureFilter(travelReimbursementValue) ? travelReimbursementValue : "any",

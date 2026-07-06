@@ -52,22 +52,33 @@ describe("hackathonSearchSchema", () => {
     expect(result).toEqual({
       q: "Toronto",
       countries: [],
+      format: "in_person",
       limit: 12,
     });
   });
 
-  it("normalizes country abbreviations and feature filters from page search params", () => {
+  it("normalizes country abbreviations and filters from page search params", () => {
     const result = normalizeSearchFilters({
       country: "O-N",
+      format: "online",
       beginnerFriendly: "on",
       travelReimbursement: "off",
     });
 
     expect(result).toMatchObject({
       countries: ["Canada"],
+      format: "online",
       beginnerFriendly: "on",
       travelReimbursement: "off",
     });
+  });
+
+  it("ignores removed hybrid format filters from page search params", () => {
+    const result = normalizeSearchFilters({
+      format: "hybrid",
+    });
+
+    expect(result.format).toBe("any");
   });
 });
 
@@ -116,7 +127,7 @@ describe("hackathon submission schemas", () => {
       country: "Canada",
       startDate: "2026-09-12",
       endDate: "2026-09-14",
-      format: "hybrid",
+      format: "in_person",
       shortDescription: "A weekend hackathon for students building useful software.",
       applicationUrl: "https://example.com/apply",
       applicationOpensAt: "2026-07-01",
@@ -136,7 +147,7 @@ describe("hackathon submission schemas", () => {
       country: "Canada",
       startDate: "2026-09-12",
       endDate: "2026-09-14",
-      format: "hybrid",
+      format: "in_person",
       shortDescription: "A weekend hackathon for students building useful software.",
       acceptanceAt: "2026-08-30",
       submissionDeadlineAt: "2026-09-14",
@@ -164,6 +175,21 @@ describe("hackathon submission schemas", () => {
       startDate: "2026-09-14",
       endDate: "2026-09-12",
       format: "online",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects the removed hybrid format", () => {
+    const result = communitySubmissionSchema.safeParse({
+      submitterType: "community",
+      name: "Waterloo Build Weekend",
+      sourceUrl: "https://example.com/event",
+      websiteUrl: "https://example.com",
+      country: "Canada",
+      startDate: "2026-09-12",
+      endDate: "2026-09-14",
+      format: "hybrid",
     });
 
     expect(result.success).toBe(false);

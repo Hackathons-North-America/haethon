@@ -167,15 +167,21 @@ function BookmarkButton({
   hackathonId,
   hackathonName,
   initialSaved,
+  preview = false,
 }: {
   hackathonId: string;
   hackathonName: string;
   initialSaved: boolean;
+  preview?: boolean;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [saving, setSaving] = useState(false);
 
   async function toggleSaved() {
+    if (preview) {
+      return;
+    }
+
     const nextSaved = !saved;
     const previousSaved = saved;
 
@@ -212,9 +218,10 @@ function BookmarkButton({
       aria-label={`${saved ? "Remove" : "Add"} ${hackathonName} ${
         saved ? "from" : "to"
       } library`}
+      aria-disabled={preview || undefined}
       aria-pressed={saved}
       disabled={saving}
-      className={`absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/95 shadow-sm transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+      className={`absolute bottom-4 right-4 z-10 grid size-10 place-items-center transition-colors hover:text-[#660000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
         saved ? "text-[#660000]" : "text-black"
       } disabled:cursor-wait disabled:opacity-70`}
       onClick={toggleSaved}
@@ -234,17 +241,23 @@ function VoteControl({
   initialVote,
   initialVoteScore,
   name,
+  preview = false,
 }: {
   hackathonId: string;
   initialVote: Vote;
   initialVoteScore: number;
   name: string;
+  preview?: boolean;
 }) {
   const [vote, setVote] = useState<Vote>(initialVote);
   const [score, setScore] = useState(initialVoteScore);
   const [savingVote, setSavingVote] = useState(false);
 
   async function toggleVote(targetVote: Vote) {
+    if (preview) {
+      return;
+    }
+
     const nextVote = vote === targetVote ? 0 : targetVote;
     const previousVote = vote;
     const previousScore = score;
@@ -287,6 +300,7 @@ function VoteControl({
     >
       <button
         aria-label={`Upvote ${name}`}
+        aria-disabled={preview || undefined}
         aria-pressed={vote === 1}
         disabled={savingVote}
         className={`grid size-8 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
@@ -306,6 +320,7 @@ function VoteControl({
       </span>
       <button
         aria-label={`Downvote ${name}`}
+        aria-disabled={preview || undefined}
         aria-pressed={vote === -1}
         disabled={savingVote}
         className={`grid size-8 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
@@ -369,30 +384,13 @@ function CardAccentEdges() {
   );
 }
 
-function HackathonBadges({ badges }: { badges?: string[] }) {
-  if (!badges?.length) {
-    return null;
-  }
-
-  return (
-    <ul className="mt-5 flex flex-wrap items-start gap-2 overflow-hidden">
-      {badges.map((badge) => (
-        <li
-          className="inline-flex max-w-full rounded-full bg-white/85 px-2.5 py-1.5 text-[11px] font-semibold text-black shadow-sm"
-          key={badge}
-        >
-          <span className="truncate">{badge}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export function HackathonCard({
   hackathon,
+  preview = false,
 }: {
   hackathon: HackathonCardData;
   index: number;
+  preview?: boolean;
 }) {
   const fallbackRgb = useMemo(() => getFallbackAccentRgb(hackathon.name), [hackathon.name]);
   const accentRgb = useLogoAccentRgb(hackathon.image, fallbackRgb);
@@ -404,42 +402,42 @@ export function HackathonCard({
       style={gradientStyle}
     >
       <CardAccentEdges />
-      <BookmarkButton
-        hackathonId={hackathon.id}
-        hackathonName={hackathon.name}
-        initialSaved={hackathon.isSaved}
-      />
 
-      <div className="flex items-start gap-4 pr-12">
+      <div className="flex items-start gap-4">
         <HackathonLogoMark hackathon={hackathon} />
         <div className="min-w-0 pt-1">
           <h2 className="text-xl font-semibold leading-6 text-black sm:text-[1.35rem]">
             {hackathon.name}
           </h2>
+          <p className="mt-2 text-[15px] font-semibold leading-5 text-[#706F6B]">
+            {hackathon.date}
+          </p>
           <p className="mt-1 text-[15px] font-semibold leading-5 text-[#706F6B]">
-            {hackathon.location} · {hackathon.date}
+            {hackathon.location}
           </p>
         </div>
       </div>
 
-      <HackathonBadges badges={hackathon.badges} />
-
-      <div className="mt-4 text-base leading-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[#706F6B]">{hackathon.duration}</p>
-          </div>
+      <div className="mt-5 text-base leading-6">
+        <p className="line-clamp-3 pr-10 text-[#706F6B]">
+          {hackathon.description}
+        </p>
+        <div className="mt-5 flex items-center justify-between gap-3 pr-10">
           <VoteControl
             hackathonId={hackathon.id}
             initialVote={hackathon.userVote}
             initialVoteScore={hackathon.voteScore}
             name={hackathon.name}
+            preview={preview}
           />
         </div>
-        <p className="mt-3 line-clamp-2 text-[#706F6B]">
-          {hackathon.description}
-        </p>
       </div>
+      <BookmarkButton
+        hackathonId={hackathon.id}
+        hackathonName={hackathon.name}
+        initialSaved={hackathon.isSaved}
+        preview={preview}
+      />
     </article>
   );
 }

@@ -105,6 +105,7 @@ export async function GET(request: Request) {
     q: searchParams.get("q") ?? undefined,
     country: searchParams.get("country") ?? undefined,
     countries: searchParams.getAll("countries"),
+    format: searchParams.get("format") ?? undefined,
     beginnerFriendly: searchParams.get("beginnerFriendly") ?? undefined,
     travelReimbursement: searchParams.get("travelReimbursement") ?? undefined,
     startsAfter: searchParams.get("startsAfter") ?? undefined,
@@ -116,7 +117,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { q, countries, beginnerFriendly, travelReimbursement, startsAfter, startsBefore, limit } = parsed.data;
+  const { q, countries, format, beginnerFriendly, travelReimbursement, startsAfter, startsBefore, limit } = parsed.data;
   const user = await getCurrentUserRecord();
 
   const rows = await db
@@ -148,6 +149,7 @@ export async function GET(request: Request) {
         inArray(hackathons.status, publicStatuses),
         q ? ilike(hackathons.name, `%${q}%`) : undefined,
         countries.length ? inArray(hackathonLocations.country, countries) : undefined,
+        format ? eq(hackathons.format, format) : undefined,
         beginnerFriendly === undefined ? undefined : eq(hackathons.beginnerFriendly, beginnerFriendly),
         travelReimbursement === undefined ? undefined : eq(hackathons.travelReimbursement, travelReimbursement),
         startsAfter ? gte(hackathonDates.startsAt, startsAfter) : undefined,
