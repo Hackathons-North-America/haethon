@@ -86,7 +86,7 @@ export function BulkIdApproval({ submissions }: { submissions: SubmissionReviewI
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]">Bulk ID approval</p>
-          <h2 className="mt-2 text-2xl font-semibold text-black">Haethon IDs</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-black">HNA IDs</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#706F6B]">
             Paste submission or published hackathon IDs, then approve, merge, or reject the next matching pending record.
           </p>
@@ -98,7 +98,7 @@ export function BulkIdApproval({ submissions }: { submissions: SubmissionReviewI
 
       <form className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]" onSubmit={onSubmit}>
         <textarea
-          aria-label="Haethon IDs"
+          aria-label="HNA IDs"
           className="min-h-28 w-full rounded-lg border border-black/15 bg-[#F7F7F4] p-4 font-mono text-xs leading-5 text-black outline-none focus:border-[#660000] focus:ring-2 focus:ring-[#660000]/15"
           onChange={(event) => setIdsText(event.target.value)}
           placeholder="Paste IDs separated by spaces, commas, or new lines"

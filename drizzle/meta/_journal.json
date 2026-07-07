@@ -15,6 +15,13 @@
       "when": 1783365472495,
       "tag": "0001_perpetual_wiccan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783454771237,
+      "tag": "0002_hackathon_series_discord_sync",
+      "breakpoints": true
     }
   ]
 }

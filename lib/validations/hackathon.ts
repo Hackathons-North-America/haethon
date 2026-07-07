@@ -58,6 +58,8 @@ export const hackathonSearchSchema = z
 
 const normalizedHackathonPayloadBaseSchema = z.object({
     name: z.string().trim().min(3).max(180),
+    seriesName: optionalString(180),
+    seriesSlug: optionalString(200),
     organizationId: optionalString(80),
     organizationName: optionalString(160),
     websiteUrl: z.string().trim().url(),

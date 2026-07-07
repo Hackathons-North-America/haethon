@@ -55,7 +55,8 @@ test("opens the hackathons browse page from the home nav", async ({ page }) => {
   await hackTheNorth.getByRole("button", { name: "Downvote Hack the North" }).click();
   await expect(hackTheNorth.getByText("141", { exact: true })).toBeVisible();
 
-  await page.getByLabel("Countries").fill("can");
+  await page.getByRole("button", { name: "Countries" }).click();
+  await page.getByLabel("Search countries").fill("can");
   await page.getByRole("option", { name: "Canada" }).click();
   await expect(page.getByRole("button", { name: "Remove Canada" })).toBeVisible();
   await page.getByRole("button", { name: "Search hackathons" }).click();

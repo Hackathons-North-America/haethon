@@ -109,6 +109,19 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const hackathonSeries = pgTable(
+  "hackathon_series",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 180 }).notNull(),
+    slug: varchar("slug", { length: 200 }).notNull().unique(),
+    websiteUrl: text("website_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("hackathon_series_slug_idx").on(table.slug)]
+);
+
 export const organizationMemberships = pgTable(
   "organization_memberships",
   {
@@ -134,6 +147,7 @@ export const hackathons = pgTable(
   "hackathons",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    seriesId: uuid("series_id").references(() => hackathonSeries.id, { onDelete: "set null" }),
     organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
     name: varchar("name", { length: 180 }).notNull(),
     slug: varchar("slug", { length: 200 }).notNull().unique(),
@@ -155,6 +169,7 @@ export const hackathons = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    index("hackathons_series_idx").on(table.seriesId),
     index("hackathons_status_idx").on(table.status),
     index("hackathons_format_idx").on(table.format),
     uniqueIndex("hackathons_name_slug_idx").on(table.name, table.slug),
@@ -488,12 +503,13 @@ export const discordChannels = pgTable("discord_channels", {
   guildId: uuid("guild_id")
     .notNull()
     .references(() => discordGuilds.id, { onDelete: "cascade" }),
+  seriesId: uuid("series_id").references(() => hackathonSeries.id, { onDelete: "set null" }),
   hackathonId: uuid("hackathon_id").references(() => hackathons.id, { onDelete: "set null" }),
   channelSnowflake: text("channel_snowflake").notNull().unique(),
   name: varchar("name", { length: 180 }).notNull(),
   category: varchar("category", { length: 120 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [uniqueIndex("discord_channels_guild_series_idx").on(table.guildId, table.seriesId)]);
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {
@@ -512,6 +528,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 }));
 
 export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
+  series: one(hackathonSeries, {
+    fields: [hackathons.seriesId],
+    references: [hackathonSeries.id],
+  }),
   organization: one(organizations, {
     fields: [hackathons.organizationId],
     references: [organizations.id],
@@ -530,12 +550,17 @@ export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
   votes: many(userHackathonVotes),
 }));
 
+export const hackathonSeriesRelations = relations(hackathonSeries, ({ many }) => ({
+  hackathons: many(hackathons),
+}));
+
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   memberships: many(organizationMemberships),
   submissions: many(hackathonSubmissions),
 }));
 
 export type InsertUser = typeof users.$inferInsert;
+export type SelectHackathonSeries = typeof hackathonSeries.$inferSelect;
 export type SelectHackathon = typeof hackathons.$inferSelect;
 export type SelectUser = typeof users.$inferSelect;
 export type SelectHackathonSubmission = typeof hackathonSubmissions.$inferSelect;

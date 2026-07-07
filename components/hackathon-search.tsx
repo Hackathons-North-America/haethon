@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarDays, Globe2, MapPin, Search, Settings2, X } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, Check, Globe2, MapPin, PlusSquare, Search, Settings2, X } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
 import { countryOptions } from "@/lib/hackathons/countries";
+import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
+import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, dateRangeForPeriod } from "@/lib/hackathons/search-filters";
 import type {
   DatePeriod,
@@ -20,6 +23,18 @@ type HackathonSearchResponse = {
 };
 
 const countryListboxId = "hackathon-country-options";
+const countryPopoverId = "hackathon-country-popover";
+const datePopoverId = "hackathon-date-popover";
+const formatPopoverId = "hackathon-format-popover";
+const featurePopoverId = "hackathon-feature-popover";
+
+type OpenPopover = "countries" | "date" | "format" | "features" | null;
+
+const formatOptions: { label: string; value: HackathonFormatFilter; detail: string }[] = [
+  { label: "Any format", value: "any", detail: "Show online and in-person events" },
+  { label: "Online", value: "online", detail: "Remote hackathons you can join anywhere" },
+  { label: "In person", value: "in_person", detail: "Venue-based hackathons and local events" },
+];
 
 function buildSearchParams({
   beginnerFriendly,
@@ -131,23 +146,87 @@ export function HackathonSearch({
   const [hasSearched, setHasSearched] = useState(() => hasActiveFilters(initialFilters));
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
+  const filterFormRef = useRef<HTMLFormElement>(null);
+  const countrySearchRef = useRef<HTMLInputElement>(null);
+  const countryRowRef = useRef<HTMLDivElement>(null);
+  const [countriesOverflow, setCountriesOverflow] = useState(false);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!filterFormRef.current?.contains(event.target as Node)) {
+        setOpenPopover(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenPopover(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (openPopover === "countries") {
+      countrySearchRef.current?.focus();
+    }
+  }, [openPopover]);
+
+  useEffect(() => {
+    const row = countryRowRef.current;
+
+    if (!row) {
+      return;
+    }
+
+    const checkOverflow = () => setCountriesOverflow(row.scrollWidth > row.clientWidth + 1);
+
+    checkOverflow();
+
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(row);
+
+    return () => observer.disconnect();
+  }, [countries]);
+
+  const featureTags: {
+    key: string;
+    label: string;
+    value: FeatureFilter;
+    setValue: (next: FeatureFilter) => void;
+  }[] = [
+    { key: "beginnerFriendly", label: "Beginner friendly", value: beginnerFriendly, setValue: setBeginnerFriendly },
+    {
+      key: "travelReimbursement",
+      label: "Travel reimbursements",
+      value: travelReimbursement,
+      setValue: setTravelReimbursement,
+    },
+  ];
 
   const currentFilters = useMemo(
     () => ({ beginnerFriendly, countries, datePeriod, format, name, travelReimbursement }),
     [beginnerFriendly, countries, datePeriod, format, name, travelReimbursement]
   );
   const activeFilters = useMemo(() => hasActiveFilters(currentFilters), [currentFilters]);
-  const countrySuggestions = useMemo(() => {
+  const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
+  const filteredCountries = useMemo(() => {
     const query = countryQuery.trim().toLowerCase();
 
-    if (!query) {
-      return [];
-    }
+    return countryOptions.filter((option) => !query || option.toLowerCase().includes(query));
+  }, [countryQuery]);
 
-    return countryOptions
-      .filter((option) => !countries.includes(option) && option.toLowerCase().includes(query))
-      .slice(0, 8);
-  }, [countries, countryQuery]);
+  const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
+  const selectedFormatLabel = formatOptions.find((option) => option.value === format)?.label ?? "Any format";
+  const selectedFeatureLabels = featureTags.filter((tag) => tag.value === "on").map((tag) => tag.label);
 
   function selectCountry(country: string) {
     setCountries((selectedCountries) =>
@@ -158,6 +237,27 @@ export function HackathonSearch({
 
   function removeCountry(country: string) {
     setCountries((selectedCountries) => selectedCountries.filter((selectedCountry) => selectedCountry !== country));
+  }
+
+  function toggleCountry(country: string) {
+    if (countries.includes(country)) {
+      removeCountry(country);
+      return;
+    }
+
+    selectCountry(country);
+  }
+
+  function countryDetail(country: string) {
+    if (country === "Canada" || country === "United States" || country === "Mexico") {
+      return "North America";
+    }
+
+    if (country === "United Kingdom" || country === "Ireland" || country === "France" || country === "Germany") {
+      return "Frequent hackathon market";
+    }
+
+    return "International destination";
   }
 
   async function runSearch(nextFilters = currentFilters, options = { markSearched: true }) {
@@ -190,6 +290,23 @@ export function HackathonSearch({
     }
   }
 
+  function applyRegionPreset(presetId: RegionPresetId) {
+    const preset = regionPresets.find((option) => option.id === presetId);
+
+    if (!preset) {
+      return;
+    }
+
+    // A second click on the active preset clears it back to "all".
+    const nextCountries = selectedPreset === presetId ? [] : [...preset.filters.countries];
+    const nextFormat = selectedPreset === presetId ? "any" : preset.filters.format;
+
+    setCountries(nextCountries);
+    setCountryQuery("");
+    setFormat(nextFormat);
+    void runSearch({ ...currentFilters, countries: nextCountries, format: nextFormat });
+  }
+
   function clearSearch() {
     setName("");
     setCountries([]);
@@ -210,9 +327,51 @@ export function HackathonSearch({
     <>
       <section aria-label="Hackathon filters" className="bg-white px-5 pb-7 pt-14 sm:pt-16">
         <div className="mx-auto max-w-[1120px]">
+          <div className="relative mb-8 flex items-center justify-center">
+            <div aria-label="Region filters" className="flex items-end gap-8 sm:gap-12" role="group">
+              {regionPresets.map((preset) => {
+                const active = selectedPreset === preset.id;
+
+                return (
+                  <button
+                    aria-pressed={active}
+                    className="group flex flex-col items-center gap-1.5 pb-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35"
+                    key={preset.id}
+                    onClick={() => applyRegionPreset(preset.id)}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="text-2xl leading-none">
+                      {preset.emoji}
+                    </span>
+                    <span
+                      className={`text-sm transition-colors ${
+                        active ? "font-semibold text-black" : "text-[#706F6B] group-hover:text-black"
+                      }`}
+                    >
+                      {preset.label}
+                    </span>
+                    <span
+                      className={`h-0.5 w-full rounded-full transition-colors ${
+                        active ? "bg-black" : "bg-transparent group-hover:bg-black/20"
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <Link
+              className="absolute right-0 inline-flex min-h-10 items-center gap-2 rounded-full border border-black/15 px-4 text-sm font-semibold text-black transition-colors hover:border-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35"
+              href="/submit"
+            >
+              <PlusSquare aria-hidden="true" className="size-4" />
+              New entry
+            </Link>
+          </div>
+
           <form
             className="relative z-30 flex flex-col rounded-[2.35rem] border border-black/10 bg-white p-2 shadow-[0_10px_36px_rgba(0,0,0,0.14)] md:flex-row md:items-stretch"
             method="get"
+            ref={filterFormRef}
             onSubmit={(event) => {
               event.preventDefault();
               void runSearch();
@@ -230,155 +389,316 @@ export function HackathonSearch({
               />
             </label>
 
-            <div className="relative flex min-h-[4.2rem] min-w-0 flex-[1.2] flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
-              <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
-                <Globe2 aria-hidden="true" className="size-3.5" />
-                Countries
-              </span>
+            <div className="relative min-h-[4.2rem] min-w-0 flex-[1.25]">
               {countries.map((country) => (
                 <input key={country} name="countries" type="hidden" value={country} />
               ))}
-              {countries.length ? (
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {countries.map((country) => (
-                    <button
-                      aria-label={`Remove ${country}`}
-                      className="inline-flex max-w-full items-center gap-1 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black hover:border-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35"
-                      key={country}
-                      onClick={() => removeCountry(country)}
-                      type="button"
-                    >
-                      <span className="truncate">{country}</span>
-                      <X aria-hidden="true" className="size-3.5 shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <input
-                aria-autocomplete="list"
-                aria-controls={countryListboxId}
-                aria-expanded={countrySuggestions.length > 0}
+              <button
+                aria-controls={countryPopoverId}
+                aria-expanded={openPopover === "countries"}
                 aria-label="Countries"
-                className="mt-1 min-w-0 bg-transparent text-sm leading-5 text-[#706F6B] outline-none placeholder:text-[#706F6B]"
-                onChange={(event) => setCountryQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && countrySuggestions[0]) {
-                    event.preventDefault();
-                    selectCountry(countrySuggestions[0]);
-                  }
-
-                  if (event.key === "Backspace" && !countryQuery && countries.length) {
-                    removeCountry(countries[countries.length - 1]);
-                  }
-                }}
-                placeholder={countries.length ? "Add another country" : "Search countries"}
-                role="combobox"
-                type="search"
-                value={countryQuery}
-              />
-              {countrySuggestions.length ? (
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-[2rem] px-6 py-3 text-left hover:bg-[#F7F7F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                  openPopover === "countries" ? "bg-[#F7F7F4] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
+                }`}
+                onClick={() => setOpenPopover((current) => (current === "countries" ? null : "countries"))}
+                type="button"
+              >
+                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
+                  <Globe2 aria-hidden="true" className="size-3.5" />
+                  Countries
+                </span>
+                {countries.length ? (
+                  <span className="relative mt-1 block min-w-0">
+                    <span className="flex min-w-0 flex-nowrap gap-1.5 overflow-hidden" ref={countryRowRef}>
+                      {countries.map((country) => (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black"
+                          key={country}
+                        >
+                          <span>{country}</span>
+                        </span>
+                      ))}
+                    </span>
+                    {countriesOverflow ? (
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-y-0 right-0 flex items-center bg-gradient-to-l from-[#F7F7F4] via-[#F7F7F4] pl-6 pr-1 text-xs font-semibold text-[#706F6B]"
+                      >
+                        ...
+                      </span>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="mt-1 text-sm leading-5 text-[#706F6B]">Search countries</span>
+                )}
+              </button>
+              {openPopover === "countries" ? (
                 <div
-                  className="absolute left-3 right-3 top-[calc(100%-0.35rem)] z-50 overflow-hidden rounded-lg border border-black/10 bg-white py-1 shadow-[0_14px_34px_rgba(0,0,0,0.16)]"
-                  id={countryListboxId}
-                  role="listbox"
+                  className="absolute left-0 right-0 top-[calc(100%+0.9rem)] z-50 overflow-hidden rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:left-[-1rem] md:right-auto md:w-[34rem]"
+                  id={countryPopoverId}
                 >
-                  {countrySuggestions.map((country) => (
-                    <button
-                      className="block w-full px-3 py-2 text-left text-sm text-black hover:bg-[#F7F7F4] focus-visible:bg-[#F7F7F4] focus-visible:outline-none"
-                      key={country}
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        selectCountry(country);
+                  <div className="flex items-center gap-2 rounded-full border border-black/10 bg-[#F7F7F4] px-4 py-3">
+                    <Search aria-hidden="true" className="size-4 text-[#706F6B]" />
+                    <input
+                      aria-autocomplete="list"
+                      aria-controls={countryListboxId}
+                      aria-expanded="true"
+                      aria-label="Search countries"
+                      className="min-w-0 flex-1 bg-transparent text-sm leading-5 text-black outline-none placeholder:text-[#706F6B]"
+                      onChange={(event) => setCountryQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && filteredCountries[0]) {
+                          event.preventDefault();
+                          toggleCountry(filteredCountries[0]);
+                        }
                       }}
-                      aria-selected="false"
-                      role="option"
-                      type="button"
-                    >
-                      {country}
-                    </button>
-                  ))}
+                      placeholder="Search countries"
+                      ref={countrySearchRef}
+                      role="combobox"
+                      type="search"
+                      value={countryQuery}
+                    />
+                  </div>
+                  {countries.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {countries.map((country) => (
+                        <button
+                          aria-label={`Remove ${country}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black hover:border-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35"
+                          key={country}
+                          onClick={() => removeCountry(country)}
+                          type="button"
+                        >
+                          {country}
+                          <X aria-hidden="true" className="size-3.5" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div
+                    className="mt-4 grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2"
+                    id={countryListboxId}
+                    role="listbox"
+                  >
+                    {filteredCountries.map((country) => {
+                      const selected = countries.includes(country);
+
+                      return (
+                        <button
+                          aria-selected={selected}
+                          className={`flex min-h-[4.25rem] items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                            selected
+                              ? "border-[#D9043D]/35 bg-[#FFF3F6]"
+                              : "border-black/10 bg-white hover:border-black/20 hover:bg-[#F7F7F4]"
+                          }`}
+                          key={country}
+                          onClick={() => toggleCountry(country)}
+                          role="option"
+                          type="button"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-black">{country}</span>
+                            <span className="mt-0.5 block truncate text-xs text-[#706F6B]">{countryDetail(country)}</span>
+                          </span>
+                          <span
+                            className={`grid size-6 shrink-0 place-items-center rounded-full border ${
+                              selected ? "border-[#D9043D] bg-[#D9043D] text-white" : "border-black/15 text-transparent"
+                            }`}
+                          >
+                            <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {!filteredCountries.length ? (
+                      <div className="col-span-full rounded-xl border border-black/10 bg-[#F7F7F4] px-4 py-5 text-sm font-semibold text-[#706F6B]">
+                        No countries match that search.
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
 
-            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
-              <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
-                <CalendarDays aria-hidden="true" className="size-3.5" />
-                Date
-              </span>
-              <select
-                className="min-w-0 cursor-pointer bg-transparent text-sm leading-5 text-[#706F6B] outline-none"
-                name="datePeriod"
-                onChange={(event) => setDatePeriod(event.target.value as DatePeriod)}
-                value={datePeriod}
+            <div className="relative min-h-[4.2rem] min-w-0 flex-1">
+              <input name="datePeriod" type="hidden" value={datePeriod} />
+              <button
+                aria-controls={datePopoverId}
+                aria-expanded={openPopover === "date"}
+                aria-label="Date"
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-[2rem] px-6 py-3 text-left hover:bg-[#F7F7F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                  openPopover === "date" ? "bg-[#F7F7F4] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
+                }`}
+                onClick={() => setOpenPopover((current) => (current === "date" ? null : "date"))}
+                type="button"
               >
-                {datePeriodOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
+                  <CalendarDays aria-hidden="true" className="size-3.5" />
+                  Date
+                </span>
+                <span className="mt-1 block truncate text-sm leading-5 text-[#706F6B]">{selectedDateLabel}</span>
+              </button>
+              {openPopover === "date" ? (
+                <div
+                  className="absolute left-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[18rem] rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
+                  id={datePopoverId}
+                >
+                  <div className="grid gap-2">
+                    {datePeriodOptions.map((option) => {
+                      const selected = datePeriod === option.value;
 
-            <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]">
-              <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
-                <MapPin aria-hidden="true" className="size-3.5" />
-                Format
-              </span>
-              <select
-                className="min-w-0 cursor-pointer bg-transparent text-sm leading-5 text-[#706F6B] outline-none"
-                name="format"
-                onChange={(event) => setFormat(event.target.value as HackathonFormatFilter)}
-                value={format}
-              >
-                <option value="any">Any format</option>
-                <option value="online">Online</option>
-                <option value="in_person">In person</option>
-              </select>
-            </label>
+                      return (
+                        <button
+                          aria-pressed={selected}
+                          className={`flex min-h-[3.5rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                            selected
+                              ? "border-[#D9043D]/35 bg-[#FFF3F6]"
+                              : "border-black/10 bg-white hover:border-black/20 hover:bg-[#F7F7F4]"
+                          }`}
+                          key={option.value}
+                          onClick={() => {
+                            setDatePeriod(option.value);
+                            setOpenPopover(null);
+                          }}
+                          type="button"
+                        >
+                          <span className="text-sm font-semibold text-black">{option.label}</span>
+                          <span
+                            className={`grid size-6 shrink-0 place-items-center rounded-full border ${
+                              selected ? "border-[#D9043D] bg-[#D9043D] text-white" : "border-black/15 text-transparent"
+                            }`}
+                          >
+                            <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
-            <div
-              aria-labelledby="hackathon-feature-filters-label"
-              className="flex min-h-[4.2rem] min-w-0 flex-[1.6] flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-[#F7F7F4] hover:bg-[#F7F7F4]"
-              role="group"
-            >
-              <span
-                className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black"
-                id="hackathon-feature-filters-label"
+            <div className="relative min-h-[4.2rem] min-w-0 flex-1">
+              <input name="format" type="hidden" value={format} />
+              <button
+                aria-controls={formatPopoverId}
+                aria-expanded={openPopover === "format"}
+                aria-label="Format"
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-[2rem] px-6 py-3 text-left hover:bg-[#F7F7F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                  openPopover === "format" ? "bg-[#F7F7F4] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
+                }`}
+                onClick={() => setOpenPopover((current) => (current === "format" ? null : "format"))}
+                type="button"
               >
-                <Settings2 aria-hidden="true" className="size-3.5" />
-                Features
-              </span>
-              <div className="grid min-w-0 grid-cols-1 gap-1 sm:grid-cols-2">
-                <label className="min-w-0">
-                  <span className="sr-only">Beginner friendly</span>
-                  <select
-                    aria-label="Beginner friendly"
-                    className="w-full min-w-0 cursor-pointer bg-transparent text-sm leading-5 text-[#706F6B] outline-none"
-                    name="beginnerFriendly"
-                    onChange={(event) => setBeginnerFriendly(event.target.value as FeatureFilter)}
-                    value={beginnerFriendly}
-                  >
-                    <option value="any">Beginner any</option>
-                    <option value="on">Beginner on</option>
-                    <option value="off">Beginner off</option>
-                  </select>
-                </label>
-                <label className="min-w-0">
-                  <span className="sr-only">Travel reimbursement</span>
-                  <select
-                    aria-label="Travel reimbursement"
-                    className="w-full min-w-0 cursor-pointer bg-transparent text-sm leading-5 text-[#706F6B] outline-none"
-                    name="travelReimbursement"
-                    onChange={(event) => setTravelReimbursement(event.target.value as FeatureFilter)}
-                    value={travelReimbursement}
-                  >
-                    <option value="any">Travel any</option>
-                    <option value="on">Travel on</option>
-                    <option value="off">Travel off</option>
-                  </select>
-                </label>
-              </div>
+                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black">
+                  <MapPin aria-hidden="true" className="size-3.5" />
+                  Format
+                </span>
+                <span className="mt-1 block truncate text-sm leading-5 text-[#706F6B]">{selectedFormatLabel}</span>
+              </button>
+              {openPopover === "format" ? (
+                <div
+                  className="absolute left-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[19rem] rounded-[1.75rem] border border-black/10 bg-white p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
+                  id={formatPopoverId}
+                >
+                  <div className="grid gap-2">
+                    {formatOptions.map((option) => {
+                      const selected = format === option.value;
+
+                      return (
+                        <button
+                          aria-pressed={selected}
+                          className={`flex min-h-[4.25rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                            selected
+                              ? "border-[#D9043D]/35 bg-[#FFF3F6]"
+                              : "border-black/10 bg-white hover:border-black/20 hover:bg-[#F7F7F4]"
+                          }`}
+                          key={option.value}
+                          onClick={() => {
+                            setFormat(option.value);
+                            setOpenPopover(null);
+                          }}
+                          type="button"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-black">{option.label}</span>
+                            <span className="mt-0.5 block truncate text-xs text-[#706F6B]">{option.detail}</span>
+                          </span>
+                          <span
+                            className={`grid size-6 shrink-0 place-items-center rounded-full border ${
+                              selected ? "border-[#D9043D] bg-[#D9043D] text-white" : "border-black/15 text-transparent"
+                            }`}
+                          >
+                            <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative min-h-[4.2rem] min-w-0 flex-[1.5]">
+              {featureTags.map((tag) =>
+                tag.value !== "any" ? <input key={tag.key} name={tag.key} type="hidden" value={tag.value} /> : null
+              )}
+              <button
+                aria-controls={featurePopoverId}
+                aria-expanded={openPopover === "features"}
+                aria-labelledby="hackathon-feature-filters-label"
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-[2rem] px-6 py-3 text-left hover:bg-[#F7F7F4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                  openPopover === "features" ? "bg-[#F7F7F4] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
+                }`}
+                onClick={() => setOpenPopover((current) => (current === "features" ? null : "features"))}
+                type="button"
+              >
+                <span
+                  className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-black"
+                  id="hackathon-feature-filters-label"
+                >
+                  <Settings2 aria-hidden="true" className="size-3.5" />
+                  Features
+                </span>
+                <span className="mt-1 block truncate text-sm leading-5 text-[#706F6B]">
+                  {selectedFeatureLabels.length ? selectedFeatureLabels.join(", ") : "Add features"}
+                </span>
+              </button>
+              {openPopover === "features" ? (
+                <div
+                  className="absolute right-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[20rem] rounded-[1.75rem] border border-black/10 bg-white p-5 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[27rem]"
+                  id={featurePopoverId}
+                >
+                  <div className="flex flex-wrap gap-3">
+                    {featureTags.map((tag) => {
+                      const active = tag.value === "on";
+
+                      return (
+                        <button
+                          aria-pressed={active}
+                          className={`inline-flex min-h-12 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+                            active
+                              ? "border-[#D9043D] bg-[#D9043D] text-white hover:bg-[#B80033]"
+                              : "border-black/15 bg-white text-black hover:border-black"
+                          }`}
+                          key={tag.key}
+                          onClick={() => tag.setValue(active ? "any" : "on")}
+                          type="button"
+                        >
+                          <span
+                            className={`grid size-5 place-items-center rounded-full border ${
+                              active ? "border-white text-white" : "border-black/15 text-transparent"
+                            }`}
+                          >
+                            <Check aria-hidden="true" className="size-3" strokeWidth={3} />
+                          </span>
+                          {tag.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-2 px-2 py-2 md:px-3">
@@ -411,9 +731,7 @@ export function HackathonSearch({
               <span>
                 Showing {hackathons.length} {hackathons.length === 1 ? "hackathon" : "hackathons"} matching your search.
               </span>
-            ) : (
-              <span>Search by name, countries, date, format, or features.</span>
-            )}
+            ) : null}
           </div>
         </div>
       </section>

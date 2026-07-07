@@ -18,7 +18,7 @@ export function AdminSidebar() {
     <aside className="border-b border-black/10 bg-white p-4 lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r lg:p-5">
       <div className="lg:sticky lg:top-5">
         <Link className="font-serif text-2xl font-semibold text-black" href="/">
-          Haethon
+          HNA
         </Link>
         <nav aria-label="Admin navigation" className="mt-6 flex gap-2 lg:flex-col">
           {items.map(({ href, icon: Icon, label }) => {

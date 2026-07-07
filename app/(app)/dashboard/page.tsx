@@ -103,6 +103,12 @@ export default async function DashboardPage() {
   );
 
   const trackedIds = tracked.map((row) => row.hackathonId);
+  const suggestionOrderBy = profile?.countryCode
+    ? [
+        sql`case when ${hackathonLocations.countryCode} = ${profile.countryCode} then 0 else 1 end`,
+        asc(hackathonDates.startsAt),
+      ]
+    : [asc(hackathonDates.startsAt)];
   const suggestionRows = await db
     .select({
       id: hackathons.id,
@@ -134,12 +140,7 @@ export default async function DashboardPage() {
         trackedIds.length ? notInArray(hackathons.id, trackedIds) : undefined
       )
     )
-    .orderBy(
-      profile?.countryCode
-        ? sql`case when ${hackathonLocations.countryCode} = ${profile.countryCode} then 0 else 1 end`
-        : sql`0`,
-      asc(hackathonDates.startsAt)
-    )
+    .orderBy(...suggestionOrderBy)
     .limit(3);
 
   const suggestions: HackathonCardData[] = suggestionRows.map((row) => ({

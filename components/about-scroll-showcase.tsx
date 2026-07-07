@@ -169,7 +169,7 @@ export function AboutScrollShowcase() {
   return (
     <section aria-labelledby="about-showcase-heading" className="px-5 sm:px-8 lg:px-12">
       <h2 id="about-showcase-heading" className="sr-only">
-        Haethon work areas
+        HNA work areas
       </h2>
 
       <div

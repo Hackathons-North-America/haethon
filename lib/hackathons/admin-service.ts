@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
 import { hackathonDates, hackathonLocations, hackathons } from "@/lib/db/schema";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
 import { adminHackathonUpdateSchema } from "@/lib/validations/hackathon";
@@ -125,6 +126,8 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
   if (!updated) {
     throw new Error("Hackathon not found after update.");
   }
+
+  await syncHackathonDiscordChannelSafely(hackathonId);
 
   return updated;
 }

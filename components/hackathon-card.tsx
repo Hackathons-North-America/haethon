@@ -224,7 +224,7 @@ function BookmarkButton({
       aria-disabled={preview || undefined}
       aria-pressed={saved}
       disabled={saving}
-      className={`absolute bottom-4 right-4 z-10 grid size-10 place-items-center transition-colors hover:text-[#660000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
+      className={`relative z-10 grid size-10 shrink-0 place-items-center transition-colors hover:text-[#660000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#660000]/35 ${
         saved ? "text-[#660000]" : "text-black"
       } disabled:cursor-wait disabled:opacity-70`}
       onClick={toggleSaved}
@@ -344,19 +344,11 @@ function VoteControl({
 
 function HackathonLogoMark({ hackathon }: { hackathon: HackathonCardData }) {
   return (
-    <div className="relative grid size-[4.5rem] shrink-0 place-items-center border border-black/10 bg-white/55 shadow-sm">
-      <span
-        aria-hidden="true"
-        className="absolute -right-px top-2 h-3 border-r border-black/25"
-      />
-      <span
-        aria-hidden="true"
-        className="absolute -left-px bottom-2 h-3 border-l border-black/20"
-      />
+    <div className="relative grid size-[4.5rem] shrink-0 place-items-center overflow-hidden">
       {hackathon.image ? (
         <Image
           alt={`${hackathon.name} logo`}
-          className="object-contain p-2.5"
+          className="object-contain"
           fill
           priority={false}
           sizes="72px"
@@ -437,10 +429,10 @@ export function HackathonCard({
       </div>
 
       <div className="mt-5 text-base leading-6">
-        <p className="line-clamp-3 pr-10 text-[#706F6B]">
+        <p className="line-clamp-3 text-[#706F6B]">
           {hackathon.description}
         </p>
-        <div className="mt-5 flex items-center justify-between gap-3 pr-10">
+        <div className="mt-5 flex items-center justify-between gap-3">
           <VoteControl
             hackathonId={hackathon.id}
             initialVote={hackathon.userVote}
@@ -448,14 +440,14 @@ export function HackathonCard({
             name={hackathon.name}
             preview={preview}
           />
+          <BookmarkButton
+            hackathonId={hackathon.id}
+            hackathonName={hackathon.name}
+            initialSaved={hackathon.isSaved}
+            preview={preview}
+          />
         </div>
       </div>
-      <BookmarkButton
-        hackathonId={hackathon.id}
-        hackathonName={hackathon.name}
-        initialSaved={hackathon.isSaved}
-        preview={preview}
-      />
     </article>
   );
 }

@@ -7,7 +7,6 @@ import {
   CircleUser,
   Compass,
   LayoutDashboard,
-  PlusSquare,
   ShieldCheck,
 } from "lucide-react";
 
@@ -15,7 +14,6 @@ const items = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
   { href: "/my", icon: CalendarDays, label: "My Hackathons" },
-  { href: "/submit", icon: PlusSquare, label: "New Entry" },
   { href: "/account", icon: CircleUser, label: "Hacker Profile" },
 ];
 
@@ -28,10 +26,7 @@ export function AppSidebar({ isAdmin, isSignedIn }: { isAdmin: boolean; isSigned
     <aside className="app-shell-sidebar z-40 border-b border-black/10 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
       <div className="flex items-center justify-between gap-4 px-5 pb-0 pt-5 lg:block lg:px-5">
         <Link className="block" href="/">
-          <span className="font-serif text-2xl font-semibold leading-none text-black">Haethon</span>
-          <span className="mt-1.5 block font-mono text-[10px] font-medium uppercase tracking-[0.22em] text-[#660000]">
-            Web app
-          </span>
+          <span className="font-serif text-2xl font-semibold leading-none text-black">HNA</span>
         </Link>
         {!isSignedIn ? (
           <Link

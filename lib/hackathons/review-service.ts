@@ -2,6 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
 import {
   hackathonDates,
   hackathonLocations,
@@ -22,6 +23,7 @@ import {
   slugify,
 } from "@/lib/hackathons/utils";
 import type { HackathonSubmissionInput, NormalizedHackathonPayload } from "@/lib/hackathons/utils";
+import { ensureHackathonSeries } from "@/lib/hackathons/series";
 import {
   adminHackathonFixImportItemSchema,
   adminHackathonImportPayloadSchema,
@@ -168,6 +170,7 @@ export async function findBestDuplicate(payload: { name: string; websiteUrl?: st
 export async function createPublishedHackathon(payload: NormalizedHackathonPayload) {
   payload = normalizeLocationPayload(payload);
   const organizationId = await ensureOrganization(payload);
+  const seriesId = await ensureHackathonSeries(payload);
   const slug = await uniqueHackathonSlug(payload.name);
   const now = new Date();
 
@@ -175,6 +178,7 @@ export async function createPublishedHackathon(payload: NormalizedHackathonPaylo
     .insert(hackathons)
     .values({
       organizationId,
+      seriesId,
       name: payload.name,
       slug,
       shortDescription: payload.shortDescription,
@@ -216,6 +220,8 @@ export async function createPublishedHackathon(payload: NormalizedHackathonPaylo
     reliabilityScore: "0.85",
   });
 
+  await syncHackathonDiscordChannelSafely(created.id);
+
   return created.id;
 }
 
@@ -227,9 +233,12 @@ export async function mergeIntoHackathon(targetHackathonId: string, payload: Nor
     throw new Error("Target hackathon not found.");
   }
 
+  const seriesId = existing.seriesId ?? (await ensureHackathonSeries(payload));
+
   await db
     .update(hackathons)
     .set({
+      seriesId,
       shortDescription: existing.shortDescription ?? payload.shortDescription,
       websiteUrl: existing.websiteUrl ?? payload.websiteUrl,
       imageUrl: existing.imageUrl ?? payload.imageUrl,
@@ -295,6 +304,8 @@ export async function mergeIntoHackathon(targetHackathonId: string, payload: Nor
     sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
     reliabilityScore: "0.7",
   });
+
+  await syncHackathonDiscordChannelSafely(targetHackathonId);
 
   return targetHackathonId;
 }

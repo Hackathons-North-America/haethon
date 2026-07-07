@@ -24,6 +24,7 @@ const appTables = [
   "hackathon_dates",
   "hackathon_locations",
   "hackathon_results",
+  "hackathon_series",
   "hackathon_submissions",
   "hackathon_tags",
   "hackathons",

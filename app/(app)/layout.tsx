@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="app-shell-content min-w-0 flex-1">{children}</div>
       <div aria-hidden="true" className="app-shell-wipe">
         <span className="app-shell-wipe-label font-mono text-xs font-medium uppercase tracking-[0.3em] text-[#f7f3ea]">
-          Haethon · Web app
+          HNA
         </span>
       </div>
     </div>
