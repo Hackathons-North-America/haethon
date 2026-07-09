@@ -43,7 +43,7 @@ export function channelNameForHackathon(input: {
   name: string;
   startsAt: Date | null;
 }) {
-  const eventName = slugify(input.name);
+  const eventName = slugify(input.name).split("-").slice(0, 5).join("-");
 
   if (!input.startsAt) {
     return eventName.slice(0, 100);

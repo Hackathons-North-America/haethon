@@ -7,6 +7,23 @@ const emptyToUndefined = (value: unknown) => (typeof value === "string" && value
 
 const optionalUrl = z.preprocess(emptyToUndefined, z.string().trim().url().optional());
 const optionalString = (max: number) => z.preprocess(emptyToUndefined, z.string().trim().max(max).optional());
+
+// Scraped sources often carry a full event description that exceeds our short
+// description cap. For imports we truncate to fit rather than reject the card.
+const truncatedOptionalString = (max: number) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const trimmed = value.trim();
+
+    if (trimmed === "") {
+      return undefined;
+    }
+
+    return trimmed.length > max ? `${trimmed.slice(0, max - 1).trimEnd()}…` : trimmed;
+  }, z.string().max(max).optional());
 const optionalBooleanQueryParam = z
   .enum(["true", "false"])
   .transform((value) => value === "true")
@@ -89,6 +106,7 @@ export const normalizedHackathonPayloadSchema = normalizedHackathonPayloadBaseSc
 export const adminHackathonImportPayloadSchema = normalizedHackathonPayloadBaseSchema
   .extend({
     externalId: optionalString(200),
+    shortDescription: truncatedOptionalString(500),
   })
   .strip()
   .superRefine(dateRangeRefinement)
@@ -196,6 +214,7 @@ export const userHackathonUpdateSchema = z.object({
   isSaved: z.boolean().optional(),
   isPinned: z.boolean().optional(),
   awardName: optionalString(180),
+  devpostUrl: optionalUrl,
   notes: optionalString(2000),
 });
 
