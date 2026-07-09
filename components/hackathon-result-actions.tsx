@@ -47,6 +47,7 @@ export function HackathonResultActions({
   const [pinPending, setPinPending] = useState(false);
   const [winnerOpen, setWinnerOpen] = useState(false);
   const [award, setAward] = useState("");
+  const [devpostUrl, setDevpostUrl] = useState("");
   const [winnerPending, setWinnerPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +88,7 @@ export function HackathonResultActions({
     const result = await patchUserHackathon(userHackathonId, {
       applicationStatus: "won",
       awardName: award.trim(),
+      devpostUrl: devpostUrl.trim(),
     });
 
     if (!result.ok) {
@@ -99,6 +101,7 @@ export function HackathonResultActions({
 
     setWinnerOpen(false);
     setAward("");
+    setDevpostUrl("");
     setWinnerPending(false);
     router.refresh();
   }
@@ -137,34 +140,48 @@ export function HackathonResultActions({
       </div>
 
       {status === "attended" && winnerOpen ? (
-        <form className="flex flex-wrap items-center gap-2" onSubmit={submitWinner}>
-          <input
-            aria-label="Prize or award you won"
-            autoFocus
-            className="h-8 w-52 border border-black/15 bg-white px-3 text-sm text-black outline-none focus:border-[#660000]"
-            maxLength={180}
-            onChange={(event) => setAward(event.target.value)}
-            placeholder="Prize won (e.g. Best AI Hack)"
-            value={award}
-          />
-          <button
-            className="inline-flex min-h-8 items-center bg-[#660000] px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition hover:bg-[#4d0000] disabled:opacity-50"
-            disabled={winnerPending || !award.trim()}
-            type="submit"
-          >
-            {winnerPending ? "Saving…" : "Save win"}
-          </button>
-          <button
-            className="min-h-8 px-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#706F6B] hover:text-black"
-            onClick={() => {
-              setWinnerOpen(false);
-              setAward("");
-              setError(null);
-            }}
-            type="button"
-          >
-            Cancel
-          </button>
+        <form className="flex flex-col gap-2" onSubmit={submitWinner}>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              aria-label="Prize or award you won"
+              autoFocus
+              className="h-8 w-52 border border-black/15 bg-white px-3 text-sm text-black outline-none focus:border-[#660000]"
+              maxLength={180}
+              onChange={(event) => setAward(event.target.value)}
+              placeholder="Prize won (e.g. Best AI Hack)"
+              value={award}
+            />
+            <input
+              aria-label="Devpost link (optional)"
+              className="h-8 w-64 border border-black/15 bg-white px-3 text-sm text-black outline-none focus:border-[#660000]"
+              inputMode="url"
+              onChange={(event) => setDevpostUrl(event.target.value)}
+              placeholder="Devpost link (optional)"
+              type="url"
+              value={devpostUrl}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex min-h-8 items-center bg-[#660000] px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white transition hover:bg-[#4d0000] disabled:opacity-50"
+              disabled={winnerPending || !award.trim()}
+              type="submit"
+            >
+              {winnerPending ? "Saving…" : "Save win"}
+            </button>
+            <button
+              className="min-h-8 px-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#706F6B] hover:text-black"
+              onClick={() => {
+                setWinnerOpen(false);
+                setAward("");
+                setDevpostUrl("");
+                setError(null);
+              }}
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       ) : null}
 

@@ -1,0 +1,1 @@
+ALTER TABLE "user_hackathons" ADD COLUMN "devpost_url" text;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
-import { BellRing, CalendarDays, MapPin, Trophy } from "lucide-react";
+import { BellRing, CalendarDays, ExternalLink, MapPin, Trophy } from "lucide-react";
 
 import { HackathonResultActions } from "@/components/hackathon-result-actions";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
@@ -24,6 +24,7 @@ type PipelineRow = {
   applicationStatus: string;
   isPinned: boolean;
   awardName: string | null;
+  devpostUrl: string | null;
   hackathonId: string;
   hackathonName: string;
   slug: string;
@@ -74,6 +75,7 @@ export default async function MyHackathonsPage() {
         applicationStatus: userHackathons.applicationStatus,
         isPinned: userHackathons.isPinned,
         awardName: userHackathons.awardName,
+        devpostUrl: userHackathons.devpostUrl,
         hackathonId: hackathons.id,
         hackathonName: hackathons.name,
         slug: hackathons.slug,
@@ -291,6 +293,18 @@ export default async function MyHackathonsPage() {
 
                     {won && row.awardName ? (
                       <p className="mt-3 text-sm font-semibold text-black">{row.awardName}</p>
+                    ) : null}
+
+                    {won && row.devpostUrl ? (
+                      <a
+                        className="mt-1.5 inline-flex items-center gap-1 text-sm text-[#660000] underline-offset-4 hover:underline"
+                        href={row.devpostUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
+                        View Devpost
+                      </a>
                     ) : null}
 
                     <div className="mt-4">

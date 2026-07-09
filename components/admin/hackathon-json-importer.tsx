@@ -261,27 +261,17 @@ export function HackathonJsonImporter() {
               <HackathonCardPreview payload={activePayload} previewId={`import-preview-${currentIndex}`} />
               <HackathonPayloadDetails payload={activePayload} />
             </div>
-            {pendingDiscord ? (
+            {pendingDiscord && pendingDiscord.discord.action !== "create" ? (
               <div className="flex flex-col justify-between rounded-lg border border-[#660000]/20 bg-[#FBF5F5] p-4">
                 <div>
                   <p className="text-sm font-semibold text-black">Create a Discord channel?</p>
                   <p className="mt-2 text-sm leading-6 text-[#706F6B]">
                     Imported. This qualifies for the{" "}
                     <span className="font-semibold text-black">{pendingDiscord.discord.categoryName}</span> category.
-                    Approving will{" "}
-                    {pendingDiscord.discord.action === "create" ? (
-                      <>create a new channel</>
-                    ) : (
-                      <>
-                        recycle the existing{" "}
-                        <span className="font-semibold text-black">
-                          #{pendingDiscord.discord.existingChannelName}
-                        </span>{" "}
-                        channel
-                      </>
-                    )}{" "}
-                    named <span className="font-semibold text-black">#{pendingDiscord.discord.name}</span> and place it
-                    there. Deny keeps the hackathon published without a channel.
+                    Approving will recycle the existing{" "}
+                    <span className="font-semibold text-black">#{pendingDiscord.discord.existingChannelName}</span>{" "}
+                    channel named <span className="font-semibold text-black">#{pendingDiscord.discord.name}</span> and
+                    place it there. Deny keeps the hackathon published without a channel.
                   </p>
                 </div>
                 <div className="mt-5 grid gap-3">
@@ -305,7 +295,7 @@ export function HackathonJsonImporter() {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : pendingDiscord ? null : (
               <div className="flex flex-col justify-between rounded-lg border border-black/10 bg-[#F7F7F4] p-4">
                 <div>
                   <p className="text-sm font-semibold text-black">Does this card look right?</p>
@@ -335,6 +325,42 @@ export function HackathonJsonImporter() {
                 </div>
               </div>
             )}
+          </div>
+        ) : null}
+
+        {pendingDiscord && pendingDiscord.discord.action === "create" ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+            <div className="w-full max-w-2xl rounded-2xl border border-[#660000]/20 bg-white p-8 shadow-2xl sm:p-12">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]">New Discord channel</p>
+              <h2 className="mt-3 text-3xl font-semibold text-black">Create a Discord channel?</h2>
+              <p className="mt-4 text-base leading-7 text-[#706F6B]">
+                Imported. This qualifies for the{" "}
+                <span className="font-semibold text-black">{pendingDiscord.discord.categoryName}</span> category.
+                Approving will create a new channel named{" "}
+                <span className="font-semibold text-black">#{pendingDiscord.discord.name}</span> and place it there.
+                Deny keeps the hackathon published without a channel.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <button
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-[#027A48] px-4 text-base font-semibold text-white disabled:opacity-50"
+                  disabled={discordBusy}
+                  onClick={() => decideDiscord("approve")}
+                  type="button"
+                >
+                  <Check aria-hidden="true" className="size-5" />
+                  Approve channel
+                </button>
+                <button
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-[#B42318] px-4 text-base font-semibold text-[#B42318] disabled:opacity-50"
+                  disabled={discordBusy}
+                  onClick={() => decideDiscord("deny")}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-5" />
+                  Deny channel
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 

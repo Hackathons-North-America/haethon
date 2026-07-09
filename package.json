@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "db:setup": "node scripts/db/setup.mjs",
     "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/db/migrate.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
