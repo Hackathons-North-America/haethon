@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUserRecord } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonDates, hackathonLocations, hackathons, userHackathons, userHackathonVotes } from "@/lib/db/schema";
+import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
 import { hackathonSearchSchema } from "@/lib/validations/hackathon";
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -123,6 +124,7 @@ export async function GET(request: Request) {
   const rows = await db
     .select({
       id: hackathons.id,
+      seriesId: hackathons.seriesId,
       name: hackathons.name,
       slug: hackathons.slug,
       shortDescription: hackathons.shortDescription,
@@ -183,6 +185,7 @@ export async function GET(request: Request) {
 
   const savedByHackathon = new Map(savedRows.map((row) => [row.hackathonId, row.isSaved]));
   const voteByHackathon = new Map(voteRows.map((row) => [row.hackathonId, row.vote]));
+  const discordHackathonIds = await getHackathonIdsWithDiscord(rows);
 
   return NextResponse.json({
     data: rows.map((row) => ({
@@ -190,6 +193,7 @@ export async function GET(request: Request) {
       date: formatDateRange(row.startsAt, row.endsAt),
       description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
       duration: formatDuration(row.startsAt, row.endsAt, row.format),
+      hasDiscord: discordHackathonIds.has(row.id),
       id: row.id,
       image: row.imageUrl,
       isSaved: savedByHackathon.get(row.id) ?? false,

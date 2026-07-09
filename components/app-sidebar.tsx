@@ -7,6 +7,7 @@ import {
   CircleUser,
   Compass,
   LayoutDashboard,
+  Settings,
   ShieldCheck,
 } from "lucide-react";
 
@@ -15,12 +16,19 @@ const items = [
   { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
   { href: "/my", icon: CalendarDays, label: "My Hackathons" },
   { href: "/account", icon: CircleUser, label: "Hacker Profile" },
+  { href: "/account/settings", icon: Settings, label: "Account Settings" },
 ];
 
 export function AppSidebar({ isAdmin, isSignedIn }: { isAdmin: boolean; isSignedIn: boolean }) {
   const pathname = usePathname();
 
   const links = isAdmin ? [...items, { href: "/admin", icon: ShieldCheck, label: "Admin" }] : items;
+
+  // The active link is the one whose href is the longest matching prefix of the
+  // current path, so /account/settings highlights Settings rather than both it and Hacker Profile.
+  const activeHref = links
+    .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <aside className="app-shell-sidebar z-40 border-b border-black/10 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
@@ -43,7 +51,7 @@ export function AppSidebar({ isAdmin, isSignedIn }: { isAdmin: boolean; isSigned
         className="flex gap-1 overflow-x-auto px-3 py-3 lg:mt-6 lg:flex-col lg:overflow-visible lg:px-3"
       >
         {links.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          const active = href === activeHref;
 
           return (
             <Link

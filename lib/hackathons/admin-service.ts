@@ -35,7 +35,7 @@ const adminHackathonSelection = {
   acceptanceAt: hackathonDates.acceptanceAt,
 };
 
-function adminHackathonQuery() {
+export function adminHackathonQuery() {
   return db
     .select(adminHackathonSelection)
     .from(hackathons)

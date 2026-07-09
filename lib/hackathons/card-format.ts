@@ -49,26 +49,28 @@ export function formatDuration(startsAt: Date | null, endsAt: Date | null, forma
   return `${duration} · ${formatLabel}`;
 }
 
-export function formatLocation({
-  city,
-  country,
-  format,
-  region,
-  venue,
-}: {
+type LocationInput = {
   city: string | null;
   country: string | null;
   format: string;
   region: string | null;
   venue: string | null;
-}) {
+};
+
+export function formatLocationParts({ city, country, format, region, venue }: LocationInput) {
   if (format === "online") {
-    return "Online";
+    return { country: null, locality: "Online" };
   }
 
-  const locality = [city, region].filter(Boolean).join(", ");
+  const locality = [city, region].filter(Boolean).join(", ") || venue || null;
 
-  return locality || venue || country || "Location TBA";
+  return { country: country || null, locality };
+}
+
+export function formatLocation(input: LocationInput) {
+  const { country, locality } = formatLocationParts(input);
+
+  return [country, locality].filter(Boolean).join(", ") || "Location TBA";
 }
 
 export function buildBadges({

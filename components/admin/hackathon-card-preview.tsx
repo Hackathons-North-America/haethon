@@ -48,7 +48,7 @@ function locationText(payload: PreviewPayload) {
     return "Online";
   }
 
-  const parts = [text(payload.city), text(payload.region), text(payload.country)].filter(Boolean);
+  const parts = [text(payload.city), text(payload.region)].filter(Boolean);
 
   if (parts.length) {
     return parts.join(", ");
@@ -91,6 +91,7 @@ export function previewPayloadToCard(payload: PreviewPayload, id = "admin-previe
     id,
     image: text(payload.imageUrl) || null,
     isSaved: false,
+    country: text(payload.format, "in_person") === "online" ? null : text(payload.country) || null,
     location: locationText(payload),
     name,
     userVote: 0,

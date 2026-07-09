@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -22,10 +22,13 @@ import {
 } from "lucide-react";
 
 import { AddToCalendarButton } from "@/components/add-to-calendar-button";
+import { DiscordGlyph } from "@/components/discord-glyph";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
 import { getCurrentUserRecord } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  discordChannels,
+  discordGuilds,
   hackathonDates,
   hackathonLocations,
   hackathonTags,
@@ -48,6 +51,7 @@ async function getHackathon(slug: string) {
   const [row] = await db
     .select({
       id: hackathons.id,
+      seriesId: hackathons.seriesId,
       name: hackathons.name,
       shortDescription: hackathons.shortDescription,
       websiteUrl: hackathons.websiteUrl,
@@ -79,6 +83,29 @@ async function getHackathon(slug: string) {
     .limit(1);
 
   return row ?? null;
+}
+
+async function getDiscordChannelLink(hackathonId: string, seriesId: string | null) {
+  const [channel] = await db
+    .select({
+      channelSnowflake: discordChannels.channelSnowflake,
+      guildSnowflake: discordGuilds.guildSnowflake,
+    })
+    .from(discordChannels)
+    .innerJoin(discordGuilds, eq(discordGuilds.id, discordChannels.guildId))
+    .where(
+      or(
+        eq(discordChannels.hackathonId, hackathonId),
+        seriesId ? eq(discordChannels.seriesId, seriesId) : undefined
+      )
+    )
+    .limit(1);
+
+  if (!channel) {
+    return null;
+  }
+
+  return `https://discord.com/channels/${channel.guildSnowflake}/${channel.channelSnowflake}`;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -146,7 +173,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const [tagRows, [tracked], upcomingReminders] = await Promise.all([
+  const [tagRows, [tracked], upcomingReminders, discordChannelLink] = await Promise.all([
     db
       .select({ name: tags.name })
       .from(hackathonTags)
@@ -172,6 +199,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           )
           .orderBy(asc(reminders.scheduledFor))
       : Promise.resolve([]),
+    getDiscordChannelLink(hackathon.id, hackathon.seriesId),
   ]);
 
   const applyUrl = hackathon.applicationUrl ?? hackathon.websiteUrl;
@@ -357,8 +385,19 @@ export default async function HackathonDetailPage({ params }: PageProps) {
               rel="noopener noreferrer"
               target="_blank"
             >
-              Apply on event site
+              Website link
               <ArrowUpRight aria-hidden="true" className="size-4" />
+            </a>
+          ) : null}
+          {discordChannelLink ? (
+            <a
+              className="inline-flex min-h-11 items-center justify-center gap-1.5 border border-[#5865F2] bg-[#5865F2] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#4752c4]"
+              href={discordChannelLink}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <DiscordGlyph className="size-4" />
+              Chat on Discord
             </a>
           ) : null}
           {hackathon.websiteUrl && hackathon.websiteUrl !== applyUrl ? (

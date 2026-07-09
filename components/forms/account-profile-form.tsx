@@ -1,7 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { AtSign, Camera, Code, ExternalLink, Globe, Link2, MapPin, Pencil, Save, School, X } from "lucide-react";
+import { ComponentType, FormEvent, useEffect, useState } from "react";
+import { Globe, Pencil, Save, X } from "lucide-react";
+import { FaLinkedin } from "react-icons/fa6";
+import { SiDevpost, SiGithub, SiInstagram, SiX } from "react-icons/si";
+
+type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" }>;
 
 type ProfileValues = {
   headline?: string | null;
@@ -25,7 +29,7 @@ type ProfileFormProps = {
 
 type ProfileLink = {
   href: string;
-  icon: typeof Code;
+  icon: IconComponent;
   label: string;
 };
 
@@ -33,6 +37,7 @@ const inputClassName =
   "w-full rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm text-black outline-none transition placeholder:text-[#706F6B] focus:border-[#660000] focus:bg-white focus:ring-2 focus:ring-[#660000]/15";
 const labelClassName = "mb-1.5 block text-sm font-semibold text-black";
 const headingClassName = "text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]";
+const detailLabelClassName = "text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-[#706F6B]";
 
 function formValue(formData: FormData, name: keyof ProfileValues) {
   return formData.get(name)?.toString() ?? "";
@@ -74,6 +79,27 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
     portfolioUrl: profile?.portfolioUrl ?? "",
   });
 
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsEditing(false);
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isEditing]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus("saving");
@@ -110,46 +136,128 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
   }
 
   const location = [values.locationCity, values.locationRegion].filter(Boolean).join(", ");
-  const links = [
-    { label: values.githubUrl ? compactHandle(values.githubUrl, "GitHub") : "GitHub", href: values.githubUrl, icon: Code },
-    { label: values.linkedinUrl ? compactHandle(values.linkedinUrl, "LinkedIn") : "LinkedIn", href: values.linkedinUrl, icon: Link2 },
-    { label: values.instagramUrl ? compactHandle(values.instagramUrl, "Instagram") : "Instagram", href: values.instagramUrl, icon: Camera },
-    { label: values.xUrl ? compactHandle(values.xUrl, "X") : "X", href: values.xUrl, icon: X },
-    { label: values.devpostUrl ? labelFromUrl(values.devpostUrl) : "Devpost", href: values.devpostUrl, icon: ExternalLink },
+  const rawLinks: { label: string; href: string | null | undefined; icon: IconComponent }[] = [
+    { label: values.githubUrl ? compactHandle(values.githubUrl, "GitHub") : "GitHub", href: values.githubUrl, icon: SiGithub },
+    { label: values.linkedinUrl ? compactHandle(values.linkedinUrl, "LinkedIn") : "LinkedIn", href: values.linkedinUrl, icon: FaLinkedin },
+    { label: values.instagramUrl ? compactHandle(values.instagramUrl, "Instagram") : "Instagram", href: values.instagramUrl, icon: SiInstagram },
+    { label: values.xUrl ? compactHandle(values.xUrl, "X") : "X", href: values.xUrl, icon: SiX },
+    { label: values.devpostUrl ? labelFromUrl(values.devpostUrl) : "Devpost", href: values.devpostUrl, icon: SiDevpost },
     { label: values.portfolioUrl ? labelFromUrl(values.portfolioUrl) : "Portfolio", href: values.portfolioUrl, icon: Globe },
-  ].filter((link): link is ProfileLink => Boolean(link.href));
+  ];
+  const links = rawLinks.filter((link): link is ProfileLink => Boolean(link.href));
+  const initials =
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || displayName[0]?.toUpperCase() || "?";
+  const profileDetails = [
+    { label: "Email", value: displayEmail, breakAll: true },
+    values.headline ? { label: "Headline", value: values.headline } : null,
+    values.bio ? { label: "Bio", value: values.bio } : null,
+    values.school ? { label: "University", value: values.school } : null,
+    location ? { label: "Location", value: location } : null,
+  ].filter((detail) => detail !== null);
 
   return (
-    <section className="space-y-4">
-      <div>
-        <p className={headingClassName}>My account</p>
-        <h1 className="mt-3 text-3xl font-semibold leading-tight text-black">{displayName}</h1>
-        <p className="mt-1 break-all text-sm text-[#706F6B]">{displayEmail}</p>
+    <section>
+      {/* Profile header: identity and labeled details, followed by socials */}
+      <div className="rounded-2xl border border-black/10 bg-[#F7F7F4] p-6 sm:p-8">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+          <div
+            aria-hidden="true"
+            className="flex size-16 shrink-0 items-center justify-center rounded-full bg-[#660000] text-2xl font-semibold text-[#EFEDEA]"
+          >
+            {initials}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className={headingClassName}>My account</p>
+                <h1 className="mt-2 text-3xl font-semibold leading-tight text-black">{displayName}</h1>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatus("idle");
+                  setIsEditing(true);
+                }}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#660000] bg-white px-4 text-sm font-semibold text-[#660000] transition hover:bg-[#660000] hover:text-white focus-visible:bg-[#660000] focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]"
+              >
+                <Pencil aria-hidden="true" className="size-4" />
+                Edit profile
+              </button>
+            </div>
+
+            <dl className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+              {profileDetails.map(({ label, value, breakAll }) => (
+                <div key={label} className={label === "Bio" ? "sm:col-span-2" : undefined}>
+                  <dt className={detailLabelClassName}>{label}</dt>
+                  <dd className={`mt-1 text-sm leading-6 text-black${breakAll ? " break-all" : ""}`}>{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {links.length > 0 ? (
+              <div className="mt-5 border-t border-black/10 pt-5">
+                <p className={detailLabelClassName}>Socials</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {links.map(({ href, icon: Icon, label }) => (
+                    <a
+                      className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-sm text-[#706F6B] transition hover:border-[#660000] hover:text-[#660000]"
+                      href={href}
+                      key={href}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <Icon aria-hidden="true" className="size-4 shrink-0" />
+                      <span className="break-all">{label}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-2 text-sm text-black">
-        {values.headline ? <p className="font-semibold">{values.headline}</p> : null}
-        {values.bio ? <p className="leading-6 text-black">{values.bio}</p> : null}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          setStatus("idle");
-          setIsEditing((current) => !current);
-        }}
-        className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#660000] bg-white px-4 text-sm font-semibold text-[#660000] transition hover:bg-[#660000] hover:text-white focus-visible:bg-[#660000] focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]"
-      >
-        <Pencil aria-hidden="true" className="size-4" />
-        Edit profile
-      </button>
+      {status === "saved" ? <p className="mt-3 text-center text-sm font-semibold text-[#027A48]">Saved</p> : null}
 
       {isEditing ? (
-        <form onSubmit={onSubmit} className="rounded-lg border border-black/10 bg-[#F7F7F4] p-4">
-          <h2 className={headingClassName}>Profile</h2>
+        <div
+          className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit profile"
+        >
+          <div
+            className="flex h-dvh items-center justify-center px-4 py-8"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setIsEditing(false);
+              }
+            }}
+          >
+          <form
+            onSubmit={onSubmit}
+            className="flex max-h-full w-full max-w-3xl flex-col rounded-xl border border-black/10 bg-white text-left shadow-2xl"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-3 px-6 pt-6 pb-4">
+              <h2 className={headingClassName}>Edit profile</h2>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                aria-label="Close"
+                className="inline-flex size-8 items-center justify-center rounded-lg text-[#706F6B] transition hover:bg-black/5 hover:text-black"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </div>
 
-          <div className="mt-4 grid gap-4">
-            <div>
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
               <label className={labelClassName} htmlFor="headline">
                 Headline
               </label>
@@ -157,7 +265,7 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
             </div>
             <div>
               <label className={labelClassName} htmlFor="school">
-                School
+                University
               </label>
               <input id="school" name="school" defaultValue={values.school ?? ""} className={inputClassName} />
             </div>
@@ -173,16 +281,12 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
               </label>
               <input id="locationRegion" name="locationRegion" defaultValue={values.locationRegion ?? ""} className={inputClassName} />
             </div>
-          </div>
-
-          <div className="mt-4">
-            <label className={labelClassName} htmlFor="bio">
-              Bio
-            </label>
-            <textarea id="bio" name="bio" rows={4} defaultValue={values.bio ?? ""} className={inputClassName} />
-          </div>
-
-          <div className="mt-5 grid gap-4">
+            <div>
+              <label className={labelClassName} htmlFor="bio">
+                Bio
+              </label>
+              <textarea id="bio" name="bio" rows={2} defaultValue={values.bio ?? ""} className={inputClassName} />
+            </div>
             {[
               ["linkedinUrl", "LinkedIn"],
               ["instagramUrl", "Instagram"],
@@ -206,7 +310,7 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
             ))}
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-black/10 px-6 py-4">
             <button
               disabled={status === "saving"}
               type="submit"
@@ -215,43 +319,19 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
               <Save aria-hidden="true" className="size-4" />
               {status === "saving" ? "Saving" : "Save profile"}
             </button>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 px-4 text-sm font-semibold text-black transition hover:bg-black/5"
+            >
+              Cancel
+            </button>
             {status === "error" ? <p className="text-sm font-semibold text-[#B42318]">Could not save</p> : null}
           </div>
-        </form>
+          </form>
+          </div>
+        </div>
       ) : null}
-
-      {status === "saved" ? <p className="text-sm font-semibold text-[#027A48]">Saved</p> : null}
-
-      <div className="space-y-3 border-t border-black/10 pt-4 text-sm text-black">
-        <p className="flex items-center gap-2">
-          <AtSign aria-hidden="true" className="size-4 shrink-0 text-[#706F6B]" />
-          <span className="break-all">{displayEmail}</span>
-        </p>
-        {values.school ? (
-          <p className="flex items-center gap-2">
-            <School aria-hidden="true" className="size-4 shrink-0 text-[#706F6B]" />
-            <span>{values.school}</span>
-          </p>
-        ) : null}
-        {location ? (
-          <p className="flex items-center gap-2">
-            <MapPin aria-hidden="true" className="size-4 shrink-0 text-[#706F6B]" />
-            <span>{location}</span>
-          </p>
-        ) : null}
-        {links.map(({ href, icon: Icon, label }) => (
-          <a
-            className="flex items-center gap-2 text-[#706F6B] hover:text-[#660000]"
-            href={href}
-            key={href}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <Icon aria-hidden="true" className="size-4 shrink-0" />
-            <span className="break-all">{label}</span>
-          </a>
-        ))}
-      </div>
     </section>
   );
 }

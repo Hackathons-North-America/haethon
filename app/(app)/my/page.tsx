@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, eq, isNull, ne, or } from "drizzle-orm";
-import { BellRing, CalendarDays, ExternalLink, MapPin, Trophy } from "lucide-react";
+import { BellRing, CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import { HackathonResultActions } from "@/components/hackathon-result-actions";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
@@ -42,11 +42,11 @@ type PipelineRow = {
 
 const stageOrder = ["interested", "applied", "accepted", "attending"] as const;
 
-const stageCopy: Record<(typeof stageOrder)[number], { title: string; hint: string }> = {
-  interested: { title: "Interested", hint: "Saved for later — we'll nudge you when applications move." },
-  applied: { title: "Applied", hint: "Waiting on decisions." },
-  accepted: { title: "Accepted", hint: "You're in — time to plan the trip." },
-  attending: { title: "Attending", hint: "Check in at the event to verify your attendance." },
+const stageTitles: Record<(typeof stageOrder)[number], string> = {
+  interested: "Interested",
+  applied: "Applied",
+  accepted: "Accepted",
+  attending: "Attending",
 };
 
 function nextDeadline(row: PipelineRow, now: Date) {
@@ -123,26 +123,28 @@ export default async function MyHackathonsPage() {
   }
 
   const byStage = new Map<string, PipelineRow[]>();
+  const pastRows: PipelineRow[] = [];
 
   for (const row of rows) {
+    const ended = row.endsAt ? row.endsAt < now : false;
+
+    if (ended || row.applicationStatus === "attended" || row.applicationStatus === "won") {
+      pastRows.push(row);
+      continue;
+    }
+
     const list = byStage.get(row.applicationStatus) ?? [];
     list.push(row);
     byStage.set(row.applicationStatus, list);
   }
 
-  const pastRows = [...(byStage.get("attended") ?? []), ...(byStage.get("won") ?? [])];
+  pastRows.sort((a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0));
+
   const activeCount = stageOrder.reduce((total, stage) => total + (byStage.get(stage)?.length ?? 0), 0);
 
   return (
     <main className="min-h-screen bg-white px-5 pb-20 pt-14 text-black sm:px-8 sm:pt-16 lg:px-12">
       <div className="mx-auto w-full max-w-[980px]">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <h1 className="text-3xl font-semibold tracking-normal text-black sm:text-4xl">My hackathons</h1>
-          <p className="text-sm text-[#706F6B]">
-            {activeCount} in the pipeline · reminders arrive by email, so you don&apos;t have to keep checking
-          </p>
-        </div>
-
         {activeCount === 0 ? (
           <div className="mt-10 rounded-lg border border-black/10 bg-[#F7F7F4] p-8 text-center">
             <p className="text-base font-semibold text-black">Nothing in your pipeline yet.</p>
@@ -168,18 +170,14 @@ export default async function MyHackathonsPage() {
 
           return (
             <section className="mt-10" key={stage}>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]">
-                  {stageCopy[stage].title} · {stageRows.length}
-                </h2>
-                <p className="text-sm text-[#706F6B]">{stageCopy[stage].hint}</p>
-              </div>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#660000]">
+                {stageTitles[stage]} · {stageRows.length}
+              </h2>
 
               <div className="mt-4 space-y-3">
                 {stageRows.map((row) => {
                   const deadline = nextDeadline(row, now);
                   const rowReminders = remindersByHackathon.get(row.hackathonId) ?? [];
-                  const ended = row.endsAt ? row.endsAt < now : false;
 
                   return (
                     <article className="rounded-lg border border-black/10 bg-[#F7F7F4] p-5" key={row.id}>
@@ -215,7 +213,6 @@ export default async function MyHackathonsPage() {
                           hackathonId={row.hackathonId}
                           initialStatus={row.applicationStatus}
                         />
-                        {stage === "attending" && ended ? <MarkAttendedButton userHackathonId={row.id} /> : null}
                       </div>
 
                       {rowReminders.length ? (
@@ -245,18 +242,11 @@ export default async function MyHackathonsPage() {
 
         {pastRows.length ? (
           <section className="mt-12 border-t border-black/10 pt-8">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#706F6B]">Past</h2>
-              <Link
-                className="text-sm font-semibold text-[#660000] underline-offset-4 hover:underline"
-                href="/account"
-              >
-                See your full record on your profile
-              </Link>
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-[#706F6B]">Past</h2>
             <div className="mt-4 space-y-3">
               {pastRows.map((row) => {
                 const won = row.applicationStatus === "won";
+                const attended = row.applicationStatus === "attended";
 
                 return (
                   <article className="rounded-lg border border-black/10 bg-[#F7F7F4] p-5" key={row.id}>
@@ -279,40 +269,60 @@ export default async function MyHackathonsPage() {
                           </span>
                         </p>
                       </div>
-                      {won ? (
-                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#660000]/25 bg-white px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#660000]">
-                          <Trophy aria-hidden="true" className="size-3.5" />
-                          Winner
-                        </span>
-                      ) : (
-                        <span className="inline-flex shrink-0 items-center rounded-full border border-black/10 bg-white px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#706F6B]">
-                          Attended
-                        </span>
-                      )}
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        {won ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#660000] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white">
+                            <Trophy aria-hidden="true" className="size-3.5" />
+                            Winner
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full border border-black/10 bg-white px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#706F6B]">
+                            {attended ? "Attended" : "Ended"}
+                          </span>
+                        )}
+                        {row.isPinned ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#660000]/25 bg-white px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#660000]">
+                            <Pin aria-hidden="true" className="size-3.5 fill-current" />
+                            Pinned
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
 
-                    {won && row.awardName ? (
-                      <p className="mt-3 text-sm font-semibold text-black">{row.awardName}</p>
+                    {(won && row.awardName) || row.devpostUrl ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                        {won && row.awardName ? (
+                          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#660000]">
+                            <Trophy aria-hidden="true" className="size-3.5 shrink-0" />
+                            {row.awardName}
+                          </p>
+                        ) : null}
+                        {row.devpostUrl ? (
+                          <a
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-black underline-offset-4 hover:text-[#660000] hover:underline"
+                            href={row.devpostUrl}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
+                            View project
+                          </a>
+                        ) : null}
+                      </div>
                     ) : null}
 
-                    {won && row.devpostUrl ? (
-                      <a
-                        className="mt-1.5 inline-flex items-center gap-1 text-sm text-[#660000] underline-offset-4 hover:underline"
-                        href={row.devpostUrl}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
-                        View Devpost
-                      </a>
-                    ) : null}
-
-                    <div className="mt-4">
-                      <HackathonResultActions
-                        isPinned={row.isPinned}
-                        status={won ? "won" : "attended"}
-                        userHackathonId={row.id}
-                      />
+                    <div className="mt-4 border-t border-black/10 pt-4">
+                      {won || attended ? (
+                        <HackathonResultActions
+                          awardName={row.awardName}
+                          devpostUrl={row.devpostUrl}
+                          isPinned={row.isPinned}
+                          status={won ? "won" : "attended"}
+                          userHackathonId={row.id}
+                        />
+                      ) : (
+                        <MarkAttendedButton userHackathonId={row.id} />
+                      )}
                     </div>
                   </article>
                 );

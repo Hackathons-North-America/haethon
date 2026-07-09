@@ -6,14 +6,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowBigDown, ArrowBigUp, Bookmark } from "lucide-react";
 
+import { DiscordGlyph } from "@/components/discord-glyph";
+
 type Vote = -1 | 0 | 1;
 type Rgb = [number, number, number];
 
 export type HackathonCardData = {
   badges?: string[];
+  country?: string | null;
   date: string;
   description: string;
   duration: string;
+  hasDiscord?: boolean;
   id: string;
   image?: string | null;
   isSaved: boolean;
@@ -393,7 +397,7 @@ export function HackathonCard({
 
   return (
     <article
-      className="group relative min-w-0 overflow-hidden border border-black/10 p-5 shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out hover:z-10 hover:scale-110 sm:p-6"
+      className="group relative flex min-w-0 flex-col overflow-hidden border border-black/10 p-5 shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out hover:z-10 hover:scale-110 sm:p-6"
       style={gradientStyle}
     >
       {hackathon.slug && !preview ? (
@@ -416,23 +420,31 @@ export function HackathonCard({
       <div className="flex items-start gap-4">
         <HackathonLogoMark hackathon={hackathon} />
         <div className="min-w-0 pt-1">
-          <h2 className="text-xl font-semibold leading-6 text-black sm:text-[1.35rem]">
+          <h2 className="line-clamp-3 text-xl font-semibold leading-6 text-black sm:text-[1.35rem]">
             {hackathon.name}
           </h2>
           <p className="mt-2 text-[15px] font-semibold leading-5 text-[#706F6B]">
             {hackathon.date}
           </p>
+          {hackathon.country ? (
+            <p className="mt-1 text-[15px] font-semibold leading-5 text-[#706F6B]">
+              {hackathon.country}
+            </p>
+          ) : null}
           <p className="mt-1 text-[15px] font-semibold leading-5 text-[#706F6B]">
             {hackathon.location}
           </p>
+          {hackathon.hasDiscord ? (
+            <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#5865F2]">
+              <DiscordGlyph className="size-3.5" />
+              Discord
+            </span>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-5 text-base leading-6">
-        <p className="line-clamp-3 text-[#706F6B]">
-          {hackathon.description}
-        </p>
-        <div className="mt-5 flex items-center justify-between gap-3">
+      <div className="mt-auto pt-5 text-base leading-6">
+        <div className="flex items-center justify-between gap-3">
           <VoteControl
             hackathonId={hackathon.id}
             initialVote={hackathon.userVote}

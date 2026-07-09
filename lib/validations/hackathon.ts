@@ -24,6 +24,11 @@ const truncatedOptionalString = (max: number) =>
 
     return trimmed.length > max ? `${trimmed.slice(0, max - 1).trimEnd()}…` : trimmed;
   }, z.string().max(max).optional());
+
+// Like the optional variants, but empty strings clear the stored value instead of being ignored.
+const emptyToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
+const clearableUrl = z.preprocess(emptyToNull, z.string().trim().url().nullable().optional());
+const clearableString = (max: number) => z.preprocess(emptyToNull, z.string().trim().max(max).nullable().optional());
 const optionalBooleanQueryParam = z
   .enum(["true", "false"])
   .transform((value) => value === "true")
@@ -213,8 +218,8 @@ export const userHackathonUpdateSchema = z.object({
   applicationStatus: z.enum(["interested", "applied", "accepted", "attending", "attended", "won"]).optional(),
   isSaved: z.boolean().optional(),
   isPinned: z.boolean().optional(),
-  awardName: optionalString(180),
-  devpostUrl: optionalUrl,
+  awardName: clearableString(180),
+  devpostUrl: clearableUrl,
   notes: optionalString(2000),
 });
 

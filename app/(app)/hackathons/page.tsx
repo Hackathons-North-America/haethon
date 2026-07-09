@@ -6,7 +6,8 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import { getCurrentUserRecord } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonDates, hackathonLocations, hackathons, userHackathons, userHackathonVotes } from "@/lib/db/schema";
-import { buildBadges, formatDateRange, formatDuration, formatLocation } from "@/lib/hackathons/card-format";
+import { buildBadges, formatDateRange, formatDuration, formatLocationParts } from "@/lib/hackathons/card-format";
+import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
 import { dateRangeForPeriod, normalizeSearchFilters } from "@/lib/hackathons/search-filters";
 import type { HackathonSearchFilters } from "@/lib/hackathons/search-filters";
 
@@ -31,6 +32,7 @@ async function getHackathonCards(filters: HackathonSearchFilters): Promise<Hacka
   const rows = await db
     .select({
       id: hackathons.id,
+      seriesId: hackathons.seriesId,
       name: hackathons.name,
       slug: hackathons.slug,
       shortDescription: hackathons.shortDescription,
@@ -90,22 +92,29 @@ async function getHackathonCards(filters: HackathonSearchFilters): Promise<Hacka
 
   const savedByHackathon = new Map(savedRows.map((row) => [row.hackathonId, row.isSaved]));
   const voteByHackathon = new Map(voteRows.map((row) => [row.hackathonId, row.vote]));
+  const discordHackathonIds = await getHackathonIdsWithDiscord(rows);
 
-  return rows.map((row) => ({
-    badges: buildBadges(row),
-    date: formatDateRange(row.startsAt, row.endsAt),
-    description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
-    duration: formatDuration(row.startsAt, row.endsAt, row.format),
-    id: row.id,
-    image: row.imageUrl,
-    isSaved: savedByHackathon.get(row.id) ?? false,
-    location: formatLocation(row),
-    name: row.name,
-    slug: row.slug,
-    userVote: (voteByHackathon.get(row.id) ?? 0) as -1 | 0 | 1,
-    voteScore: row.voteScore,
-    websiteUrl: row.websiteUrl,
-  }));
+  return rows.map((row) => {
+    const location = formatLocationParts(row);
+
+    return {
+      badges: buildBadges(row),
+      country: location.country,
+      date: formatDateRange(row.startsAt, row.endsAt),
+      description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
+      duration: formatDuration(row.startsAt, row.endsAt, row.format),
+      hasDiscord: discordHackathonIds.has(row.id),
+      id: row.id,
+      image: row.imageUrl,
+      isSaved: savedByHackathon.get(row.id) ?? false,
+      location: location.locality ?? "Location TBA",
+      name: row.name,
+      slug: row.slug,
+      userVote: (voteByHackathon.get(row.id) ?? 0) as -1 | 0 | 1,
+      voteScore: row.voteScore,
+      websiteUrl: row.websiteUrl,
+    };
+  });
 }
 
 export default async function HackathonsPage({

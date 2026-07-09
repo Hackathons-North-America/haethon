@@ -16,7 +16,7 @@ import {
   userHackathons,
   userProfiles,
 } from "@/lib/db/schema";
-import { buildBadges, formatDateRange, formatDuration, formatLocation } from "@/lib/hackathons/card-format";
+import { buildBadges, formatDateRange, formatDuration, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 
 export const metadata: Metadata = {
@@ -143,21 +143,26 @@ export default async function DashboardPage() {
     .orderBy(...suggestionOrderBy)
     .limit(3);
 
-  const suggestions: HackathonCardData[] = suggestionRows.map((row) => ({
-    badges: buildBadges(row),
-    date: formatDateRange(row.startsAt, row.endsAt),
-    description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
-    duration: formatDuration(row.startsAt, row.endsAt, row.format),
-    id: row.id,
-    image: row.imageUrl,
-    isSaved: false,
-    location: formatLocation(row),
-    name: row.name,
-    slug: row.slug,
-    userVote: 0,
-    voteScore: row.voteScore,
-    websiteUrl: row.websiteUrl,
-  }));
+  const suggestions: HackathonCardData[] = suggestionRows.map((row) => {
+    const location = formatLocationParts(row);
+
+    return {
+      badges: buildBadges(row),
+      country: location.country,
+      date: formatDateRange(row.startsAt, row.endsAt),
+      description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
+      duration: formatDuration(row.startsAt, row.endsAt, row.format),
+      id: row.id,
+      image: row.imageUrl,
+      isSaved: false,
+      location: location.locality ?? "Location TBA",
+      name: row.name,
+      slug: row.slug,
+      userVote: 0,
+      voteScore: row.voteScore,
+      websiteUrl: row.websiteUrl,
+    };
+  });
 
   const firstName = user.firstName ?? "hacker";
   const actionCount = closingSoon.length + decisionsOut.length + unloggedAttendance.length;

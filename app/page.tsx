@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Building2, ClipboardList, Maximize2, Search } from "lucide-react";
 
 import { HeroTypewriterSpan } from "@/components/hero-typewriter-span";
+import { MacbookHero } from "@/components/ui/macbook-hero";
 
 const navItems = [
   { label: "About", href: "/about" },
@@ -148,20 +149,19 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="border-b border-black/10 bg-white px-8 pb-[4.5rem] pt-24 sm:px-14 sm:pb-[5.5rem] sm:pt-32 md:pb-28 md:pt-44 lg:px-20">
-        <div className="mx-auto max-w-[1120px]">
+      <section className="relative isolate overflow-hidden bg-white px-8 pb-[4.5rem] pt-12 sm:px-14 sm:pb-[5.5rem] sm:pt-16 md:pb-28 md:pt-[5.5rem] lg:px-20">
+        <div className="mx-auto w-full max-w-[520px] sm:max-w-[520px] md:max-w-[680px] lg:max-w-[840px] xl:max-w-[980px] 2xl:max-w-[1120px]">
           <h1
             aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
-            className="max-w-[720px] text-[1.6rem] font-semibold leading-[1.2] tracking-normal text-black sm:text-[1.9rem] lg:text-[2rem]"
+            className="w-full text-[1.6rem] font-semibold leading-[1.5] tracking-normal text-black sm:text-[1.9rem] lg:text-[2rem]"
           >
             Search hundreds of upcoming hackathons, build your profile, and{" "}
             <HeroTypewriterSpan />
           </h1>
-          <p className="mt-8 max-w-[640px] text-base font-medium leading-6 text-[#3F3E3B]">
-            Filter for hackathons by location, date, and category, track your
-            achievements, and stay informed with reminders for deadlines and
-            upcoming events.
-          </p>
+        </div>
+
+        <div className="mx-auto mt-14 w-full max-w-[1120px] sm:mt-16">
+          <MacbookHero />
         </div>
       </section>
 
