@@ -397,6 +397,54 @@ select {
     radial-gradient(ellipse 38% 32% at 42% 22%, rgb(29 42 68 / 0.26), transparent 62%);
 }
 
+/* ---------- Hackathon card aurora ----------
+   Card surface painted from --hackathon-accent-rgb (sampled from the event
+   logo). Light theme reads as a pale daylight sky; dark theme becomes a
+   night-sky aurora — accent curtain up top, boreal/teal/navy glows below.
+   A ::after overlay carries a stronger pass that fades in on hover. */
+
+.hackathon-card-aurora {
+  background:
+    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.16), transparent 42%),
+    radial-gradient(90% 70% at 88% 12%, rgb(70 120 110 / 0.1), transparent 50%),
+    radial-gradient(80% 60% at 70% 100%, rgb(45 74 34 / 0.07), transparent 55%),
+    linear-gradient(160deg, #ffffff 0%, #f7f3ea 100%);
+}
+
+.dark .hackathon-card-aurora {
+  background:
+    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.34), transparent 48%),
+    linear-gradient(115deg, transparent 24%, rgb(var(--hackathon-accent-rgb) / 0.08) 40%, transparent 62%),
+    radial-gradient(90% 75% at 85% 8%, rgb(70 120 110 / 0.28), transparent 52%),
+    radial-gradient(85% 70% at 75% 96%, rgb(45 74 34 / 0.26), transparent 58%),
+    radial-gradient(70% 55% at 28% 82%, rgb(29 42 68 / 0.3), transparent 60%),
+    linear-gradient(160deg, #181a19 0%, #0f1110 100%);
+}
+
+.hackathon-card-aurora::after {
+  background:
+    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.12), transparent 46%),
+    radial-gradient(90% 70% at 88% 12%, rgb(70 120 110 / 0.1), transparent 52%);
+  content: "";
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.45s ease;
+}
+
+.dark .hackathon-card-aurora::after {
+  background:
+    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.2), transparent 50%),
+    radial-gradient(90% 75% at 85% 8%, rgb(70 120 110 / 0.18), transparent 54%),
+    radial-gradient(85% 70% at 75% 96%, rgb(45 74 34 / 0.16), transparent 60%);
+}
+
+.hackathon-card-aurora:hover::after,
+.hackathon-card-aurora:focus-within::after {
+  opacity: 1;
+}
+
 /* ---------- Hero atmosphere ---------- */
 
 /* Film grain over the aurora — tactile, keeps the gradients from banding. */

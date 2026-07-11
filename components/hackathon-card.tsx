@@ -57,15 +57,13 @@ function getFallbackAccentRgb(name: string): Rgb {
   return palette[hash % palette.length] ?? palette[0];
 }
 
-function getGradientStyle(rgb: Rgb) {
+/* The aurora surface itself lives in globals.css (.hackathon-card-aurora),
+   keyed off this accent variable so it can flip with the theme. */
+function getAccentStyle(rgb: Rgb) {
   const [r, g, b] = rgb;
 
   return {
     "--hackathon-accent-rgb": `${r} ${g} ${b}`,
-    background: [
-      `radial-gradient(circle at 14% 8%, rgba(${r}, ${g}, ${b}, 0.18), transparent 36%)`,
-      `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.14), #ffffff 52%, #f7f3ea 100%)`,
-    ].join(", "),
   } as CSSProperties & { "--hackathon-accent-rgb": string };
 }
 
@@ -393,12 +391,12 @@ export function HackathonCard({
 }) {
   const fallbackRgb = useMemo(() => getFallbackAccentRgb(hackathon.name), [hackathon.name]);
   const accentRgb = useLogoAccentRgb(hackathon.image, fallbackRgb);
-  const gradientStyle = useMemo(() => getGradientStyle(accentRgb), [accentRgb]);
+  const accentStyle = useMemo(() => getAccentStyle(accentRgb), [accentRgb]);
 
   return (
     <article
-      className="group relative flex min-w-0 flex-col overflow-hidden border border-navy/10 dark:border-white/10 p-5 shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out hover:z-10 hover:scale-110 sm:p-6"
-      style={gradientStyle}
+      className="hackathon-card-aurora group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-navy/10 dark:border-white/10 p-5 shadow-[0_18px_45px_rgb(0_0_0/0.06)] dark:shadow-[0_18px_45px_rgb(0_0_0/0.5)] transition-transform duration-200 ease-out hover:z-10 hover:scale-105 sm:p-6"
+      style={accentStyle}
     >
       {hackathon.slug && !preview ? (
         <Link
@@ -415,6 +413,11 @@ export function HackathonCard({
           target="_blank"
         />
       ) : null}
+      {/* Film grain keeps the aurora tactile, matching the hero. */}
+      <span
+        aria-hidden="true"
+        className="hero-grain pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay dark:opacity-[0.09]"
+      />
       <CardAccentEdges />
 
       <div className="flex items-start gap-4">
