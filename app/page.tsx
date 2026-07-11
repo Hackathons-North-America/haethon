@@ -1,7 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { HeroHeadline } from "@/components/hero-headline";
 import { HeroAurora } from "@/components/hero-inuksuk";
+import { HeroPolaroids } from "@/components/hero-polaroids";
 import { HeroTypewriterSpan } from "@/components/hero-typewriter-span";
 import {
   DiscoverVisual,
@@ -10,7 +12,7 @@ import {
 } from "@/components/landing-feature-visuals";
 import { LandingMap } from "@/components/landing-map";
 import { LandingReveal } from "@/components/landing-reveal";
-import { PolaroidFrame, heroPolaroids, mobilePolaroids } from "@/components/polaroid-frame";
+import { PolaroidFrame, mobilePolaroids } from "@/components/polaroid-frame";
 import { PrimaryNav } from "@/components/primary-nav";
 
 const features = [
@@ -89,39 +91,12 @@ export default function Home() {
       <section className="relative isolate min-h-[min(110svh,980px)] overflow-hidden pb-28 pt-28 sm:pb-32 sm:pt-32">
         <HeroAurora />
 
-        {heroPolaroids.map((shot) => (
-          <PolaroidFrame
-            key={shot.src}
-            src={shot.src}
-            alt={shot.alt}
-            caption={shot.caption}
-            className={shot.className}
-            width={shot.width}
-            height={shot.height}
-            sticker={shot.sticker}
-            lift={shot.lift}
-          />
-        ))}
+        <HeroPolaroids />
 
         <div className="relative z-10 mx-auto flex max-w-[640px] flex-col items-center px-5 text-center sm:px-8 lg:max-w-[700px]">
-          <LandingReveal>
-            <p className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-navy/[0.03] px-3.5 py-1.5 text-[0.75rem] font-medium text-navy/65 dark:border-white/10 dark:bg-white/5 dark:text-wheat/70">
-              <span aria-hidden="true">✦</span>
-              Across Canada &amp; the US
-            </p>
-          </LandingReveal>
+          <HeroHeadline />
 
-          <LandingReveal delay={0.08}>
-            <h1 className="mt-7 font-serif text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-navy dark:text-wheat">
-              Where{" "}
-              <span className="bg-gradient-to-r from-boreal via-[#5a9e8a] to-cabernet bg-clip-text text-transparent">
-                hackers
-              </span>{" "}
-              find their next weekend.
-            </h1>
-          </LandingReveal>
-
-          <LandingReveal delay={0.14}>
+          <LandingReveal delay={0.45}>
             <p
               aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
               className="mt-6 max-w-[34rem] text-base leading-relaxed text-navy/60 sm:text-lg dark:text-wheat/65"
@@ -131,17 +106,23 @@ export default function Home() {
             </p>
           </LandingReveal>
 
-          <LandingReveal delay={0.2}>
+          <LandingReveal delay={0.6}>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/hackathons"
-                className="inline-flex min-h-11 items-center justify-center rounded-full bg-cabernet px-6 text-sm font-semibold text-wheat transition-colors hover:bg-[#5c151c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:focus-visible:outline-wheat"
+                className="cta-sheen group inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-cabernet px-6 text-sm font-semibold text-wheat shadow-[0_12px_32px_-12px_rgba(114,28,36,0.6)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#5c151c] hover:shadow-[0_18px_40px_-12px_rgba(114,28,36,0.7)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet active:translate-y-0 dark:bg-wheat dark:text-[#141414] dark:shadow-[0_12px_32px_-12px_rgba(244,235,217,0.35)] dark:hover:bg-white dark:hover:shadow-[0_18px_40px_-12px_rgba(244,235,217,0.45)] dark:focus-visible:outline-wheat"
               >
                 Open App
+                <span
+                  aria-hidden="true"
+                  className="transition-transform duration-300 group-hover:translate-x-0.5"
+                >
+                  →
+                </span>
               </Link>
               <Link
                 href="/about"
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-navy/15 bg-white/70 px-6 text-sm font-semibold text-navy transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-navy/30 dark:border-white/15 dark:bg-white/5 dark:text-wheat dark:hover:bg-white/10 dark:focus-visible:outline-wheat"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-navy/15 bg-white/70 px-6 text-sm font-semibold text-navy backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_28px_-14px_rgba(29,42,68,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-navy/30 active:translate-y-0 dark:border-white/15 dark:bg-white/5 dark:text-wheat dark:hover:bg-white/10 dark:hover:shadow-[0_12px_28px_-14px_rgba(0,0,0,0.6)] dark:focus-visible:outline-wheat"
               >
                 About HNA
               </Link>
@@ -171,9 +152,11 @@ export default function Home() {
               height={shot.height}
               sticker={shot.sticker}
               lift={shot.lift}
+              tape={shot.tape}
             />
           ))}
         </div>
+
       </section>
 
       <section

@@ -82,7 +82,7 @@ export function HeroTypewriterSpan({
         className={`inline ${className}`}
       >
         <span data-hero-typewriter-text>{text || "\u00A0"}</span>
-        <span className="ml-1 inline-block h-[0.86em] w-[0.075em] translate-y-[0.08em] bg-current motion-safe:animate-pulse" />
+        <span className="typewriter-caret ml-1 inline-block h-[0.86em] w-[0.075em] translate-y-[0.08em] bg-current" />
       </span>
     </>
   );

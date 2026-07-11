@@ -9,6 +9,7 @@ type PolaroidFrameProps = {
   height?: number;
   sticker?: "beaver" | null;
   lift?: "left" | "right" | "none";
+  tape?: "corners" | "top" | null;
 };
 
 export function PolaroidFrame({
@@ -20,6 +21,7 @@ export function PolaroidFrame({
   height = 240,
   sticker = null,
   lift = "none",
+  tape = null,
 }: PolaroidFrameProps) {
   // Don't set `relative` here — hero frames pass `absolute`, and both utilities
   // conflict in Tailwind (order in the stylesheet wins, not class string order).
@@ -31,15 +33,37 @@ export function PolaroidFrame({
       data-lift={lift}
       tabIndex={0}
     >
-      <div className="polaroid-lift relative rounded-none bg-white p-[5px] pb-6 shadow-[0_12px_28px_-8px_rgba(0,0,0,0.35),0_2px_6px_-2px_rgba(0,0,0,0.16)] ring-1 ring-black/[0.04] dark:bg-[#f7f0e4] dark:ring-black/10">
+      <div className="polaroid-lift relative rounded-none bg-[linear-gradient(165deg,#ffffff_0%,#faf6ec_100%)] p-[5px] pb-6 shadow-[0_12px_28px_-8px_rgba(0,0,0,0.35),0_2px_6px_-2px_rgba(0,0,0,0.16)] ring-1 ring-black/[0.04] dark:bg-[linear-gradient(165deg,#f9f3e7_0%,#f0e7d5_100%)] dark:ring-black/10">
+        {tape === "top" ? (
+          <span
+            aria-hidden="true"
+            className="polaroid-tape left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rotate-[-3deg]"
+          />
+        ) : null}
+        {tape === "corners" ? (
+          <>
+            <span
+              aria-hidden="true"
+              className="polaroid-tape -left-3.5 -top-1.5 rotate-[-40deg]"
+            />
+            <span
+              aria-hidden="true"
+              className="polaroid-tape -right-3.5 -top-1.5 rotate-[40deg]"
+            />
+          </>
+        ) : null}
         <div className="relative overflow-hidden rounded-none bg-[#111]">
           <Image
             src={src}
             alt={alt}
             width={width}
             height={height}
-            className="aspect-[4/3] h-auto w-full object-cover"
+            className="polaroid-photo aspect-[4/3] h-auto w-full object-cover"
             sizes="(max-width: 1024px) 160px, 220px"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 shadow-[inset_0_0_14px_rgba(0,0,0,0.22),inset_0_0_1px_rgba(0,0,0,0.4)]"
           />
           {caption ? (
             <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-2.5 pb-2 pt-6 text-center font-serif text-[0.65rem] font-medium italic tracking-tight text-white/90 sm:text-[0.7rem]">
@@ -74,6 +98,7 @@ export const leftPolaroids = [
     height: 682,
     sticker: "beaver" as const,
     lift: "left" as const,
+    tape: "top" as const,
   },
   {
     src: "/photos/atrium.png",
@@ -85,6 +110,7 @@ export const leftPolaroids = [
     height: 682,
     sticker: null,
     lift: "left" as const,
+    tape: "corners" as const,
   },
   {
     src: "/photos/team-huddle.png",
@@ -96,6 +122,7 @@ export const leftPolaroids = [
     height: 427,
     sticker: null,
     lift: "left" as const,
+    tape: "top" as const,
   },
   {
     src: "/photos/swag.png",
@@ -107,6 +134,7 @@ export const leftPolaroids = [
     height: 650,
     sticker: null,
     lift: "left" as const,
+    tape: "corners" as const,
   },
   {
     src: "/photos/collab.png",
@@ -118,6 +146,7 @@ export const leftPolaroids = [
     height: 682,
     sticker: "beaver" as const,
     lift: "left" as const,
+    tape: "top" as const,
   },
 ] as const;
 
@@ -133,6 +162,7 @@ export const rightPolaroids = [
     height: 768,
     sticker: null,
     lift: "right" as const,
+    tape: "corners" as const,
   },
   {
     src: "/photos/stage.png",
@@ -144,6 +174,7 @@ export const rightPolaroids = [
     height: 682,
     sticker: "beaver" as const,
     lift: "right" as const,
+    tape: "top" as const,
   },
   {
     src: "/photos/demo-guitar.png",
@@ -155,6 +186,7 @@ export const rightPolaroids = [
     height: 427,
     sticker: null,
     lift: "right" as const,
+    tape: "corners" as const,
   },
   {
     src: "/photos/sushi.png",
@@ -166,6 +198,7 @@ export const rightPolaroids = [
     height: 682,
     sticker: null,
     lift: "right" as const,
+    tape: "top" as const,
   },
   {
     src: "/photos/atrium-wide.png",
@@ -177,6 +210,7 @@ export const rightPolaroids = [
     height: 682,
     sticker: null,
     lift: "right" as const,
+    tape: "corners" as const,
   },
 ] as const;
 

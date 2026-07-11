@@ -345,6 +345,172 @@ select {
   }
 }
 
+/* ---------- Hero atmosphere ---------- */
+
+/* Film grain over the aurora — tactile, keeps the gradients from banding. */
+.hero-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+@keyframes hero-star-twinkle {
+  0%,
+  100% {
+    opacity: var(--star-min, 0.2);
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: var(--star-max, 0.9);
+    transform: scale(1.2);
+  }
+}
+
+.hero-star {
+  animation: hero-star-twinkle var(--star-duration, 4s) ease-in-out
+    var(--star-delay, 0s) infinite;
+}
+
+@keyframes hero-gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.hero-gradient-word {
+  animation: hero-gradient-pan 7s ease-in-out infinite;
+  background-size: 220% 100%;
+}
+
+@keyframes hero-scroll-dot {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+
+  25%,
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 2.1rem);
+  }
+}
+
+.hero-scroll-dot {
+  animation: hero-scroll-dot 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+
+  50%,
+  95% {
+    opacity: 0;
+  }
+}
+
+.typewriter-caret {
+  animation: caret-blink 1.1s step-end infinite;
+}
+
+/* Sheen sweep across the primary CTA on hover. */
+.cta-sheen {
+  overflow: hidden;
+  position: relative;
+}
+
+.cta-sheen::after {
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgb(255 255 255 / 0.32) 48%,
+    rgb(255 255 255 / 0.08) 54%,
+    transparent 68%
+  );
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-130%);
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cta-sheen:hover::after,
+.cta-sheen:focus-visible::after {
+  transform: translateX(130%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-star,
+  .hero-gradient-word,
+  .hero-scroll-dot,
+  .typewriter-caret {
+    animation: none;
+  }
+
+  .cta-sheen::after {
+    display: none;
+  }
+}
+
+/* ---------- Polaroid scrapbook ---------- */
+
+/* Washi tape holding the polaroids down. */
+.polaroid-tape {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.06),
+      transparent 16%,
+      transparent 84%,
+      rgb(0 0 0 / 0.06)
+    ),
+    linear-gradient(180deg, rgb(252 248 238 / 0.88), rgb(238 229 209 / 0.72));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.14);
+  clip-path: polygon(
+    0 8%,
+    4% 0,
+    96% 3%,
+    100% 12%,
+    99% 90%,
+    95% 100%,
+    5% 97%,
+    1% 86%
+  );
+  height: 1.1rem;
+  position: absolute;
+  width: 3.4rem;
+  z-index: 2;
+}
+
+/* Wrapper owns position + breakpoints; hover raises the whole stack. */
+.polaroid-wrap:hover,
+.polaroid-wrap:focus-within {
+  z-index: 50;
+}
+
+/* Slightly faded print that comes alive on lift. */
+.polaroid-photo {
+  filter: saturate(0.88) contrast(1.04) sepia(0.08);
+  transition: filter 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.polaroid-frame:hover .polaroid-photo,
+.polaroid-frame:focus-visible .polaroid-photo {
+  filter: saturate(1.06) contrast(1.02) sepia(0);
+}
+
 /* Polaroid scrapbook lift — transform lives on an inner card so the outer
    rotation stays fixed (avoids jitter from competing rotate/scale utilities). */
 .polaroid-lift {
@@ -382,7 +548,8 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .polaroid-lift {
+  .polaroid-lift,
+  .polaroid-photo {
     transition: none;
   }
 

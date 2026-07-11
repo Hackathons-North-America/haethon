@@ -18,6 +18,7 @@ const plexMono = IBM_Plex_Mono({
 const newsreader = Newsreader({
   variable: "--font-newsreader",
   weight: ["500", "600"],
+  style: ["normal", "italic"],
   subsets: ["latin"],
 });
 
