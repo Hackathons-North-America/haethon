@@ -325,42 +325,44 @@ export function HackathonSearch({
 
   return (
     <>
-      <section aria-label="Hackathon filters" className="bg-white dark:bg-white/[0.06] px-5 pb-7 pt-14 sm:pt-16">
+      <section aria-label="Hackathon filters" className="px-5 pb-7 pt-14 sm:pt-16">
         <div className="mx-auto max-w-[1120px]">
-          <div className="relative mb-8 flex items-center justify-center">
-            <div aria-label="Region filters" className="flex items-end gap-8 sm:gap-12" role="group">
+          <div className="relative mb-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div
+              aria-label="Region filters"
+              className="inline-flex items-center gap-1 rounded-full border border-navy/10 bg-white/70 p-1.5 shadow-[0_10px_32px_-14px_rgba(29,42,68,0.3)] backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.06] dark:shadow-[0_12px_36px_-14px_rgba(0,0,0,0.6)]"
+              role="group"
+            >
               {regionPresets.map((preset) => {
                 const active = selectedPreset === preset.id;
 
                 return (
                   <button
                     aria-pressed={active}
-                    className="group flex flex-col items-center gap-1.5 pb-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40"
+                    className={`group inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-all sm:gap-2 sm:px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 ${
+                      active
+                        ? "bg-cabernet text-wheat shadow-[0_8px_20px_-8px_rgba(114,28,36,0.55)] dark:bg-wheat dark:text-[#141414] dark:shadow-[0_8px_20px_-8px_rgba(244,235,217,0.35)]"
+                        : "text-navy/55 hover:bg-navy/[0.05] hover:text-navy dark:text-wheat/55 dark:hover:bg-white/5 dark:hover:text-wheat"
+                    }`}
                     key={preset.id}
                     onClick={() => applyRegionPreset(preset.id)}
                     type="button"
                   >
-                    <span aria-hidden="true" className="text-2xl leading-none">
-                      {preset.emoji}
-                    </span>
                     <span
-                      className={`text-sm transition-colors ${
-                        active ? "font-semibold text-navy dark:text-wheat" : "text-navy/55 dark:text-wheat/55 group-hover:text-navy dark:group-hover:text-wheat"
+                      aria-hidden="true"
+                      className={`text-lg leading-none transition-[transform,filter] duration-300 group-hover:scale-110 ${
+                        active ? "" : "grayscale group-hover:grayscale-0"
                       }`}
                     >
-                      {preset.label}
+                      {preset.emoji}
                     </span>
-                    <span
-                      className={`h-0.5 w-full rounded-full transition-colors ${
-                        active ? "bg-cabernet dark:bg-[#e4a3ab]" : "bg-transparent group-hover:bg-navy/20 dark:group-hover:bg-white/25"
-                      }`}
-                    />
+                    {preset.label}
                   </button>
                 );
               })}
             </div>
             <Link
-              className="absolute right-0 inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/15 dark:border-white/15 px-4 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:border-navy dark:hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/15 dark:border-white/15 px-4 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:border-navy dark:hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 sm:absolute sm:right-0"
               href="/submit"
             >
               <PlusSquare aria-hidden="true" className="size-4" />
