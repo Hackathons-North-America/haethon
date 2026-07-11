@@ -158,7 +158,7 @@ function AdminHackathonRow({
           />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-cabernet hover:bg-[#5c151c] px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-cabernet hover:bg-[#5c151c] px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
               disabled={busy}
               onClick={() => (editing ? closeEditor() : setEditing(true))}
               type="button"

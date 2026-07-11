@@ -85,8 +85,14 @@ const surfaceCard =
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-page text-ink">
-      <PrimaryNav />
+    // The landing page is always night-sky dark, whatever the app theme:
+    // the `dark` class scopes every dark: variant, and globals.css keys the
+    // html/body background off data-page-theme so overscroll matches.
+    <main
+      data-page-theme="dark"
+      className="dark min-h-screen overflow-x-clip bg-page text-ink"
+    >
+      <PrimaryNav showThemeToggle={false} />
 
       <section className="relative isolate min-h-[min(110svh,980px)] overflow-hidden pb-28 pt-28 sm:pb-32 sm:pt-32">
         <HeroAurora />

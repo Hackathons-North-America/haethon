@@ -300,7 +300,7 @@ export default async function MyHackathonsPage() {
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                         {won ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-cabernet px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-cabernet px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white">
                             <Trophy aria-hidden="true" className="size-3.5" />
                             Winner
                           </span>

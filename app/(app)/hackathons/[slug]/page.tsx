@@ -442,7 +442,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           ) : null}
           {applyUrl ? (
             <a
-              className="inline-flex rounded-full min-h-11 items-center justify-center gap-1.5 border border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet px-6 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 transition-colors hover:bg-[#5c151c]"
+              className="inline-flex rounded-full min-h-11 items-center justify-center gap-1.5 border border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet px-6 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition-colors hover:bg-[#5c151c]"
               href={applyUrl}
               rel="noopener noreferrer"
               target="_blank"

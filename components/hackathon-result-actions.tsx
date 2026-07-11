@@ -17,7 +17,7 @@ const outlineButtonClassName = `${buttonClassName} border-cabernet/40 bg-white d
 const inputClassName = "h-8 border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-navy dark:text-wheat outline-none focus:border-cabernet";
 
 const submitButtonClassName =
-  "inline-flex rounded-full min-h-8 items-center bg-cabernet px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 transition hover:bg-[#5c151c] disabled:opacity-50";
+  "inline-flex rounded-full min-h-8 items-center bg-cabernet px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition hover:bg-[#5c151c] disabled:opacity-50";
 
 const cancelButtonClassName =
   "min-h-8 px-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-navy/55 dark:text-wheat/55 hover:text-navy dark:hover:text-wheat";
@@ -152,7 +152,7 @@ export function HackathonResultActions({
           aria-pressed={pinned}
           className={`${buttonClassName} ${
             pinned
-              ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 hover:bg-[#5c151c]"
+              ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white hover:bg-[#5c151c]"
               : "border-cabernet/40 bg-white dark:bg-white/[0.06] text-cabernet dark:text-[#e4a3ab] hover:bg-cabernet hover:text-wheat"
           }`}
           disabled={pending === "pin"}

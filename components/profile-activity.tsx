@@ -61,7 +61,7 @@ export function ProfileActivity({
             <button
               className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
                 year.year === active.year
-                  ? "bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15"
+                  ? "bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
                   : "bg-white dark:bg-white/[0.06] text-navy/55 dark:text-wheat/55 hover:text-navy dark:hover:text-wheat"
               }`}
               key={year.year}

@@ -30,7 +30,7 @@ export function AdminSidebar() {
               <Link
                 aria-current={active ? "page" : undefined}
                 className={`inline-flex min-h-11 items-center gap-3 rounded-full px-3 text-sm font-semibold transition-colors ${
-                  active ? "bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15" : "text-navy/70 dark:text-wheat/70 hover:bg-ivory dark:hover:bg-white/10 hover:text-navy dark:hover:text-wheat"
+                  active ? "bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white" : "text-navy/70 dark:text-wheat/70 hover:bg-ivory dark:hover:bg-white/10 hover:text-navy dark:hover:text-wheat"
                 }`}
                 href={href}
                 key={href}

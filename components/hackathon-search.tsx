@@ -502,7 +502,7 @@ export function HackathonSearch({
                           </span>
                           <span
                             className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15" : "border-navy/15 dark:border-white/15 text-transparent"
+                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white" : "border-navy/15 dark:border-white/15 text-transparent"
                             }`}
                           >
                             <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
@@ -565,7 +565,7 @@ export function HackathonSearch({
                           <span className="text-sm font-semibold text-navy dark:text-wheat">{option.label}</span>
                           <span
                             className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15" : "border-navy/15 dark:border-white/15 text-transparent"
+                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white" : "border-navy/15 dark:border-white/15 text-transparent"
                             }`}
                           >
                             <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
@@ -626,7 +626,7 @@ export function HackathonSearch({
                           </span>
                           <span
                             className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15" : "border-navy/15 dark:border-white/15 text-transparent"
+                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white" : "border-navy/15 dark:border-white/15 text-transparent"
                             }`}
                           >
                             <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
@@ -678,7 +678,7 @@ export function HackathonSearch({
                           aria-pressed={active}
                           className={`inline-flex min-h-12 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 ${
                             active
-                              ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 hover:bg-[#5c151c]"
+                              ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white hover:bg-[#5c151c]"
                               : "border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] text-navy dark:text-wheat hover:border-navy dark:hover:border-white/60"
                           }`}
                           key={tag.key}
@@ -714,7 +714,7 @@ export function HackathonSearch({
               ) : null}
               <button
                 aria-label="Search hackathons"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-cabernet px-5 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 hover:bg-[#5c151c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 disabled:cursor-wait disabled:bg-cabernet/70 md:size-12 md:min-h-0 md:px-0"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-cabernet px-5 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white hover:bg-[#5c151c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 disabled:cursor-wait disabled:bg-cabernet/70 md:size-12 md:min-h-0 md:px-0"
                 disabled={isSearching}
                 type="submit"
               >

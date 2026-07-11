@@ -118,7 +118,7 @@ export function EmailTestForm({ hackathons }: { hackathons: HackathonOption[] })
 
       <div className="flex items-center gap-3">
         <button
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-cabernet px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-cabernet px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition-opacity hover:opacity-90 disabled:opacity-50"
           disabled={disabled}
           type="submit"
         >

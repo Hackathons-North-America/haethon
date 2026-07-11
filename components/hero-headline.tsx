@@ -76,7 +76,7 @@ export function HeroHeadline() {
       />
       <Sparkle
         still={still}
-        className="absolute -right-5 bottom-2 hidden text-[0.22em] text-boreal sm:block dark:text-[#7fb8a5]"
+        className="absolute -right-5 bottom-2 hidden text-[0.22em] text-[#7fb8a5] sm:block"
         duration={4.4}
         delay={1.4}
       />
@@ -85,7 +85,7 @@ export function HeroHeadline() {
         Where
       </RevealWord>{" "}
       <RevealWord index={1} still={still} className="relative">
-        <span className="hero-gradient-word bg-gradient-to-r from-boreal via-[#5a9e8a] to-cabernet bg-clip-text text-transparent dark:from-[#a9d8b6] dark:via-[#63c2a6] dark:to-[#e4a3ab]">
+        <span className="hero-gradient-word bg-gradient-to-r from-[#a9d8b6] via-[#63c2a6] to-[#e4a3ab] bg-clip-text text-transparent">
           hackers
         </span>
         {/* Hand-drawn double-pass underline that inks itself in. */}

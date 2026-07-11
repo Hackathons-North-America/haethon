@@ -66,7 +66,7 @@ export function HackathonCheckinForm({ hackathonId }: { hackathonId: string }) {
             value={code}
           />
           <button
-            className="h-9 rounded-xl bg-cabernet px-3 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 transition hover:bg-[#5c151c] disabled:opacity-50"
+            className="h-9 rounded-xl bg-cabernet px-3 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition hover:bg-[#5c151c] disabled:opacity-50"
             disabled={pending || !code.trim()}
             type="submit"
           >

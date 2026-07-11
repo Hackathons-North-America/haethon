@@ -24,6 +24,13 @@
   --page-fg: #f4ebd9;
 }
 
+/* Pages locked to dark (the landing page sets data-page-theme on <main>)
+   pull html/body along so overscroll never flashes the light background. */
+:root:has([data-page-theme="dark"]) {
+  --page-bg: #141414;
+  --page-fg: #f4ebd9;
+}
+
 @theme inline {
   --color-obsidian: var(--obsidian);
   --color-ivory: var(--ivory);

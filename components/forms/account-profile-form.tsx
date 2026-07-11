@@ -167,7 +167,7 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
           <div
             aria-hidden="true"
-            className="flex size-16 shrink-0 items-center justify-center rounded-full bg-cabernet text-2xl font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15"
+            className="flex size-16 shrink-0 items-center justify-center rounded-full bg-cabernet text-2xl font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
           >
             {initials}
           </div>
@@ -184,7 +184,7 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
                   setStatus("idle");
                   setIsEditing(true);
                 }}
-                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-cabernet dark:border-[#e4a3ab]/50 bg-white dark:bg-white/[0.06] px-4 text-sm font-semibold text-cabernet dark:text-[#e4a3ab] transition hover:bg-cabernet hover:text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 focus-visible:bg-cabernet focus-visible:text-wheat focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet dark:focus-visible:outline-wheat"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-cabernet dark:border-[#e4a3ab]/50 bg-white dark:bg-white/[0.06] px-4 text-sm font-semibold text-cabernet dark:text-[#e4a3ab] transition hover:bg-cabernet hover:text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white focus-visible:bg-cabernet focus-visible:text-wheat focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet dark:focus-visible:outline-wheat"
               >
                 <Pencil aria-hidden="true" className="size-4" />
                 Edit profile
@@ -314,7 +314,7 @@ export function AccountProfileForm({ displayEmail, displayName, profile }: Profi
             <button
               disabled={status === "saving"}
               type="submit"
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-cabernet px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 transition hover:bg-[#5c151c] disabled:opacity-60"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-cabernet px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition hover:bg-[#5c151c] disabled:opacity-60"
             >
               <Save aria-hidden="true" className="size-4" />
               {status === "saving" ? "Saving" : "Save profile"}

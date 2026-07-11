@@ -300,7 +300,7 @@ export function HackathonSubmissionForm() {
           <button
             disabled={status === "submitting"}
             type="submit"
-            className="inline-flex rounded-full min-h-11 items-center justify-center border border-cabernet dark:border-[#e4a3ab]/50 px-6 font-mono text-xs font-medium uppercase tracking-[0.14em] text-cabernet dark:text-[#e4a3ab] transition-colors hover:bg-cabernet hover:text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:hover:bg-white/15 focus-visible:bg-cabernet focus-visible:text-wheat focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet dark:focus-visible:outline-wheat disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex rounded-full min-h-11 items-center justify-center border border-cabernet dark:border-[#e4a3ab]/50 px-6 font-mono text-xs font-medium uppercase tracking-[0.14em] text-cabernet dark:text-[#e4a3ab] transition-colors hover:bg-cabernet hover:text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white focus-visible:bg-cabernet focus-visible:text-wheat focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet dark:focus-visible:outline-wheat disabled:cursor-not-allowed disabled:opacity-50"
           >
             {status === "submitting" ? "Submitting" : "Submit for review"}
           </button>
