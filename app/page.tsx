@@ -10,7 +10,7 @@ import {
 } from "@/components/landing-feature-visuals";
 import { LandingMap } from "@/components/landing-map";
 import { LandingReveal } from "@/components/landing-reveal";
-import { PolaroidFrame, heroPolaroids } from "@/components/polaroid-frame";
+import { PolaroidFrame, heroPolaroids, mobilePolaroids } from "@/components/polaroid-frame";
 import { PrimaryNav } from "@/components/primary-nav";
 
 const features = [
@@ -86,7 +86,7 @@ export default function Home() {
     <main className="min-h-screen overflow-x-clip bg-page text-ink">
       <PrimaryNav />
 
-      <section className="relative isolate min-h-[min(100svh,860px)] overflow-hidden px-5 pb-24 pt-28 sm:px-8 sm:pb-28 sm:pt-32 lg:px-12">
+      <section className="relative isolate min-h-[min(110svh,980px)] overflow-hidden pb-28 pt-28 sm:pb-32 sm:pt-32">
         <HeroAurora />
 
         {heroPolaroids.map((shot) => (
@@ -98,19 +98,12 @@ export default function Home() {
             className={shot.className}
             width={shot.width}
             height={shot.height}
+            sticker={shot.sticker}
+            lift={shot.lift}
           />
         ))}
 
-        <Image
-          src="/logo-beaver.png"
-          alt=""
-          aria-hidden="true"
-          width={100}
-          height={88}
-          className="pointer-events-none absolute left-[42%] top-[12%] z-[2] hidden w-[56px] rotate-[-18deg] drop-shadow-[0_12px_24px_rgba(0,0,0,0.25)] lg:block dark:drop-shadow-[0_12px_24px_rgba(0,0,0,0.45)]"
-        />
-
-        <div className="relative z-10 mx-auto flex max-w-[820px] flex-col items-center text-center">
+        <div className="relative z-10 mx-auto flex max-w-[640px] flex-col items-center px-5 text-center sm:px-8 lg:max-w-[700px]">
           <LandingReveal>
             <p className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-navy/[0.03] px-3.5 py-1.5 text-[0.75rem] font-medium text-navy/65 dark:border-white/10 dark:bg-white/5 dark:text-wheat/70">
               <span aria-hidden="true">✦</span>
@@ -159,16 +152,25 @@ export default function Home() {
           </LandingReveal>
         </div>
 
-        <div className="relative z-10 mx-auto mt-12 flex max-w-[420px] justify-center gap-3 sm:mt-16 sm:hidden">
-          {heroPolaroids.slice(0, 2).map((shot, i) => (
+        <div className="relative z-10 mx-auto mt-12 grid max-w-[360px] grid-cols-2 gap-2 sm:mt-14 sm:hidden">
+          {mobilePolaroids.map((shot, i) => (
             <PolaroidFrame
               key={`mobile-${shot.src}`}
               src={shot.src}
               alt={shot.alt}
               caption={shot.caption}
-              className={`w-[42%] ${i === 0 ? "rotate-[-6deg]" : "rotate-[5deg]"}`}
+              className={`w-full ${
+                [
+                  "rotate-[-8deg] translate-y-1",
+                  "rotate-[7deg] -translate-y-2",
+                  "rotate-[10deg] -translate-x-1",
+                  "rotate-[-6deg] translate-y-2",
+                ][i]
+              }`}
               width={shot.width}
               height={shot.height}
+              sticker={shot.sticker}
+              lift={shot.lift}
             />
           ))}
         </div>

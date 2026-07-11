@@ -344,3 +344,50 @@ select {
     animation: none;
   }
 }
+
+/* Polaroid scrapbook lift — transform lives on an inner card so the outer
+   rotation stays fixed (avoids jitter from competing rotate/scale utilities). */
+.polaroid-lift {
+  transform: translate3d(0, 0, 0) scale(1);
+  transition:
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.polaroid-frame:hover,
+.polaroid-frame:focus-visible {
+  z-index: 50;
+}
+
+.polaroid-frame:hover .polaroid-lift,
+.polaroid-frame:focus-visible .polaroid-lift {
+  box-shadow:
+    0 28px 48px -14px rgba(0, 0, 0, 0.4),
+    0 8px 16px -8px rgba(0, 0, 0, 0.2);
+}
+
+.polaroid-frame[data-lift="left"]:hover .polaroid-lift,
+.polaroid-frame[data-lift="left"]:focus-visible .polaroid-lift {
+  transform: translate3d(1.75rem, -0.5rem, 0) scale(1.08);
+}
+
+.polaroid-frame[data-lift="right"]:hover .polaroid-lift,
+.polaroid-frame[data-lift="right"]:focus-visible .polaroid-lift {
+  transform: translate3d(-1.75rem, -0.5rem, 0) scale(1.08);
+}
+
+.polaroid-frame[data-lift="none"]:hover .polaroid-lift,
+.polaroid-frame[data-lift="none"]:focus-visible .polaroid-lift {
+  transform: translate3d(0, -0.4rem, 0) scale(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .polaroid-lift {
+    transition: none;
+  }
+
+  .polaroid-frame:hover .polaroid-lift,
+  .polaroid-frame:focus-visible .polaroid-lift {
+    transform: none;
+  }
+}
