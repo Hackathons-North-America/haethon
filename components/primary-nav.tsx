@@ -1,51 +1,66 @@
+import Image from "next/image";
 import Link from "next/link";
+
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
   { label: "About", href: "/about" },
-  { label: "FQA", href: "/#fqa" },
+  { label: "FAQ", href: "/#fqa" },
 ];
-
-const navLinkClassName =
-  "decoration-[#660000] decoration-1 underline-offset-6 hover:text-[#660000] hover:underline focus-visible:text-[#660000] focus-visible:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]";
-
-const openAppLinkClassName =
-  "inline-flex min-h-9 items-center justify-center border border-[#660000] px-4 text-[#660000] transition-colors hover:bg-[#660000] hover:text-white focus-visible:bg-[#660000] focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]";
 
 type PrimaryNavProps = {
   activeHref?: string;
-  className?: string;
 };
 
-export function PrimaryNav({ activeHref, className = "bg-white" }: PrimaryNavProps) {
+export function PrimaryNav({ activeHref }: PrimaryNavProps) {
   return (
-    <header className={`sticky top-0 z-40 ${className}`}>
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-40 px-4 pt-4 sm:px-6 sm:pt-5">
       <nav
         aria-label="Primary navigation"
-        className="border-b border-black/10 px-8 font-mono text-xs font-medium uppercase tracking-[0.14em] text-[#706F6B] sm:px-14 lg:px-20"
+        className="pointer-events-auto mx-auto flex w-full max-w-[1080px] items-center justify-between gap-3 rounded-full border border-navy/10 bg-white/90 px-3 py-2 shadow-[0_10px_36px_-14px_rgba(29,42,68,0.28)] backdrop-blur-xl sm:gap-4 sm:px-4 sm:py-2.5 dark:border-white/10 dark:bg-[#141414]/75 dark:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.65)]"
       >
-        <div className="mx-auto flex min-h-20 max-w-[1120px] flex-col items-start justify-center gap-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:py-0">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <Link
-            className={`${navLinkClassName} font-serif text-xl font-semibold normal-case leading-none tracking-normal text-black sm:text-2xl`}
             href="/"
+            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-navy/[0.04] dark:hover:bg-white/5"
           >
-            Hackathons North America
+            <Image
+              src="/logo-beaver.png"
+              alt="Hackathons North America"
+              width={36}
+              height={32}
+              className="h-8 w-auto"
+              priority
+            />
+            <span className="hidden font-serif text-[0.95rem] font-semibold tracking-tight text-navy sm:inline dark:text-wheat">
+              HNA
+            </span>
           </Link>
 
-          <div className="flex flex-wrap items-center justify-start gap-x-5 gap-y-3 sm:justify-end sm:gap-x-8">
-            {navItems.map((item) => (
-              <Link
-                aria-current={item.href === activeHref ? "page" : undefined}
-                className={`${navLinkClassName} ${item.href === activeHref ? "text-[#660000] underline" : ""}`}
-                href={item.href}
-                key={item.label}
-              >
-                {item.label}
-              </Link>
-            ))}
-            <Link className={openAppLinkClassName} href="/hackathons">
-              Open App
+          {navItems.map((item) => (
+            <Link
+              aria-current={item.href === activeHref ? "page" : undefined}
+              className={`rounded-full px-3 py-2 text-[0.8rem] font-medium transition-colors sm:px-3.5 ${
+                item.href === activeHref
+                  ? "bg-navy/[0.06] text-navy dark:bg-white/10 dark:text-wheat"
+                  : "text-navy/50 hover:bg-navy/[0.04] hover:text-navy dark:text-white/55 dark:hover:bg-white/5 dark:hover:text-wheat"
+              }`}
+              href={item.href}
+              key={item.label}
+            >
+              {item.label}
             </Link>
-          </div>
+          ))}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <ThemeToggle />
+          <Link
+            className="rounded-full bg-cabernet px-4 py-2 text-[0.8rem] font-semibold text-wheat transition-colors hover:bg-[#5c151c] sm:px-5 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
+            href="/hackathons"
+          >
+            Open App
+          </Link>
         </div>
       </nav>
     </header>

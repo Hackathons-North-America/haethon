@@ -1,10 +1,27 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --obsidian: #0b0b0b;
   --ivory: #f7f3ea;
   --gold: #fbbf24;
   --ink-blue: #111827;
+
+  /* HNA brand palette */
+  --cabernet: #721c24;
+  --navy: #1d2a44;
+  --boreal: #2d4a22;
+  --wheat: #f4ebd9;
+  --rust: #b3541e;
+
+  --page-bg: #ffffff;
+  --page-fg: #1d2a44;
+}
+
+.dark {
+  --page-bg: #141414;
+  --page-fg: #f4ebd9;
 }
 
 @theme inline {
@@ -12,6 +29,13 @@
   --color-ivory: var(--ivory);
   --color-gold: var(--gold);
   --color-ink-blue: var(--ink-blue);
+  --color-cabernet: var(--cabernet);
+  --color-navy: var(--navy);
+  --color-boreal: var(--boreal);
+  --color-wheat: var(--wheat);
+  --color-rust: var(--rust);
+  --color-page: var(--page-bg);
+  --color-ink: var(--page-fg);
   --font-sans: var(--font-space-grotesk);
   --font-serif: var(--font-newsreader);
   --font-mono: var(--font-plex-mono);
@@ -22,12 +46,12 @@
 }
 
 html {
-  background: var(--obsidian);
+  background: var(--page-bg);
 }
 
 body {
-  background: var(--obsidian);
-  color: var(--ivory);
+  background: var(--page-bg);
+  color: var(--page-fg);
   font-family: var(--font-space-grotesk), sans-serif;
 }
 
@@ -45,7 +69,7 @@ select {
 }
 
 ::selection {
-  background: rgb(102 0 0 / 0.18);
+  background: rgb(114 28 36 / 0.28);
   color: white;
 }
 
@@ -54,7 +78,7 @@ select {
 .app-shell-wipe {
   align-items: center;
   animation: app-shell-wipe 0.7s cubic-bezier(0.76, 0, 0.24, 1) 0.08s both;
-  background: linear-gradient(105deg, #4d0000 0%, #660000 55%, #7a1414 100%);
+  background: linear-gradient(105deg, #5c151c 0%, #721c24 55%, #8a2830 100%);
   display: flex;
   inset: 0;
   justify-content: center;

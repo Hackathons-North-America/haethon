@@ -26,6 +26,23 @@ export const metadata: Metadata = {
   description: "Discover, track, and organize hackathons across North America.",
 };
 
+const themeInitScript = `
+(() => {
+  try {
+    const stored = localStorage.getItem("hna-theme");
+    const theme =
+      stored === "light" || stored === "dark"
+        ? stored
+        : window.matchMedia("(prefers-color-scheme: light)").matches
+          ? "light"
+          : "dark";
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("light", theme === "light");
+    document.documentElement.style.colorScheme = theme;
+  } catch {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,8 +52,12 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${spaceGrotesk.variable} ${plexMono.variable} ${newsreader.variable} h-full`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full bg-obsidian text-ivory antialiased">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="min-h-full bg-page text-ink antialiased">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

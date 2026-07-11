@@ -1,367 +1,365 @@
+import Image from "next/image";
 import Link from "next/link";
 
+import { HeroAurora } from "@/components/hero-inuksuk";
 import { HeroTypewriterSpan } from "@/components/hero-typewriter-span";
-import { MacbookHero } from "@/components/ui/macbook-hero";
+import {
+  DiscoverVisual,
+  ProfileVisual,
+  RemindersVisual,
+} from "@/components/landing-feature-visuals";
+import { LandingMap } from "@/components/landing-map";
+import { LandingReveal } from "@/components/landing-reveal";
+import { PolaroidFrame, heroPolaroids } from "@/components/polaroid-frame";
+import { PrimaryNav } from "@/components/primary-nav";
 
-const navItems = [
-  { label: "About", href: "/about" },
-  { label: "FQA", href: "#fqa" },
-];
-
-const navLinkClassName =
-  "decoration-[#660000] decoration-1 underline-offset-6 hover:text-[#660000] hover:underline focus-visible:text-[#660000] focus-visible:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]";
-
-const openAppLinkClassName =
-  "inline-flex min-h-9 items-center justify-center border border-[#660000] px-4 text-[#660000] transition-colors hover:bg-[#660000] hover:text-white focus-visible:bg-[#660000] focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]";
-
-const showcaseBlocks = [
+const features = [
   {
-    id: "agents",
-    heading: "Find every hackathon in one place",
-    company: "One directory",
-    caption:
-      "for hundreds of hackathons across North America — search by name and filter by location, date, and format.",
-    features: [
-      "Smart Search",
-      "Location & Date Filters",
-      "Beginner-Friendly",
-      "Travel Reimbursement",
-    ],
+    id: "discover",
+    eyebrow: "Discover",
+    heading: "Every hackathon in one place",
+    body: "Search hundreds of events across North America by name, city, date, and format — including beginner-friendly and travel-reimbursed options.",
+    Visual: DiscoverVisual,
   },
   {
-    id: "scale",
-    heading: "Never miss another application deadline",
-    company: "Automatic reminders",
-    caption:
-      "for application openings, closings, decisions, and check-in — sent straight to your inbox.",
-    features: [
-      "Application Reminders",
-      "Decision Alerts",
-      "Event Countdowns",
-      "Email Notifications",
-    ],
+    id: "reminders",
+    eyebrow: "Reminders",
+    heading: "Deadlines that find you",
+    body: "Get email alerts when applications open or close, decisions land, and check-in starts — so you never scramble at the last minute.",
+    Visual: RemindersVisual,
   },
   {
-    id: "platforms",
-    heading: "Build a profile that proves what you've shipped",
-    company: "Verified attendance",
-    caption:
-      "and wins pinned to your profile, with an activity heatmap of every hackathon you've been to.",
-    features: [
-      "Pipeline Tracking",
-      "Verified Check-In",
-      "Pinned Wins",
-      "Activity Heatmap",
-    ],
+    id: "profile",
+    eyebrow: "Profile",
+    heading: "A record of what you shipped",
+    body: "Track your pipeline, verify attendance, pin wins, and build an activity history that shows where you've been and what you've built.",
+    Visual: ProfileVisual,
+  },
+] as const;
+
+const audiences = [
+  {
+    label: "Hackers",
+    title: "Find and follow events",
+    body: "Discover hackathons, save the ones you care about, and keep every deadline in one feed.",
+  },
+  {
+    label: "Organizers",
+    title: "Publish and grow",
+    body: "List your event to reach more builders, and tap HNA's network for advice and reach.",
+  },
+  {
+    label: "Hosts",
+    title: "Run it with us",
+    body: "Partner with HNA to host end to end — or use our playbooks to run your own.",
   },
 ];
 
-function AgentChatVisual() {
-  return (
-    <div className="grid min-h-[300px] grid-cols-[0.26fr_1fr] sm:min-h-[430px]">
-      <div className="space-y-3 border-r border-black/10 p-5 sm:p-7">
-        <div className="h-2.5 w-3/4 rounded bg-white/20" />
-        <div className="h-2.5 w-1/2 rounded bg-white/10" />
-        <div className="h-2.5 w-2/3 rounded bg-white/10" />
-        <div className="h-2.5 w-3/5 rounded bg-white/10" />
-        <div className="h-2.5 w-1/2 rounded bg-white/10" />
-      </div>
-      <div className="flex flex-col p-5 sm:p-7">
-        <div className="max-w-[62%] space-y-2 rounded-lg bg-white/10 p-4">
-          <div className="h-2 rounded bg-white/25" />
-          <div className="h-2 w-4/5 rounded bg-white/25" />
-        </div>
-        <div className="mt-4 max-w-[54%] space-y-2 self-end rounded-lg bg-white/20 p-4">
-          <div className="h-2 rounded bg-white/40" />
-          <div className="h-2 w-2/3 rounded bg-white/40" />
-        </div>
-        <div className="max-w-[62%] space-y-2 rounded-lg bg-white/10 p-4 sm:mt-4">
-          <div className="h-2 rounded bg-white/25" />
-          <div className="h-2 w-3/4 rounded bg-white/25" />
-          <div className="h-2 w-1/2 rounded bg-white/25" />
-        </div>
-        <div className="mt-auto flex items-center gap-3 rounded-lg border border-black/15 p-3">
-          <div className="h-2 w-1/3 rounded bg-white/15" />
-          <div className="ml-auto size-6 rounded bg-white/90" />
-        </div>
-      </div>
-    </div>
-  );
-}
+const faqs = [
+  {
+    question: "What is Hackathons North America?",
+    answer:
+      "HNA is a discovery and tracking layer for hackathons across North America — plus organizer support and a flagship event ecosystem.",
+  },
+  {
+    question: "Is it free to use?",
+    answer:
+      "Yes. Searching, saving events, and tracking your pipeline are free for hackers.",
+  },
+  {
+    question: "How do reminders work?",
+    answer:
+      "Save a hackathon and choose which milestones you care about. We will email you when applications open, close, decisions go out, or check-in begins.",
+  },
+  {
+    question: "Can I list my hackathon?",
+    answer:
+      "Organizers can submit events for review. Once published, they appear in search and can reach hackers across the HNA network.",
+  },
+];
 
-function ScaleDashboardVisual() {
-  return (
-    <div className="min-h-[300px] p-5 sm:min-h-[430px] sm:p-7">
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        {["82ms", "12.4M", "99.99%"].map((stat) => (
-          <div
-            key={stat}
-            className="rounded-lg border border-black/10 bg-white/5 p-4 sm:p-5"
-          >
-            <div className="h-2 w-1/2 rounded bg-white/15" />
-            <div className="mt-4 text-xl font-semibold text-black sm:text-2xl">
-              {stat}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex h-40 items-end gap-1.5 rounded-lg border border-black/10 bg-white/5 p-4 sm:mt-5 sm:h-56 sm:gap-2 sm:p-6">
-        {[18, 24, 20, 32, 28, 44, 38, 56, 48, 70, 62, 84, 76, 96, 88, 100].map(
-          (height, i) => (
-            <span
-              key={`${height}-${i}`}
-              className="flex-1 rounded-t bg-white/30"
-              style={{ height: `${height}%` }}
-            />
-          )
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DocsPlatformVisual() {
-  return (
-    <div className="flex min-h-[300px] flex-col sm:min-h-[430px]">
-      <div className="flex items-center gap-2 border-b border-black/10 px-5 py-4 sm:px-7">
-        <span className="size-2 rounded-full bg-white/20" />
-        <span className="size-2 rounded-full bg-white/20" />
-        <span className="size-2 rounded-full bg-white/20" />
-        <span className="ml-4 h-5 w-44 rounded-full bg-white/10" />
-        <span className="ml-auto h-5 w-16 rounded-full bg-white/90" />
-      </div>
-      <div className="grid flex-1 grid-cols-[0.24fr_1fr] sm:grid-cols-[0.22fr_1fr_0.18fr]">
-        <div className="space-y-3 border-r border-black/10 p-5 sm:p-7">
-          <div className="h-2 w-4/5 rounded bg-white/20" />
-          <div className="h-2 w-3/5 rounded bg-white/10" />
-          <div className="h-2 w-2/3 rounded bg-white/10" />
-          <div className="h-2 w-1/2 rounded bg-white/10" />
-          <div className="h-2 w-3/5 rounded bg-white/10" />
-        </div>
-        <div className="p-5 sm:p-7">
-          <div className="h-4 w-1/3 rounded bg-white/25" />
-          <div className="mt-5 space-y-3">
-            <div className="h-2 rounded bg-white/10" />
-            <div className="h-2 w-11/12 rounded bg-white/10" />
-            <div className="h-2 w-4/5 rounded bg-white/10" />
-          </div>
-          <div className="mt-6 h-24 rounded-lg border border-black/10 bg-black/25 sm:h-32" />
-          <div className="mt-6 space-y-3">
-            <div className="h-2 rounded bg-white/10" />
-            <div className="h-2 w-2/3 rounded bg-white/10" />
-          </div>
-        </div>
-        <div className="hidden space-y-3 border-l border-black/10 p-7 sm:block">
-          <div className="h-2 w-full rounded bg-white/15" />
-          <div className="h-2 w-3/4 rounded bg-white/10" />
-          <div className="h-2 w-4/5 rounded bg-white/10" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const showcaseVisuals: Record<string, () => React.JSX.Element> = {
-  agents: AgentChatVisual,
-  scale: ScaleDashboardVisual,
-  platforms: DocsPlatformVisual,
-};
+const surfaceCard =
+  "rounded-[1.75rem] border border-navy/10 bg-navy/[0.03] p-6 sm:rounded-[2rem] sm:p-8 lg:p-10 dark:border-white/10 dark:bg-white/[0.04]";
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#F8F8F4] text-black">
-      <nav
-        aria-label="Primary navigation"
-        className="border-b border-black/10 bg-white px-8 font-mono text-xs font-medium uppercase tracking-[0.14em] text-[#706F6B] sm:px-14 lg:px-20"
-      >
-        <div className="mx-auto flex min-h-20 max-w-[1120px] flex-col items-start justify-center gap-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:py-0">
-          <Link
-            href="/"
-            className={`${navLinkClassName} font-serif text-xl font-semibold normal-case leading-none tracking-normal text-black sm:text-2xl`}
-          >
-            Hackathons North America
-          </Link>
+    <main className="min-h-screen overflow-x-clip bg-page text-ink">
+      <PrimaryNav />
 
-          <div className="flex flex-wrap items-center justify-start gap-x-5 gap-y-3 sm:justify-end sm:gap-x-8">
-            {navItems.map((item) => (
+      <section className="relative isolate min-h-[min(100svh,860px)] overflow-hidden px-5 pb-24 pt-28 sm:px-8 sm:pb-28 sm:pt-32 lg:px-12">
+        <HeroAurora />
+
+        {heroPolaroids.map((shot) => (
+          <PolaroidFrame
+            key={shot.src}
+            src={shot.src}
+            alt={shot.alt}
+            caption={shot.caption}
+            className={shot.className}
+            width={shot.width}
+            height={shot.height}
+          />
+        ))}
+
+        <Image
+          src="/logo-beaver.png"
+          alt=""
+          aria-hidden="true"
+          width={100}
+          height={88}
+          className="pointer-events-none absolute left-[42%] top-[12%] z-[2] hidden w-[56px] rotate-[-18deg] drop-shadow-[0_12px_24px_rgba(0,0,0,0.25)] lg:block dark:drop-shadow-[0_12px_24px_rgba(0,0,0,0.45)]"
+        />
+
+        <div className="relative z-10 mx-auto flex max-w-[820px] flex-col items-center text-center">
+          <LandingReveal>
+            <p className="inline-flex items-center gap-2 rounded-full border border-navy/10 bg-navy/[0.03] px-3.5 py-1.5 text-[0.75rem] font-medium text-navy/65 dark:border-white/10 dark:bg-white/5 dark:text-wheat/70">
+              <span aria-hidden="true">✦</span>
+              Across Canada &amp; the US
+            </p>
+          </LandingReveal>
+
+          <LandingReveal delay={0.08}>
+            <h1 className="mt-7 font-serif text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-navy dark:text-wheat">
+              Where{" "}
+              <span className="bg-gradient-to-r from-boreal via-[#5a9e8a] to-cabernet bg-clip-text text-transparent">
+                hackers
+              </span>{" "}
+              find their next weekend.
+            </h1>
+          </LandingReveal>
+
+          <LandingReveal delay={0.14}>
+            <p
+              aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
+              className="mt-6 max-w-[34rem] text-base leading-relaxed text-navy/60 sm:text-lg dark:text-wheat/65"
+            >
+              Search hundreds of upcoming hackathons, build your profile, and{" "}
+              <HeroTypewriterSpan className="text-rust" />
+            </p>
+          </LandingReveal>
+
+          <LandingReveal delay={0.2}>
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
-                key={item.label}
-                href={item.href}
-                className={navLinkClassName}
+                href="/hackathons"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-cabernet px-6 text-sm font-semibold text-wheat transition-colors hover:bg-[#5c151c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cabernet dark:bg-wheat dark:text-[#141414] dark:hover:bg-white dark:focus-visible:outline-wheat"
               >
-                {item.label}
+                Open App
               </Link>
-            ))}
-            <Link className={openAppLinkClassName} href="/hackathons">
-              Open App
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* The white hero ends exactly at the keyboard cutoff; the cast shadow
-          from the MacBook overflows onto the tinted section below. */}
-      <section className="relative isolate bg-white px-8 pt-12 sm:px-14 sm:pt-16 md:pt-[5.5rem] lg:px-20">
-        <div className="mx-auto w-full max-w-[520px] sm:max-w-[520px] md:max-w-[680px] lg:max-w-[840px] xl:max-w-[980px] 2xl:max-w-[1120px]">
-          <h1
-            aria-label="Search hundreds of upcoming hackathons, build your profile, and never miss another application deadline."
-            className="w-full text-[1.6rem] font-semibold leading-[1.5] tracking-normal text-black sm:text-[1.9rem] lg:text-[2rem]"
-          >
-            Search hundreds of upcoming hackathons, build your profile, and{" "}
-            <HeroTypewriterSpan />
-          </h1>
+              <Link
+                href="/about"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-navy/15 bg-white/70 px-6 text-sm font-semibold text-navy transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-navy/30 dark:border-white/15 dark:bg-white/5 dark:text-wheat dark:hover:bg-white/10 dark:focus-visible:outline-wheat"
+              >
+                About HNA
+              </Link>
+            </div>
+            <p className="mt-4 text-[0.75rem] text-navy/40 dark:text-wheat/40">
+              Free for hackers. Built for North America.
+            </p>
+          </LandingReveal>
         </div>
 
-        <div className="mx-auto w-full max-w-[1120px]">
-          <MacbookHero />
+        <div className="relative z-10 mx-auto mt-12 flex max-w-[420px] justify-center gap-3 sm:mt-16 sm:hidden">
+          {heroPolaroids.slice(0, 2).map((shot, i) => (
+            <PolaroidFrame
+              key={`mobile-${shot.src}`}
+              src={shot.src}
+              alt={shot.alt}
+              caption={shot.caption}
+              className={`w-[42%] ${i === 0 ? "rotate-[-6deg]" : "rotate-[5deg]"}`}
+              width={shot.width}
+              height={shot.height}
+            />
+          ))}
         </div>
       </section>
 
       <section
-        aria-labelledby="showcase-agents-heading"
-        className="relative z-10 -mt-[3%] overflow-hidden bg-gray-200 px-6 pb-32 pt-24 text-left text-black sm:pt-28"
+        aria-labelledby="map-heading"
+        className="px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
       >
-        {showcaseBlocks.map((block, index) => {
-          const Visual = showcaseVisuals[block.id];
-          const mirrored = index % 2 === 1;
-
-          return (
-            <div key={block.id} className={index > 0 ? "mt-40 sm:mt-64" : undefined}>
+        <div className="mx-auto max-w-[1100px]">
+          <div className={surfaceCard}>
+            <div className="max-w-[34rem]">
+              <p className="text-[0.7rem] font-medium tracking-[0.04em] text-rust">
+                Coverage
+              </p>
               <h2
-                id={`showcase-${block.id}-heading`}
-                className={`max-w-[820px] text-4xl font-semibold leading-[1.14] tracking-[-0.02em] sm:text-5xl lg:text-[3.5rem] ${
-                  mirrored ? "lg:ml-[34%]" : ""
-                }`}
+                id="map-heading"
+                className="mt-3 font-serif text-2xl font-semibold leading-[1.15] tracking-[-0.02em] text-navy sm:text-3xl lg:text-4xl dark:text-wheat"
               >
-                {block.heading}
+                From coast to coast, every weekend that matters
               </h2>
-
-              <div className="mt-10 flex flex-col gap-12 lg:mt-14 lg:flex-row lg:items-center lg:justify-between">
-                <div
-                  className={`w-full overflow-hidden rounded-xl border border-black/10 bg-white/[0.04] lg:w-[66%] ${
-                    mirrored ? "lg:order-2" : ""
-                  }`}
-                >
-                  <Visual />
-                </div>
-
-                <div className={`max-w-[360px] lg:w-[24%] ${mirrored ? "lg:order-1" : ""}`}>
-                  <p className="text-2xl font-medium leading-[1.22] tracking-tight sm:text-[1.75rem]">
-                    <span className="text-[#660000]">{block.company}</span>{" "}
-                    {block.caption}
-                  </p>
-
-                  <div className="mt-10 font-mono text-[0.8125rem]">
-                    <div className="text-[#660000]">Features</div>
-                    <ul className="mt-3 space-y-2 uppercase tracking-[0.04em]">
-                      {block.features.map((feature) => (
-                        <li key={feature}>{feature}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
+              <p className="mt-4 text-base leading-relaxed text-navy/55 dark:text-wheat/55">
+                Live routes across the cities where hackers actually build —
+                Toronto to the Bay, Montreal to Vancouver, Austin to Chicago.
+              </p>
             </div>
-          );
-        })}
 
-        <div className="mt-40 sm:mt-64">
-          <h2 className="text-4xl font-semibold leading-[1.14] tracking-[-0.02em] sm:text-5xl lg:text-[3.5rem]">
-            What we offer
-          </h2>
-
-          <div className="mt-10 grid gap-5 lg:mt-14 lg:grid-cols-2">
-            <article className="relative flex min-h-[420px] flex-col justify-end overflow-hidden rounded-xl border border-black/10 bg-white/[0.04] p-8 lg:min-h-[560px]">
-              <div aria-hidden="true" className="absolute inset-0">
-                <div className="absolute left-0 top-[12%] h-14 w-[58%] border border-black/15" />
-                <div className="absolute left-0 top-[46%] h-14 w-[22%] border border-black/15" />
-                <div className="absolute bottom-[22%] left-0 h-14 w-[32%] border border-black/15" />
-                <div className="absolute bottom-[18%] right-[14%] h-[62%] w-28 -skew-x-[28deg] border border-black/15" />
-              </div>
-              <div className="relative">
-                <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#660000]">
-                  For businesses
-                </div>
-                <div className="mt-3 text-3xl font-semibold tracking-tight">
-                  We host your hackathon
-                </div>
-                <p className="mt-4 max-w-[420px] text-sm leading-relaxed text-black/60">
-                  Run a hackathon with HNA end to end — or use our resources and
-                  playbooks to learn how to host your own.
-                </p>
-              </div>
-            </article>
-
-            <div className="grid gap-5">
-              <article className="flex min-h-[270px] overflow-hidden rounded-xl border border-black/10 bg-white/[0.04]">
-                <div className="flex flex-1 flex-col justify-center p-8">
-                  <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#660000]">
-                    For hackers
-                  </div>
-                  <h3 className="mt-3 text-2xl font-semibold tracking-tight sm:text-[2rem]">
-                    Track every hackathon
-                  </h3>
-                  <p className="mt-3 max-w-[300px] text-sm leading-relaxed text-black/60">
-                    One place to discover events, follow deadlines, and keep a
-                    record of every hackathon you attend and win.
-                  </p>
-                </div>
-                <div
-                  aria-hidden="true"
-                  className="hidden w-[42%] flex-col justify-between bg-black/40 p-6 pt-8 font-mono text-[0.8125rem] sm:flex"
-                >
-                  <div className="space-y-1.5 text-white/70">
-                    <div>Interested</div>
-                    <div>Applied</div>
-                    <div>Accepted</div>
-                    <div className="text-white">Attending</div>
-                  </div>
-                  <div className="text-white/50">12 tracked · 3 wins</div>
-                </div>
-              </article>
-
-              <article className="flex min-h-[270px] overflow-hidden rounded-xl border border-black/10 bg-white/[0.04]">
-                <div className="flex flex-1 flex-col justify-end p-8">
-                  <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#660000]">
-                    For organizers
-                  </div>
-                  <h3 className="mt-3 text-2xl font-semibold tracking-tight sm:text-[2rem]">
-                    Publish &amp; grow
-                  </h3>
-                  <p className="mt-3 max-w-[300px] text-sm leading-relaxed text-black/60">
-                    List your hackathon to reach more hackers, get advice from
-                    organizers who&apos;ve done it before, and tap HNA&apos;s
-                    marketing reach.
-                  </p>
-                </div>
-                <div
-                  aria-hidden="true"
-                  className="hidden w-[52%] flex-col gap-1.5 bg-black/40 p-6 pt-8 font-mono text-[0.8125rem] sm:flex"
-                >
-                  <div className="text-white/50">Publish hackathon</div>
-                  <div className="mt-2 space-y-1.5">
-                    <div>
-                      <span className="text-emerald-400">✓</span> Listed to
-                      thousands of hackers
-                    </div>
-                    <div>
-                      <span className="text-emerald-400">✓</span> Mentorship from
-                      seasoned organizers
-                    </div>
-                    <div>
-                      <span className="text-emerald-400">✓</span> Promoted across
-                      HNA channels
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-white/50">Sign-ups:</span> growing
-                  </div>
-                </div>
-              </article>
+            <div className="mt-8 overflow-hidden rounded-2xl border border-navy/10 bg-white dark:border-white/10">
+              <LandingMap />
             </div>
           </div>
         </div>
+      </section>
 
+      <section
+        aria-labelledby="features-heading"
+        className="px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
+      >
+        <div className="mx-auto max-w-[1100px]">
+          <div className="mx-auto max-w-[28rem] text-center">
+            <p className="text-[0.7rem] font-medium tracking-[0.04em] text-rust">
+              Product
+            </p>
+            <h2
+              id="features-heading"
+              className="mt-3 font-serif text-2xl font-semibold leading-[1.15] tracking-[-0.02em] text-navy sm:text-3xl lg:text-4xl dark:text-wheat"
+            >
+              Built for the full hackathon cycle
+            </h2>
+          </div>
+
+          <div className="mt-12 space-y-5 sm:mt-14 sm:space-y-6">
+            {features.map((feature, index) => {
+              const Visual = feature.Visual;
+              const mirrored = index % 2 === 1;
+
+              return (
+                <div
+                  key={feature.id}
+                  className="grid items-center gap-8 rounded-[1.75rem] border border-navy/10 bg-navy/[0.03] p-5 sm:rounded-[2rem] sm:p-7 lg:grid-cols-2 lg:gap-12 lg:p-8 dark:border-white/10 dark:bg-white/[0.04]"
+                >
+                  <div className={mirrored ? "lg:order-2" : undefined}>
+                    <p className="text-[0.7rem] font-medium tracking-[0.04em] text-rust">
+                      {feature.eyebrow}
+                    </p>
+                    <h3 className="mt-3 text-xl font-semibold leading-[1.2] tracking-[-0.02em] text-navy sm:text-2xl dark:text-wheat">
+                      {feature.heading}
+                    </h3>
+                    <p className="mt-3 max-w-[30rem] text-base leading-relaxed text-navy/55 dark:text-wheat/55">
+                      {feature.body}
+                    </p>
+                  </div>
+
+                  <div
+                    className={`overflow-hidden rounded-2xl border border-navy/10 dark:border-white/10 ${
+                      mirrored ? "lg:order-1" : ""
+                    }`}
+                  >
+                    <Visual />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="audiences-heading"
+        className="px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
+      >
+        <div className="mx-auto max-w-[1100px]">
+          <div className="mx-auto max-w-[26rem] text-center">
+            <p className="text-[0.7rem] font-medium tracking-[0.04em] text-rust">
+              Who it&apos;s for
+            </p>
+            <h2
+              id="audiences-heading"
+              className="mt-3 font-serif text-2xl font-semibold leading-[1.15] tracking-[-0.02em] text-navy sm:text-3xl lg:text-4xl dark:text-wheat"
+            >
+              One platform, three jobs
+            </h2>
+          </div>
+
+          <div className="mt-10 grid gap-4 sm:mt-12 sm:grid-cols-3 sm:gap-5">
+            {audiences.map((audience, i) => (
+              <div
+                key={audience.label}
+                className={`rounded-[1.5rem] border border-navy/10 bg-navy/[0.03] p-6 sm:rounded-[1.75rem] sm:p-7 dark:border-white/10 dark:bg-white/[0.04] ${
+                  i === 1 ? "sm:-rotate-1" : i === 2 ? "sm:rotate-1" : ""
+                }`}
+              >
+                <p className="text-[0.7rem] font-medium tracking-[0.04em] text-rust">
+                  {audience.label}
+                </p>
+                <h3 className="mt-3 text-lg font-semibold tracking-tight text-navy sm:text-xl dark:text-wheat">
+                  {audience.title}
+                </h3>
+                <p className="mt-2.5 text-[0.95rem] leading-relaxed text-navy/55 dark:text-wheat/55">
+                  {audience.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="fqa"
+        aria-labelledby="faq-heading"
+        className="px-5 py-16 sm:px-8 sm:py-20 lg:px-12"
+      >
+        <div className="mx-auto max-w-[1100px]">
+          <div className={`${surfaceCard} lg:p-10`}>
+            <div className="max-w-[32rem]">
+              <p className="text-[0.7rem] font-medium tracking-[0.04em] text-rust">
+                FAQ
+              </p>
+              <h2
+                id="faq-heading"
+                className="mt-3 font-serif text-2xl font-semibold leading-[1.15] tracking-[-0.02em] text-navy sm:text-3xl dark:text-wheat"
+              >
+                Questions, answered
+              </h2>
+            </div>
+
+            <dl className="mt-8 space-y-0 sm:mt-10">
+              {faqs.map((faq) => (
+                <div
+                  key={faq.question}
+                  className="grid gap-2 border-t border-navy/10 py-6 sm:grid-cols-[minmax(0,20rem)_1fr] sm:gap-12 sm:py-7 dark:border-white/10"
+                >
+                  <dt className="text-base font-semibold tracking-tight text-navy dark:text-wheat">
+                    {faq.question}
+                  </dt>
+                  <dd className="max-w-[34rem] text-[0.95rem] leading-relaxed text-navy/55 dark:text-wheat/55">
+                    {faq.answer}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-5 pb-16 pt-4 sm:px-8 sm:pb-20 lg:px-12">
+        <div className="mx-auto max-w-[1100px]">
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-cabernet/20 bg-cabernet px-6 py-12 text-center text-wheat sm:rounded-[2rem] sm:px-10 sm:py-14">
+            <Image
+              src="/logo-beaver.png"
+              alt=""
+              aria-hidden="true"
+              width={90}
+              height={80}
+              className="pointer-events-none absolute left-6 top-6 hidden w-14 rotate-[-8deg] opacity-90 sm:block"
+            />
+            <h2 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
+              Ready to find your next hackathon?
+            </h2>
+            <p className="mx-auto mt-4 max-w-[28rem] text-base leading-relaxed text-wheat/70">
+              Open the app to search events, set reminders, and start building
+              your profile.
+            </p>
+            <Link
+              href="/hackathons"
+              className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-wheat px-6 text-sm font-semibold text-[#141414] transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-wheat"
+            >
+              Open App
+            </Link>
+          </div>
+        </div>
       </section>
     </main>
   );

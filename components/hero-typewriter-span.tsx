@@ -16,7 +16,13 @@ const typeSpeedMs = 46;
 const holdMs = 1600;
 const emptyHoldMs = 220;
 
-export function HeroTypewriterSpan() {
+type HeroTypewriterSpanProps = {
+  className?: string;
+};
+
+export function HeroTypewriterSpan({
+  className = "text-cabernet",
+}: HeroTypewriterSpanProps) {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [phase, setPhase] = useState<TypewriterPhase>("waiting");
   const [text, setText] = useState(phrases[0]);
@@ -73,7 +79,7 @@ export function HeroTypewriterSpan() {
       <span className="sr-only">{phrases[0]}</span>
       <span
         aria-hidden="true"
-        className="inline text-[#660000]"
+        className={`inline ${className}`}
       >
         <span data-hero-typewriter-text>{text || "\u00A0"}</span>
         <span className="ml-1 inline-block h-[0.86em] w-[0.075em] translate-y-[0.08em] bg-current motion-safe:animate-pulse" />

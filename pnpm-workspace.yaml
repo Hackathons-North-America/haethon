@@ -1,3 +1,8 @@
+packages:
+  - 'components/*'
+  - 'apps/*'      # Add this if you have an apps folder
+  - 'packages/*'  # Add this if you have a packages folder
+
 allowBuilds:
   '@clerk/shared': true
   '@sentry/cli': true
@@ -6,6 +11,7 @@ allowBuilds:
   msgpackr-extract: true
   sharp: true
   unrs-resolver: true
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

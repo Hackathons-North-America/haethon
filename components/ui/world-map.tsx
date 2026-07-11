@@ -25,7 +25,7 @@ interface MapProps {
 
 export default function WorldMap({
   dots = [],
-  lineColor = "#660000",
+  lineColor = "#721c24",
 }: MapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
