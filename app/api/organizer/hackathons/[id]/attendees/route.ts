@@ -24,7 +24,14 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "You don't organize this hackathon." }, { status: 403 });
   }
 
-  const attendees = await listHackathonAttendees(id);
+  try {
+    const attendees = await listHackathonAttendees(id);
 
-  return NextResponse.json({ data: attendees });
+    return NextResponse.json({ data: attendees });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not load attendees." },
+      { status: 500 }
+    );
+  }
 }

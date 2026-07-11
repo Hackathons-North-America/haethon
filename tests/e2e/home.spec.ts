@@ -17,14 +17,20 @@ test("loads the home page shell", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Companies we've worked with" })).toBeVisible();
   await expect(page.getByRole("img", { name: /Placeholder company logo strip/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Hackathons we track" })).toBeVisible();
-  await expect(page.getByText("Hackathon 01").first()).toBeVisible();
   await expect(
-    page.getByRole("heading", {
-      name: "Built for hackers, organizers, and sponsors alike. Discover hackathons, grow your hacker profile, organize better events with proven resources, and connect companies with the next generation of builders—all from a single platform.",
-    })
+    page.getByRole("heading", { name: "Build agents on infrastructure that thinks like them" })
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Hacker", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Organizer", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Corporations/business", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Ship apps that scale from zero to millions instantly" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Host platforms that serve every customer" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Built by you, or your agents" })
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Deploy", exact: true })).toHaveAttribute(
+    "href",
+    "/hackathons"
+  );
 });

@@ -31,15 +31,22 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "You don't organize this hackathon." }, { status: 403 });
   }
 
-  const upgraded = await upgradeAttendanceDaysToOrganizerVerified({
-    userIds: parsed.data.userIds,
-    hackathonId: id,
-  });
+  try {
+    const upgraded = await upgradeAttendanceDaysToOrganizerVerified({
+      userIds: parsed.data.userIds,
+      hackathonId: id,
+    });
 
-  return NextResponse.json({
-    data: {
-      verifiedUserIds: [...new Set(upgraded.map((row) => row.userId))],
-      upgradedDayCount: upgraded.length,
-    },
-  });
+    return NextResponse.json({
+      data: {
+        verifiedUserIds: [...new Set(upgraded.map((row) => row.userId))],
+        upgradedDayCount: upgraded.length,
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not verify attendees." },
+      { status: 500 }
+    );
+  }
 }

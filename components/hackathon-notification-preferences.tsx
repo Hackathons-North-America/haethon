@@ -11,6 +11,9 @@ type NotificationPreference = {
   type: SelectableReminderType;
   enabled: boolean;
   scheduledFor: string | null;
+  // Whether the send time is still in the future. Omitted (treated as upcoming)
+  // where callers only ever pass deliverable reminders, like the detail page.
+  upcoming?: boolean;
 };
 
 function handleUnauthenticated() {
@@ -70,44 +73,53 @@ export function HackathonNotificationPreferences({
     }
   }
 
+  // Once a reminder's send time has passed there is nothing to subscribe to, so
+  // its clickable card is dropped — the "Email notifications" heading still shows
+  // so the section reads as a settled, past hackathon rather than disappearing.
+  const upcomingPreferences = preferences.filter(
+    (preference) => preference.upcoming ?? Boolean(preference.scheduledFor)
+  );
+
   return (
     <div className="mt-5 border-t border-black/10 pt-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-black">
         <BellRing aria-hidden="true" className="size-4 text-[#660000]" />
         Email notifications
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        {preferences.map((preference) => {
-          const scheduledFor = preference.scheduledFor ? new Date(preference.scheduledFor) : null;
-          const pending = pendingType === preference.type;
+      {upcomingPreferences.length ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {upcomingPreferences.map((preference) => {
+            const scheduledFor = preference.scheduledFor ? new Date(preference.scheduledFor) : null;
+            const pending = pendingType === preference.type;
 
-          return (
-            <label
-              className={`flex min-h-20 cursor-pointer flex-col justify-between rounded-md border bg-white p-3 text-sm transition-colors ${
-                preference.enabled
-                  ? "border-[#660000]/40 text-black"
-                  : "border-black/10 text-[#706F6B]"
-              } hover:border-[#660000]/40`}
-              key={preference.type}
-            >
-              <span className="flex items-start justify-between gap-3">
-                <span className="font-medium">{reminderTypeLabels[preference.type] ?? preference.type}</span>
-                <input
-                  checked={preference.enabled}
-                  className="mt-0.5 size-4 accent-[#660000]"
-                  disabled={pendingType !== null}
-                  onChange={(event) => updatePreference(preference.type, event.target.checked)}
-                  type="checkbox"
-                />
-              </span>
-              <span className="mt-2 text-xs text-[#706F6B]">
-                {scheduledFor ? formatReminderDate(scheduledFor) : "Date unavailable"}
-                {pending ? " - saving" : ""}
-              </span>
-            </label>
-          );
-        })}
-      </div>
+            return (
+              <label
+                className={`flex min-h-20 cursor-pointer flex-col justify-between rounded-md border bg-white p-3 text-sm transition-colors ${
+                  preference.enabled
+                    ? "border-[#660000]/40 text-black"
+                    : "border-black/10 text-[#706F6B]"
+                } hover:border-[#660000]/40`}
+                key={preference.type}
+              >
+                <span className="flex items-start justify-between gap-3">
+                  <span className="font-medium">{reminderTypeLabels[preference.type] ?? preference.type}</span>
+                  <input
+                    checked={preference.enabled}
+                    className="mt-0.5 size-4 accent-[#660000]"
+                    disabled={pendingType !== null}
+                    onChange={(event) => updatePreference(preference.type, event.target.checked)}
+                    type="checkbox"
+                  />
+                </span>
+                <span className="mt-2 text-xs text-[#706F6B]">
+                  {scheduledFor ? formatReminderDate(scheduledFor) : "No upcoming reminder"}
+                  {pending ? " - saving" : ""}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

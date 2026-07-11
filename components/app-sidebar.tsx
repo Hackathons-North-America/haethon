@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Building2,
   CalendarDays,
   CircleUser,
   Compass,
@@ -19,10 +20,22 @@ const items = [
   { href: "/account/settings", icon: Settings, label: "Account Settings" },
 ];
 
-export function AppSidebar({ isAdmin, isSignedIn }: { isAdmin: boolean; isSignedIn: boolean }) {
+export function AppSidebar({
+  isAdmin,
+  isOrganizer,
+  isSignedIn,
+}: {
+  isAdmin: boolean;
+  isOrganizer: boolean;
+  isSignedIn: boolean;
+}) {
   const pathname = usePathname();
 
-  const links = isAdmin ? [...items, { href: "/admin", icon: ShieldCheck, label: "Admin" }] : items;
+  const links = [
+    ...items,
+    ...(isOrganizer ? [{ href: "/organizer", icon: Building2, label: "Organizer" }] : []),
+    ...(isAdmin ? [{ href: "/admin", icon: ShieldCheck, label: "Admin" }] : []),
+  ];
 
   // The active link is the one whose href is the longest matching prefix of the
   // current path, so /account/settings highlights Settings rather than both it and Hacker Profile.

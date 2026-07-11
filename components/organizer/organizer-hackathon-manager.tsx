@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, KeyRound, RefreshCw, Users } from "lucide-react
 import { previewPayloadToCard } from "@/components/admin/hackathon-card-preview";
 import type { AdminHackathonListItem } from "@/components/admin/published-hackathon-manager";
 import { HackathonCard } from "@/components/hackathon-card";
+import { trackEvent } from "@/lib/analytics/events";
 import { dateToInputValue } from "@/lib/hackathons/utils";
 
 export type OrganizerHackathonItem = AdminHackathonListItem;
@@ -70,7 +71,7 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
 
     fetch(`/api/organizer/hackathons/${hackathonId}/checkin-code`)
       .then(async (response) => {
-        const result = (await response.json()) as { data?: CheckinCode | null; error?: unknown };
+        const result = (await response.json().catch(() => null)) as { data?: CheckinCode | null; error?: unknown } | null;
 
         if (cancelled) {
           return;
@@ -78,11 +79,11 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
 
         if (!response.ok) {
           setStatus("error");
-          setMessage(typeof result.error === "string" ? result.error : "Could not load the check-in code.");
+          setMessage(typeof result?.error === "string" ? result.error : "Could not load the check-in code.");
           return;
         }
 
-        setCode(result.data ?? null);
+        setCode(result?.data ?? null);
         setStatus("idle");
       })
       .catch(() => {
@@ -101,18 +102,24 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
     setStatus("generating");
     setMessage(null);
 
-    const response = await fetch(`/api/organizer/hackathons/${hackathonId}/checkin-code`, { method: "POST" });
-    const result = (await response.json()) as { data?: CheckinCode; error?: unknown };
+    try {
+      const response = await fetch(`/api/organizer/hackathons/${hackathonId}/checkin-code`, { method: "POST" });
+      const result = (await response.json().catch(() => null)) as { data?: CheckinCode; error?: unknown } | null;
 
-    if (!response.ok || !result.data) {
+      if (!response.ok || !result?.data) {
+        setStatus("error");
+        setMessage(typeof result?.error === "string" ? result.error : "Could not generate a code. Please try again.");
+        return;
+      }
+
+      setCode(result.data);
+      setStatus("idle");
+      setMessage("New code generated. Previous codes are now revoked.");
+      trackEvent("organizer_checkin_code_generated", { hackathon_id: hackathonId });
+    } catch {
       setStatus("error");
-      setMessage(typeof result.error === "string" ? result.error : "Could not generate a code.");
-      return;
+      setMessage("Could not reach the server. Please try again.");
     }
-
-    setCode(result.data);
-    setStatus("idle");
-    setMessage("New code generated. Previous codes are now revoked.");
   }
 
   return (
@@ -185,15 +192,15 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
 
     fetch(`/api/organizer/hackathons/${hackathonId}/attendees`)
       .then(async (response) => {
-        const result = (await response.json()) as { data?: Attendee[]; error?: unknown };
+        const result = (await response.json().catch(() => null)) as { data?: Attendee[]; error?: unknown } | null;
 
         if (cancelled) {
           return;
         }
 
-        if (!response.ok || !result.data) {
+        if (!response.ok || !result?.data) {
           setStatus("error");
-          setMessage(typeof result.error === "string" ? result.error : "Could not load attendees.");
+          setMessage(typeof result?.error === "string" ? result.error : "Could not load attendees.");
           return;
         }
 
@@ -234,37 +241,48 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
     setStatus("verifying");
     setMessage(null);
 
-    const response = await fetch(`/api/organizer/hackathons/${hackathonId}/attendees/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userIds: [...selected] }),
-    });
-    const result = (await response.json()) as { data?: { verifiedUserIds: string[] }; error?: unknown };
+    try {
+      const response = await fetch(`/api/organizer/hackathons/${hackathonId}/attendees/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: [...selected] }),
+      });
+      const result = (await response.json().catch(() => null)) as
+        | { data?: { verifiedUserIds: string[] }; error?: unknown }
+        | null;
 
-    if (!response.ok || !result.data) {
+      if (!response.ok || !result?.data) {
+        setStatus("error");
+        setMessage(typeof result?.error === "string" ? result.error : "Could not verify attendees.");
+        return;
+      }
+
+      const verifiedIds = new Set(result.data.verifiedUserIds);
+
+      setAttendees((current) =>
+        current
+          ? current.map((attendee) =>
+              verifiedIds.has(attendee.userId)
+                ? { ...attendee, tier: "verified" as const, bestSource: "organizer_verified" }
+                : attendee
+            )
+          : current
+      );
+      setSelected(new Set());
+      setStatus("idle");
+      setMessage(
+        verifiedIds.size
+          ? `Verified attendance for ${verifiedIds.size} ${verifiedIds.size === 1 ? "hacker" : "hackers"}.`
+          : "No check-ins were eligible for an upgrade. Hackers must check in before you can verify them."
+      );
+      trackEvent("organizer_attendees_verified", {
+        hackathon_id: hackathonId,
+        verified_count: verifiedIds.size,
+      });
+    } catch {
       setStatus("error");
-      setMessage(typeof result.error === "string" ? result.error : "Could not verify attendees.");
-      return;
+      setMessage("Could not reach the server. Please try again.");
     }
-
-    const verifiedIds = new Set(result.data.verifiedUserIds);
-
-    setAttendees((current) =>
-      current
-        ? current.map((attendee) =>
-            verifiedIds.has(attendee.userId)
-              ? { ...attendee, tier: "verified" as const, bestSource: "organizer_verified" }
-              : attendee
-          )
-        : current
-    );
-    setSelected(new Set());
-    setStatus("idle");
-    setMessage(
-      verifiedIds.size
-        ? `Verified attendance for ${verifiedIds.size} ${verifiedIds.size === 1 ? "hacker" : "hackers"}.`
-        : "No check-ins were eligible for an upgrade. Hackers must check in before you can verify them."
-    );
   }
 
   const selectable = attendees?.filter((attendee) => attendee.tier === "self_reported") ?? [];
@@ -412,6 +430,12 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
     setMessage("Changes saved.");
     setItem(result.data);
     setPreviewPayload(itemToPreviewPayload(result.data));
+    trackEvent("organizer_hackathon_updated", {
+      hackathon_id: result.data.id,
+      hackathon_name: result.data.name,
+      format: result.data.format,
+      status: result.data.status,
+    });
   }
 
   return (

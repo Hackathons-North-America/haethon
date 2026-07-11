@@ -43,7 +43,11 @@ export type HackathonDatesInput = {
 export function getSelectableReminderTypesForStatus(
   applicationStatus: string | null
 ): SelectableReminderType[] {
-  if (applicationStatus === "accepted" || applicationStatus === "attending") {
+  if (
+    applicationStatus === "applied" ||
+    applicationStatus === "accepted" ||
+    applicationStatus === "attending"
+  ) {
     return ["hackathon_week_before", "hackathon_day_before"];
   }
 
@@ -56,18 +60,22 @@ function daysBefore(date: Date, days: number) {
   return new Date(date.getTime() - days * DAY_MS);
 }
 
-export function computeSelectableReminderPlan(
-  dates: HackathonDatesInput | null,
-  now = new Date()
+/**
+ * Every selectable reminder whose anchor date is known, regardless of whether
+ * the send time is still upcoming. Application reminders count down to the
+ * application opening; event reminders count down to the hackathon start.
+ */
+export function computeSelectableReminderSchedule(
+  dates: HackathonDatesInput | null
 ): SelectableReminderPlanEntry[] {
   if (!dates) {
     return [];
   }
 
-  const plan: SelectableReminderPlanEntry[] = [];
+  const schedule: SelectableReminderPlanEntry[] = [];
   const push = (type: SelectableReminderType, scheduledFor: Date | null) => {
-    if (scheduledFor && scheduledFor > now) {
-      plan.push({ type, scheduledFor });
+    if (scheduledFor) {
+      schedule.push({ type, scheduledFor });
     }
   };
 
@@ -81,5 +89,16 @@ export function computeSelectableReminderPlan(
     push("hackathon_day_before", daysBefore(dates.startsAt, 1));
   }
 
-  return plan;
+  return schedule;
+}
+
+/**
+ * The subset of the schedule that can still be delivered — used to schedule
+ * reminders and to decide which sends are actually upcoming.
+ */
+export function computeSelectableReminderPlan(
+  dates: HackathonDatesInput | null,
+  now = new Date()
+): SelectableReminderPlanEntry[] {
+  return computeSelectableReminderSchedule(dates).filter((entry) => entry.scheduledFor > now);
 }

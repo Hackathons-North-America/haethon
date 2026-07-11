@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { computeSelectableReminderPlan, getSelectableReminderTypesForStatus } from "@/lib/hackathons/reminder-plan";
+import {
+  computeSelectableReminderPlan,
+  computeSelectableReminderSchedule,
+  getSelectableReminderTypesForStatus,
+} from "@/lib/hackathons/reminder-plan";
 
 const now = new Date("2026-07-01T00:00:00Z");
 
@@ -26,6 +30,32 @@ describe("computeSelectableReminderPlan", () => {
 
   it("offers interested hackers the two application-open reminders", () => {
     expect(getSelectableReminderTypesForStatus("interested")).toEqual([
+      "application_week_before",
+      "application_day_before",
+    ]);
+  });
+
+  it("offers applied hackers the event-start reminders too", () => {
+    expect(getSelectableReminderTypesForStatus("applied")).toEqual([
+      "hackathon_week_before",
+      "hackathon_day_before",
+    ]);
+  });
+
+  it("keeps past-dated reminders in the schedule so the control still renders", () => {
+    const alreadyStarted = { ...dates, startsAt: new Date("2020-01-08T00:00:00Z") };
+    const schedule = computeSelectableReminderSchedule(alreadyStarted);
+
+    expect(types(schedule)).toEqual([
+      "application_week_before",
+      "application_day_before",
+      "hackathon_week_before",
+      "hackathon_day_before",
+    ]);
+    // Event reminders stay anchored to the (past) start date rather than dropping out.
+    expect(schedule[2].scheduledFor).toEqual(new Date("2020-01-01T00:00:00Z"));
+    // The deliverable plan still filters those past sends out.
+    expect(types(computeSelectableReminderPlan(alreadyStarted, now))).toEqual([
       "application_week_before",
       "application_day_before",
     ]);

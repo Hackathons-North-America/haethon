@@ -2,18 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Building2, CalendarDays, Mail, ShieldAlert, Upload } from "lucide-react";
+import { CalendarDays, ClipboardCheck } from "lucide-react";
 
 const items = [
-  { href: "/admin/hackathons", icon: CalendarDays, label: "Hackathons" },
-  { href: "/admin/organizer-preview", icon: Building2, label: "Organizer view" },
-  { href: "/admin/import", icon: Upload, label: "Import" },
-  { href: "/admin/broken", icon: AlertTriangle, label: "Broken" },
-  { href: "/admin/attendance-anomalies", icon: ShieldAlert, label: "Anomalies" },
-  { href: "/admin/email-test", icon: Mail, label: "Email test" },
+  { href: "/organizer", icon: CalendarDays, label: "My hackathons" },
+  { href: "/organizer/review", icon: ClipboardCheck, label: "Review queue" },
 ];
 
-export function AdminSidebar() {
+export function OrganizerSidebar() {
   const pathname = usePathname();
 
   return (
@@ -22,7 +18,7 @@ export function AdminSidebar() {
         <Link className="font-serif text-2xl font-semibold text-black" href="/">
           HNA
         </Link>
-        <nav aria-label="Admin navigation" className="mt-6 flex gap-2 lg:flex-col">
+        <nav aria-label="Organizer navigation" className="mt-6 flex gap-2 lg:flex-col">
           {items.map(({ href, icon: Icon, label }) => {
             const active = pathname === href;
 

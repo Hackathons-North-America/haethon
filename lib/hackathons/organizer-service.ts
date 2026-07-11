@@ -6,6 +6,44 @@ import { adminHackathonQuery } from "@/lib/hackathons/admin-service";
 
 export type ManagedHackathonRow = Awaited<ReturnType<typeof listManagedHackathons>>[number];
 
+/** Converts a managed row's Date columns to ISO strings for client components. */
+export function serializeManagedHackathon(row: ManagedHackathonRow) {
+  return {
+    ...row,
+    startsAt: row.startsAt?.toISOString() ?? null,
+    endsAt: row.endsAt?.toISOString() ?? null,
+    applicationOpensAt: row.applicationOpensAt?.toISOString() ?? null,
+    applicationClosesAt: row.applicationClosesAt?.toISOString() ?? null,
+    acceptanceAt: row.acceptanceAt?.toISOString() ?? null,
+  };
+}
+
+export type SerializedManagedHackathon = ReturnType<typeof serializeManagedHackathon>;
+
+/**
+ * Splits managed hackathons into current/upcoming vs past. An event is "past"
+ * once its end date has elapsed; undated events stay under current.
+ */
+export function splitManagedHackathons(rows: ManagedHackathonRow[], now = new Date()) {
+  const current: SerializedManagedHackathon[] = [];
+  const past: SerializedManagedHackathon[] = [];
+
+  for (const row of rows) {
+    const item = serializeManagedHackathon(row);
+    const ended = row.endsAt ? row.endsAt.getTime() < now.getTime() : false;
+    (ended ? past : current).push(item);
+  }
+
+  // Current events read best soonest-first; undated ones sink to the bottom.
+  current.sort((left, right) => {
+    if (!left.startsAt) return 1;
+    if (!right.startsAt) return -1;
+    return left.startsAt.localeCompare(right.startsAt);
+  });
+
+  return { current, past };
+}
+
 /**
  * Hackathons the user can manage: everything for admins, otherwise events
  * belonging to an organization they are an approved member of, or events they

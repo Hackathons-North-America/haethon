@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getCurrentUserContext } from "@/lib/auth";
@@ -60,4 +60,29 @@ export async function PATCH(request: Request, context: RouteContext) {
   });
 
   return NextResponse.json({ data: tracked });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const userContext = await getCurrentUserContext();
+
+  if (!userContext) {
+    return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  }
+
+  const { id } = await context.params;
+
+  // Drop the tracking row entirely so the hackathon leaves the pipeline — this
+  // undoes the interested/applied/accepted/attending tag in one go — then clear
+  // any reminders that were scheduled for it.
+  await db
+    .delete(userHackathons)
+    .where(and(eq(userHackathons.userId, userContext.user.id), eq(userHackathons.hackathonId, id)));
+
+  await syncRemindersForUserHackathon({
+    userId: userContext.user.id,
+    hackathonId: id,
+    isSaved: false,
+  });
+
+  return NextResponse.json({ data: { hackathonId: id } });
 }

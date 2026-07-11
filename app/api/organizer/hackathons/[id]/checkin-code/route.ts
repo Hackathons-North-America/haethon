@@ -34,13 +34,18 @@ export async function GET(_request: Request, context: RouteContext) {
     return auth.error;
   }
 
-  const active = await getActiveCheckinCode(auth.hackathonId);
+  try {
+    const active = await getActiveCheckinCode(auth.hackathonId);
 
-  return NextResponse.json({
-    data: active
-      ? { code: active.code, createdAt: active.createdAt, expiresAt: active.expiresAt }
-      : null,
-  });
+    return NextResponse.json({
+      data: active ? { code: active.code, createdAt: active.createdAt, expiresAt: active.expiresAt } : null,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not load the check-in code." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(_request: Request, context: RouteContext) {
@@ -50,13 +55,20 @@ export async function POST(_request: Request, context: RouteContext) {
     return auth.error;
   }
 
-  const created = await rotateCheckinCode({
-    hackathonId: auth.hackathonId,
-    createdByUserId: auth.userContext.user.id,
-  });
+  try {
+    const created = await rotateCheckinCode({
+      hackathonId: auth.hackathonId,
+      createdByUserId: auth.userContext.user.id,
+    });
 
-  return NextResponse.json(
-    { data: { code: created.code, createdAt: created.createdAt, expiresAt: created.expiresAt } },
-    { status: 201 }
-  );
+    return NextResponse.json(
+      { data: { code: created.code, createdAt: created.createdAt, expiresAt: created.expiresAt } },
+      { status: 201 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not generate a code." },
+      { status: 500 }
+    );
+  }
 }

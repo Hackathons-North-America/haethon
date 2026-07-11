@@ -8,6 +8,7 @@ import { HackathonNotificationPreferences } from "@/components/hackathon-notific
 import { HackathonResultActions } from "@/components/hackathon-result-actions";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
+import { RemovablePipelineCard } from "@/components/removable-pipeline-card";
 import { getCurrentUserRecord } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
@@ -20,7 +21,7 @@ import {
 import { formatDateRange, formatLocation } from "@/lib/hackathons/card-format";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 import {
-  computeSelectableReminderPlan,
+  computeSelectableReminderSchedule,
   getSelectableReminderTypesForStatus,
 } from "@/lib/hackathons/reminder-plan";
 
@@ -195,32 +196,32 @@ export default async function MyHackathonsPage() {
                   const deadline = nextDeadline(row, now);
                   const enabledByType = preferencesByHackathon.get(row.hackathonId);
                   // The reminders offered depend on where the hacker stands: those
-                  // still interested get application-open reminders, while accepted
-                  // hackers get the event-start ones. Keep this in step with the
-                  // detail page and the reminder sync.
+                  // still interested get application-open reminders, while applied
+                  // and accepted hackers get the event-start ones. The control is
+                  // shown whenever the anchor date is known — even if the send time
+                  // has passed — so hackers can always manage their subscription;
+                  // the sync only ever schedules the still-upcoming ones.
                   const availableReminderTypes = new Set(
                     getSelectableReminderTypesForStatus(row.applicationStatus)
                   );
-                  const notificationPreferences = computeSelectableReminderPlan(
-                    {
-                      startsAt: row.startsAt,
-                      endsAt: row.endsAt,
-                      applicationOpensAt: row.applicationOpensAt,
-                      applicationClosesAt: row.applicationClosesAt,
-                      acceptanceAt: row.acceptanceAt,
-                    },
-                    now
-                  )
+                  const notificationPreferences = computeSelectableReminderSchedule({
+                    startsAt: row.startsAt,
+                    endsAt: row.endsAt,
+                    applicationOpensAt: row.applicationOpensAt,
+                    applicationClosesAt: row.applicationClosesAt,
+                    acceptanceAt: row.acceptanceAt,
+                  })
                     .filter(({ type }) => availableReminderTypes.has(type))
                     .map(({ type, scheduledFor }) => ({
                       type,
                       enabled: enabledByType?.get(type) ?? true,
                       scheduledFor: scheduledFor.toISOString(),
+                      upcoming: scheduledFor > now,
                     }));
 
                   return (
-                    <article className="rounded-lg border border-black/10 bg-[#F7F7F4] p-5" key={row.id}>
-                      <div className="flex flex-wrap items-start justify-between gap-4">
+                    <RemovablePipelineCard hackathonId={row.hackathonId} key={row.id}>
+                      <div className="flex flex-wrap items-start justify-between gap-4 pr-8">
                         <div className="min-w-0">
                           <Link
                             className="text-lg font-semibold text-black underline-offset-4 hover:text-[#660000] hover:underline"
@@ -260,7 +261,7 @@ export default async function MyHackathonsPage() {
                           initialPreferences={notificationPreferences}
                         />
                       ) : null}
-                    </article>
+                    </RemovablePipelineCard>
                   );
                 })}
               </div>

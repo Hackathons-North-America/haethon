@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Building2, ClipboardList, Maximize2, Search } from "lucide-react";
 
 import { HeroTypewriterSpan } from "@/components/hero-typewriter-span";
 import { MacbookHero } from "@/components/ui/macbook-hero";
@@ -15,107 +14,158 @@ const navLinkClassName =
 const openAppLinkClassName =
   "inline-flex min-h-9 items-center justify-center border border-[#660000] px-4 text-[#660000] transition-colors hover:bg-[#660000] hover:text-white focus-visible:bg-[#660000] focus-visible:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#660000]";
 
-const hackathonPlaceholders = [
-  "Hackathon 01",
-  "Hackathon 02",
-  "Hackathon 03",
-  "Hackathon 04",
-  "Hackathon 05",
-  "Hackathon 06",
-  "Hackathon 07",
-  "Hackathon 08",
+const showcaseBlocks = [
+  {
+    id: "agents",
+    heading: "Find every hackathon in one place",
+    company: "One directory",
+    caption:
+      "for hundreds of hackathons across North America — search by name and filter by location, date, and format.",
+    features: [
+      "Smart Search",
+      "Location & Date Filters",
+      "Beginner-Friendly",
+      "Travel Reimbursement",
+    ],
+  },
+  {
+    id: "scale",
+    heading: "Never miss another application deadline",
+    company: "Automatic reminders",
+    caption:
+      "for application openings, closings, decisions, and check-in — sent straight to your inbox.",
+    features: [
+      "Application Reminders",
+      "Decision Alerts",
+      "Event Countdowns",
+      "Email Notifications",
+    ],
+  },
+  {
+    id: "platforms",
+    heading: "Build a profile that proves what you've shipped",
+    company: "Verified attendance",
+    caption:
+      "and wins pinned to your profile, with an activity heatmap of every hackathon you've been to.",
+    features: [
+      "Pipeline Tracking",
+      "Verified Check-In",
+      "Pinned Wins",
+      "Activity Heatmap",
+    ],
+  },
 ];
 
-const audienceCards = [
-  {
-    title: "Hacker",
-    icon: Search,
-  },
-  {
-    title: "Organizer",
-    icon: ClipboardList,
-  },
-  {
-    title: "Corporations/business",
-    icon: Building2,
-  },
-];
-
-function CompanyLogoStrip({ hidden = false }: { hidden?: boolean }) {
+function AgentChatVisual() {
   return (
-    <svg
-      aria-hidden={hidden}
-      aria-label={
-        hidden
-          ? undefined
-          : "Placeholder company logo strip with Google, Microsoft, Tailscale, Backboard.io, GitHub, Warp, PCBWay, 1Password, and Perplexity"
-      }
-      className="h-auto w-[1588px] shrink-0"
-      fill="none"
-      role={hidden ? undefined : "img"}
-      viewBox="0 0 1588 46"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <g fill="#3F3E3B" fontFamily="Arial, Helvetica, sans-serif">
-        <text fontSize="24" fontWeight="700" x="16" y="32">
-          Google
-        </text>
-        <circle cx="122" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="166" y="32">
-          Microsoft
-        </text>
-        <circle cx="314" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="358" y="32">
-          Tailscale
-        </text>
-        <circle cx="492" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="536" y="32">
-          Backboard.io
-        </text>
-        <circle cx="708" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="752" y="32">
-          GitHub
-        </text>
-        <circle cx="858" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="902" y="32">
-          Warp
-        </text>
-        <circle cx="990" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="1034" y="32">
-          PCBWay
-        </text>
-        <circle cx="1160" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="1204" y="32">
-          1Password
-        </text>
-        <circle cx="1366" cy="25" fill="#706F6B" r="3" />
-        <text fontSize="24" fontWeight="700" x="1410" y="32">
-          Perplexity
-        </text>
-        <circle cx="1572" cy="25" fill="#706F6B" r="3" />
-      </g>
-    </svg>
-  );
-}
-
-function HackathonNameStrip({ hidden = false }: { hidden?: boolean }) {
-  return (
-    <div
-      aria-hidden={hidden}
-      className="flex shrink-0 items-center gap-8 whitespace-nowrap pr-8 text-lg font-semibold text-[#3F3E3B]"
-    >
-      {hackathonPlaceholders.map((hackathon) => (
-        <span key={hackathon} className="inline-flex items-center gap-8">
-          {hackathon}
-          <span
-            aria-hidden="true"
-            className="size-1 rounded-full bg-[#706F6B]"
-          />
-        </span>
-      ))}
+    <div className="grid min-h-[300px] grid-cols-[0.26fr_1fr] sm:min-h-[430px]">
+      <div className="space-y-3 border-r border-black/10 p-5 sm:p-7">
+        <div className="h-2.5 w-3/4 rounded bg-white/20" />
+        <div className="h-2.5 w-1/2 rounded bg-white/10" />
+        <div className="h-2.5 w-2/3 rounded bg-white/10" />
+        <div className="h-2.5 w-3/5 rounded bg-white/10" />
+        <div className="h-2.5 w-1/2 rounded bg-white/10" />
+      </div>
+      <div className="flex flex-col p-5 sm:p-7">
+        <div className="max-w-[62%] space-y-2 rounded-lg bg-white/10 p-4">
+          <div className="h-2 rounded bg-white/25" />
+          <div className="h-2 w-4/5 rounded bg-white/25" />
+        </div>
+        <div className="mt-4 max-w-[54%] space-y-2 self-end rounded-lg bg-white/20 p-4">
+          <div className="h-2 rounded bg-white/40" />
+          <div className="h-2 w-2/3 rounded bg-white/40" />
+        </div>
+        <div className="max-w-[62%] space-y-2 rounded-lg bg-white/10 p-4 sm:mt-4">
+          <div className="h-2 rounded bg-white/25" />
+          <div className="h-2 w-3/4 rounded bg-white/25" />
+          <div className="h-2 w-1/2 rounded bg-white/25" />
+        </div>
+        <div className="mt-auto flex items-center gap-3 rounded-lg border border-black/15 p-3">
+          <div className="h-2 w-1/3 rounded bg-white/15" />
+          <div className="ml-auto size-6 rounded bg-white/90" />
+        </div>
+      </div>
     </div>
   );
 }
+
+function ScaleDashboardVisual() {
+  return (
+    <div className="min-h-[300px] p-5 sm:min-h-[430px] sm:p-7">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        {["82ms", "12.4M", "99.99%"].map((stat) => (
+          <div
+            key={stat}
+            className="rounded-lg border border-black/10 bg-white/5 p-4 sm:p-5"
+          >
+            <div className="h-2 w-1/2 rounded bg-white/15" />
+            <div className="mt-4 text-xl font-semibold text-black sm:text-2xl">
+              {stat}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex h-40 items-end gap-1.5 rounded-lg border border-black/10 bg-white/5 p-4 sm:mt-5 sm:h-56 sm:gap-2 sm:p-6">
+        {[18, 24, 20, 32, 28, 44, 38, 56, 48, 70, 62, 84, 76, 96, 88, 100].map(
+          (height, i) => (
+            <span
+              key={`${height}-${i}`}
+              className="flex-1 rounded-t bg-white/30"
+              style={{ height: `${height}%` }}
+            />
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DocsPlatformVisual() {
+  return (
+    <div className="flex min-h-[300px] flex-col sm:min-h-[430px]">
+      <div className="flex items-center gap-2 border-b border-black/10 px-5 py-4 sm:px-7">
+        <span className="size-2 rounded-full bg-white/20" />
+        <span className="size-2 rounded-full bg-white/20" />
+        <span className="size-2 rounded-full bg-white/20" />
+        <span className="ml-4 h-5 w-44 rounded-full bg-white/10" />
+        <span className="ml-auto h-5 w-16 rounded-full bg-white/90" />
+      </div>
+      <div className="grid flex-1 grid-cols-[0.24fr_1fr] sm:grid-cols-[0.22fr_1fr_0.18fr]">
+        <div className="space-y-3 border-r border-black/10 p-5 sm:p-7">
+          <div className="h-2 w-4/5 rounded bg-white/20" />
+          <div className="h-2 w-3/5 rounded bg-white/10" />
+          <div className="h-2 w-2/3 rounded bg-white/10" />
+          <div className="h-2 w-1/2 rounded bg-white/10" />
+          <div className="h-2 w-3/5 rounded bg-white/10" />
+        </div>
+        <div className="p-5 sm:p-7">
+          <div className="h-4 w-1/3 rounded bg-white/25" />
+          <div className="mt-5 space-y-3">
+            <div className="h-2 rounded bg-white/10" />
+            <div className="h-2 w-11/12 rounded bg-white/10" />
+            <div className="h-2 w-4/5 rounded bg-white/10" />
+          </div>
+          <div className="mt-6 h-24 rounded-lg border border-black/10 bg-black/25 sm:h-32" />
+          <div className="mt-6 space-y-3">
+            <div className="h-2 rounded bg-white/10" />
+            <div className="h-2 w-2/3 rounded bg-white/10" />
+          </div>
+        </div>
+        <div className="hidden space-y-3 border-l border-black/10 p-7 sm:block">
+          <div className="h-2 w-full rounded bg-white/15" />
+          <div className="h-2 w-3/4 rounded bg-white/10" />
+          <div className="h-2 w-4/5 rounded bg-white/10" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const showcaseVisuals: Record<string, () => React.JSX.Element> = {
+  agents: AgentChatVisual,
+  scale: ScaleDashboardVisual,
+  platforms: DocsPlatformVisual,
+};
 
 export default function Home() {
   return (
@@ -168,197 +218,150 @@ export default function Home() {
       </section>
 
       <section
-        aria-labelledby="platform-audience-heading"
-        className="relative z-10 -mt-[3%] bg-[#F8F8F4] px-8 pb-16 pt-16 text-left sm:px-14 sm:pb-20 sm:pt-20 lg:px-20"
+        aria-labelledby="showcase-agents-heading"
+        className="relative z-10 -mt-[3%] overflow-hidden bg-gray-200 px-6 pb-32 pt-24 text-left text-black sm:pt-28"
       >
-        <div className="mx-auto max-w-[1120px]">
-          <div>
-            <h2 className="text-sm font-medium tracking-normal text-[#706F6B]">
-              Hackathons we track
-            </h2>
-            <div className="company-marquee mt-7 overflow-hidden py-1">
-              <div className="company-marquee-track flex w-max items-center">
-                <HackathonNameStrip />
-                <HackathonNameStrip hidden />
+        {showcaseBlocks.map((block, index) => {
+          const Visual = showcaseVisuals[block.id];
+          const mirrored = index % 2 === 1;
+
+          return (
+            <div key={block.id} className={index > 0 ? "mt-40 sm:mt-64" : undefined}>
+              <h2
+                id={`showcase-${block.id}-heading`}
+                className={`max-w-[820px] text-4xl font-semibold leading-[1.14] tracking-[-0.02em] sm:text-5xl lg:text-[3.5rem] ${
+                  mirrored ? "lg:ml-[34%]" : ""
+                }`}
+              >
+                {block.heading}
+              </h2>
+
+              <div className="mt-10 flex flex-col gap-12 lg:mt-14 lg:flex-row lg:items-center lg:justify-between">
+                <div
+                  className={`w-full overflow-hidden rounded-xl border border-black/10 bg-white/[0.04] lg:w-[66%] ${
+                    mirrored ? "lg:order-2" : ""
+                  }`}
+                >
+                  <Visual />
+                </div>
+
+                <div className={`max-w-[360px] lg:w-[24%] ${mirrored ? "lg:order-1" : ""}`}>
+                  <p className="text-2xl font-medium leading-[1.22] tracking-tight sm:text-[1.75rem]">
+                    <span className="text-[#660000]">{block.company}</span>{" "}
+                    {block.caption}
+                  </p>
+
+                  <div className="mt-10 font-mono text-[0.8125rem]">
+                    <div className="text-[#660000]">Features</div>
+                    <ul className="mt-3 space-y-2 uppercase tracking-[0.04em]">
+                      {block.features.map((feature) => (
+                        <li key={feature}>{feature}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          );
+        })}
 
-          <div className="mt-24 text-left">
-            <h2
-              id="platform-audience-heading"
-              className="max-w-[760px] text-[0.9375rem] font-semibold leading-[1.25] tracking-normal text-black sm:text-lg lg:text-[1.325rem]"
-            >
-              Built for hackers, organizers, and sponsors alike. Discover
-              hackathons, grow your hacker profile, organize better events with
-              proven resources, and connect companies with the next generation
-              of builders—all from a single platform.
-            </h2>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-[1.95fr_1fr]">
-              <article className="relative min-h-[460px] overflow-hidden rounded border border-black/10 bg-white p-5 text-left shadow-[0_18px_54px_rgba(0,0,0,0.06)] sm:p-7">
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <h3 className="max-w-[420px] text-2xl font-semibold leading-tight text-black sm:text-[1.7rem]">
-                    {audienceCards[0].title}
-                  </h3>
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded bg-[#660000] text-white">
-                    <Maximize2
-                      aria-hidden="true"
-                      className="size-4"
-                      strokeWidth={1.75}
-                    />
-                  </div>
-                </div>
-                <div className="absolute inset-x-0 bottom-0 h-[64%] bg-[linear-gradient(135deg,_rgba(102,0,0,0.08),_rgba(248,248,244,0.95)_34%,_rgba(102,0,0,0.28)_70%,_rgba(112,111,107,0.2))]" />
-                <div className="absolute bottom-8 left-8 z-10 hidden w-[27%] rounded-[1.45rem] border-[10px] border-black bg-white p-4 shadow-[0_24px_50px_rgba(0,0,0,0.2)] sm:block">
-                  <div className="mx-auto mb-8 size-3 rounded-full bg-black/80" />
-                  <div className="space-y-2 text-center">
-                    <div className="mx-auto size-8 rounded-full border border-black/15" />
-                    <div className="text-xs text-[#706F6B]">Profile</div>
-                    <div className="text-2xl font-semibold text-black">87%</div>
-                  </div>
-                  <div className="mt-9 space-y-2">
-                    <div className="h-2 rounded bg-black/10" />
-                    <div className="h-2 w-3/4 rounded bg-black/10" />
-                    <div className="h-9 rounded bg-[#660000]" />
-                  </div>
-                </div>
-                <div className="absolute bottom-0 right-0 z-10 w-[76%] rounded-tl-xl border border-black/10 bg-white shadow-[0_22px_64px_rgba(0,0,0,0.12)]">
-                  <div className="flex h-10 items-center gap-2 border-b border-black/10 px-5">
-                    <span className="size-2 rounded-full bg-black/15" />
-                    <span className="size-2 rounded-full bg-black/15" />
-                    <span className="size-2 rounded-full bg-black/15" />
-                    <span className="ml-auto h-5 w-40 rounded-full bg-[#F8F8F4]" />
-                  </div>
-                  <div className="grid min-h-[250px] grid-cols-[1.08fr_0.92fr] text-xs text-[#706F6B]">
-                    <div className="space-y-4 border-r border-black/10 p-7">
-                      <div className="h-8 rounded bg-[#F8F8F4]" />
-                      <div className="h-8 rounded bg-[#F8F8F4]" />
-                      <div className="h-8 rounded bg-[#660000]" />
-                      <div className="h-8 rounded bg-[#F8F8F4]" />
-                      <div className="h-8 rounded bg-[#F8F8F4]" />
-                    </div>
-                    <div className="p-7">
-                      <div className="h-20 rounded border border-black/10 bg-[#F8F8F4]" />
-                      <div className="mt-6 space-y-3">
-                        <div className="h-2 rounded bg-black/10" />
-                        <div className="h-2 w-5/6 rounded bg-black/10" />
-                        <div className="h-2 w-2/3 rounded bg-black/10" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <article className="relative min-h-[460px] overflow-hidden rounded border border-black/10 bg-white p-5 text-left shadow-[0_18px_54px_rgba(0,0,0,0.06)] sm:p-7">
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <h3 className="text-2xl font-semibold leading-tight text-black sm:text-[1.7rem]">
-                    {audienceCards[1].title}
-                  </h3>
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded bg-[#660000]/8 text-[#660000]">
-                    <Maximize2
-                      aria-hidden="true"
-                      className="size-4"
-                      strokeWidth={1.75}
-                    />
-                  </div>
-                </div>
-                <div className="absolute inset-x-0 bottom-0 h-[58%] bg-[linear-gradient(145deg,_rgba(248,248,244,0.9),_rgba(102,0,0,0.2)_58%,_rgba(112,111,107,0.14))]" />
-                <div className="relative z-10 mt-20 space-y-4">
-                  <div className="rounded border border-black/10 bg-white p-4 shadow-[0_20px_44px_rgba(0,0,0,0.08)]">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-9 items-center justify-center rounded bg-[#660000]/8 text-[#660000]">
-                        <ClipboardList
-                          aria-hidden="true"
-                          className="size-4"
-                          strokeWidth={1.75}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="h-2 w-24 rounded bg-black/20" />
-                        <div className="h-2 w-16 rounded bg-black/10" />
-                      </div>
-                    </div>
-                    <div className="mt-5 h-2 rounded-full bg-[#F8F8F4]">
-                      <div className="h-full w-2/3 rounded-full bg-[#660000]" />
-                    </div>
-                  </div>
-                  <div className="rounded border border-black/10 bg-white p-4 shadow-[0_20px_44px_rgba(0,0,0,0.08)]">
-                    <div className="text-xs font-medium text-[#706F6B]">
-                      Upcoming tasks
-                    </div>
-                    <div className="mt-5 flex h-28 items-end gap-2">
-                      {[32, 48, 64, 42, 78, 56, 92, 68, 52, 74].map(
-                        (height) => (
-                          <span
-                            key={height}
-                            className="flex-1 rounded-t bg-[#660000]/55"
-                            style={{ height: `${height}%` }}
-                          />
-                        )
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </article>
-
-              <article className="relative min-h-[178px] overflow-hidden rounded border border-black/10 bg-white p-5 text-left shadow-[0_18px_54px_rgba(0,0,0,0.06)] sm:p-7 md:col-span-2">
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-2xl font-semibold leading-tight text-black sm:text-[1.7rem]">
-                      {audienceCards[2].title}
-                    </h3>
-                    <div className="mt-8 grid max-w-[560px] grid-cols-3 gap-3">
-                      <div className="h-16 rounded border border-black/10 bg-white/80" />
-                      <div className="h-16 rounded border border-black/10 bg-white/80" />
-                      <div className="h-16 rounded border border-black/10 bg-white/80" />
-                    </div>
-                  </div>
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded bg-[#660000]/8 text-[#660000]">
-                    <Maximize2
-                      aria-hidden="true"
-                      className="size-4"
-                      strokeWidth={1.75}
-                    />
-                  </div>
-                </div>
-                <div className="absolute inset-y-0 right-0 w-[55%] bg-[linear-gradient(110deg,_rgba(255,255,255,0),_rgba(102,0,0,0.14)_46%,_rgba(248,248,244,0.95))]" />
-                <div className="absolute bottom-0 right-12 hidden h-[78%] w-[34%] items-end gap-2 md:flex">
-                  {[58, 38, 74, 46, 88, 64, 52, 80, 44, 68, 92, 60].map(
-                    (height) => (
-                      <span
-                        key={height}
-                        className="flex-1 rounded-t bg-[#660000]/45"
-                        style={{ height: `${height}%` }}
-                      />
-                    )
-                  )}
-                </div>
-              </article>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        aria-labelledby="company-network-heading"
-        className="bg-[#F8F8F4] px-8 pb-16 pt-4 text-left sm:px-14 sm:pb-20 lg:px-20"
-      >
-        <div className="mx-auto max-w-[1120px]">
-          <h2
-            id="company-network-heading"
-            className="text-sm font-medium tracking-normal text-[#706F6B]"
-          >
-            Companies we&apos;ve worked with
+        <div className="mt-40 sm:mt-64">
+          <h2 className="text-4xl font-semibold leading-[1.14] tracking-[-0.02em] sm:text-5xl lg:text-[3.5rem]">
+            What we offer
           </h2>
 
-          <div className="company-marquee mt-7 overflow-hidden py-1">
-            <div className="company-marquee-track flex w-max items-center">
-              <CompanyLogoStrip />
-              <CompanyLogoStrip hidden />
+          <div className="mt-10 grid gap-5 lg:mt-14 lg:grid-cols-2">
+            <article className="relative flex min-h-[420px] flex-col justify-end overflow-hidden rounded-xl border border-black/10 bg-white/[0.04] p-8 lg:min-h-[560px]">
+              <div aria-hidden="true" className="absolute inset-0">
+                <div className="absolute left-0 top-[12%] h-14 w-[58%] border border-black/15" />
+                <div className="absolute left-0 top-[46%] h-14 w-[22%] border border-black/15" />
+                <div className="absolute bottom-[22%] left-0 h-14 w-[32%] border border-black/15" />
+                <div className="absolute bottom-[18%] right-[14%] h-[62%] w-28 -skew-x-[28deg] border border-black/15" />
+              </div>
+              <div className="relative">
+                <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#660000]">
+                  For businesses
+                </div>
+                <div className="mt-3 text-3xl font-semibold tracking-tight">
+                  We host your hackathon
+                </div>
+                <p className="mt-4 max-w-[420px] text-sm leading-relaxed text-black/60">
+                  Run a hackathon with HNA end to end — or use our resources and
+                  playbooks to learn how to host your own.
+                </p>
+              </div>
+            </article>
+
+            <div className="grid gap-5">
+              <article className="flex min-h-[270px] overflow-hidden rounded-xl border border-black/10 bg-white/[0.04]">
+                <div className="flex flex-1 flex-col justify-center p-8">
+                  <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#660000]">
+                    For hackers
+                  </div>
+                  <h3 className="mt-3 text-2xl font-semibold tracking-tight sm:text-[2rem]">
+                    Track every hackathon
+                  </h3>
+                  <p className="mt-3 max-w-[300px] text-sm leading-relaxed text-black/60">
+                    One place to discover events, follow deadlines, and keep a
+                    record of every hackathon you attend and win.
+                  </p>
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="hidden w-[42%] flex-col justify-between bg-black/40 p-6 pt-8 font-mono text-[0.8125rem] sm:flex"
+                >
+                  <div className="space-y-1.5 text-white/70">
+                    <div>Interested</div>
+                    <div>Applied</div>
+                    <div>Accepted</div>
+                    <div className="text-white">Attending</div>
+                  </div>
+                  <div className="text-white/50">12 tracked · 3 wins</div>
+                </div>
+              </article>
+
+              <article className="flex min-h-[270px] overflow-hidden rounded-xl border border-black/10 bg-white/[0.04]">
+                <div className="flex flex-1 flex-col justify-end p-8">
+                  <div className="font-mono text-xs uppercase tracking-[0.14em] text-[#660000]">
+                    For organizers
+                  </div>
+                  <h3 className="mt-3 text-2xl font-semibold tracking-tight sm:text-[2rem]">
+                    Publish &amp; grow
+                  </h3>
+                  <p className="mt-3 max-w-[300px] text-sm leading-relaxed text-black/60">
+                    List your hackathon to reach more hackers, get advice from
+                    organizers who&apos;ve done it before, and tap HNA&apos;s
+                    marketing reach.
+                  </p>
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="hidden w-[52%] flex-col gap-1.5 bg-black/40 p-6 pt-8 font-mono text-[0.8125rem] sm:flex"
+                >
+                  <div className="text-white/50">Publish hackathon</div>
+                  <div className="mt-2 space-y-1.5">
+                    <div>
+                      <span className="text-emerald-400">✓</span> Listed to
+                      thousands of hackers
+                    </div>
+                    <div>
+                      <span className="text-emerald-400">✓</span> Mentorship from
+                      seasoned organizers
+                    </div>
+                    <div>
+                      <span className="text-emerald-400">✓</span> Promoted across
+                      HNA channels
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-white/50">Sign-ups:</span> growing
+                  </div>
+                </div>
+              </article>
             </div>
           </div>
         </div>
+
       </section>
     </main>
   );
