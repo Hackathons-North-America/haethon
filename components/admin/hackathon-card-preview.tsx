@@ -48,7 +48,6 @@ function locationText(payload: PreviewPayload) {
 export function previewPayloadToCard(payload: PreviewPayload, id = "admin-preview"): HackathonCardData {
   const name = text(payload.name, "Untitled hackathon");
   const startDate = dateText(payload.startDate);
-  const endDate = dateText(payload.endDate);
 
   return {
     date: startDate || "Date to be announced",

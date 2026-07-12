@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { hackathonSeries, hackathons } from "@/lib/db/schema";
 import { slugify, type NormalizedHackathonPayload } from "@/lib/hackathons/utils";
 
-export function deriveSeriesName(name: string) {
+function deriveSeriesName(name: string) {
   const withoutYear = name
     .replace(/\b(?:19|20)\d{2}\b/g, "")
     .replace(/\s+/g, " ")
@@ -14,7 +14,7 @@ export function deriveSeriesName(name: string) {
   return withoutYear || name.trim();
 }
 
-export function deriveSeriesSlug(input: { name: string; seriesName?: string | null; seriesSlug?: string | null }) {
+function deriveSeriesSlug(input: { name: string; seriesName?: string | null; seriesSlug?: string | null }) {
   return slugify(input.seriesSlug || deriveSeriesName(input.seriesName || input.name));
 }
 

@@ -7,7 +7,7 @@ import { formatReminderDate, reminderTypeLabels } from "@/lib/hackathons/reminde
  * The message body shown for each reminder type. Only the types the planner
  * currently schedules have copy; anything else falls back to its label.
  */
-export const reminderBodies: Record<string, string> = {
+const reminderBodies: Record<string, string> = {
   application_open: "Applications are open. Grab a spot before the rush.",
   application_week_before: "Applications open in a week. Line up your team and idea so you're ready to apply.",
   application_day_before: "Applications open tomorrow. Have your details ready and apply before the rush.",

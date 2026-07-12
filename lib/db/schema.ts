@@ -338,6 +338,7 @@ export const reminders = pgTable(
     type: reminderTypeEnum("type").notNull(),
     channel: notificationChannelEnum("channel").notNull().default("email"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

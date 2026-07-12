@@ -330,7 +330,7 @@ export function HackathonJsonImporter() {
 
         {pendingDiscord && pendingDiscord.discord.action === "create" ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-            <div className="w-full max-w-2xl rounded-2xl border border-cabernet/20 dark:border-[#e4a3ab]/40 bg-white dark:bg-white/[0.06] p-8 shadow-2xl sm:p-12">
+            <div className="w-full max-w-2xl rounded-2xl border border-cabernet/20 dark:border-[#e4a3ab]/40 bg-white dark:bg-[#141414] p-8 shadow-2xl sm:p-12">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">New Discord channel</p>
               <h2 className="mt-3 text-3xl font-semibold text-navy dark:text-wheat">Create a Discord channel?</h2>
               <p className="mt-4 text-base leading-7 text-navy/55 dark:text-wheat/55">

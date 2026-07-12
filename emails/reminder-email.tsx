@@ -157,5 +157,3 @@ export function ReminderEmail({
     </Html>
   );
 }
-
-export default ReminderEmail;

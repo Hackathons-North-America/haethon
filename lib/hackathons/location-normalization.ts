@@ -192,10 +192,10 @@ export function normalizeCountry(value: string | undefined) {
   );
 }
 
-export function normalizeRegion(value: string, country: string | undefined): string;
-export function normalizeRegion(value: undefined, country: string | undefined): undefined;
-export function normalizeRegion(value: string | undefined, country: string | undefined): string | undefined;
-export function normalizeRegion(value: string | undefined, country: string | undefined) {
+function normalizeRegion(value: string, country: string | undefined): string;
+function normalizeRegion(value: undefined, country: string | undefined): undefined;
+function normalizeRegion(value: string | undefined, country: string | undefined): string | undefined;
+function normalizeRegion(value: string | undefined, country: string | undefined) {
   if (!value) {
     return value;
   }
@@ -215,10 +215,10 @@ export function normalizeRegion(value: string | undefined, country: string | und
   return CANADA_REGIONS[key] ?? CANADA_REGIONS[compactedKey] ?? US_REGIONS[key] ?? US_REGIONS[compactedKey] ?? normalizeLooseName(value);
 }
 
-export function normalizeCity(value: string): string;
-export function normalizeCity(value: undefined): undefined;
-export function normalizeCity(value: string | undefined): string | undefined;
-export function normalizeCity(value: string | undefined) {
+function normalizeCity(value: string): string;
+function normalizeCity(value: undefined): undefined;
+function normalizeCity(value: string | undefined): string | undefined;
+function normalizeCity(value: string | undefined) {
   return value ? normalizeLooseName(value) : value;
 }
 

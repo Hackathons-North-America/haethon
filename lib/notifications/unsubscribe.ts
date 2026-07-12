@@ -14,7 +14,7 @@ function signUserId(userId: string) {
   return createHmac("sha256", signingSecret()).update(userId).digest("base64url");
 }
 
-export function buildUnsubscribeToken(userId: string) {
+function buildUnsubscribeToken(userId: string) {
   return `${Buffer.from(userId, "utf8").toString("base64url")}.${signUserId(userId)}`;
 }
 

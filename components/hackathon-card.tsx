@@ -322,7 +322,7 @@ function HackathonLogoMark({
   );
 }
 
-export type ReminderOption = {
+type ReminderOption = {
   type: SelectableReminderType;
   label: string;
   /* ISO string of the send time, so this stays serializable from the server. */

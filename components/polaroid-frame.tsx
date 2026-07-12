@@ -93,7 +93,7 @@ export function PolaroidFrame({
 }
 
 /** Left-edge scrapbook pile — hung off the margin, overlapping, crooked */
-export const leftPolaroids = [
+const leftPolaroids = [
   {
     src: "/photos/celebration.png",
     alt: "Hackers celebrating at HackAI Toronto",
@@ -157,7 +157,7 @@ export const leftPolaroids = [
 ] as const;
 
 /** Right-edge scrapbook pile */
-export const rightPolaroids = [
+const rightPolaroids = [
   {
     src: "/photos/keynote.png",
     alt: "A packed hackathon keynote hall filled with attendees",

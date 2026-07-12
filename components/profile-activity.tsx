@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
 
-export type ActivityWeek = { key: string; count: number };
+type ActivityWeek = { key: string; count: number };
 
 export type YearActivity = {
   year: number;

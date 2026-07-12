@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, like, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
@@ -25,13 +25,14 @@ import {
 import type { CommunitySubmissionInput, HackathonSubmissionInput, NormalizedHackathonPayload } from "@/lib/hackathons/utils";
 import { ensureHackathonSeries } from "@/lib/hackathons/series";
 import { deriveSourceType } from "@/lib/hackathons/source-badges";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import {
   adminHackathonFixImportItemSchema,
   adminHackathonImportPayloadSchema,
   reviewActionSchema,
 } from "@/lib/validations/hackathon";
 
-export type DiscordChannelPreview = Awaited<ReturnType<typeof previewHackathonDiscordChannel>>;
+type DiscordChannelPreview = Awaited<ReturnType<typeof previewHackathonDiscordChannel>>;
 export type ReviewAction = z.infer<typeof reviewActionSchema>;
 export type AdminHackathonImportPayload = z.infer<typeof adminHackathonImportPayloadSchema>;
 export type AdminHackathonFixImportItem = z.infer<typeof adminHackathonFixImportItemSchema>;
@@ -97,12 +98,16 @@ async function ensureOrganization(payload: NormalizedHackathonPayload) {
 
 async function uniqueHackathonSlug(name: string) {
   const base = slugify(name);
+  const rows = await db
+    .select({ slug: hackathons.slug })
+    .from(hackathons)
+    .where(or(eq(hackathons.slug, base), like(hackathons.slug, `${base}-%`)));
+  const existingSlugs = new Set(rows.map((row) => row.slug));
 
   for (let index = 0; index < 25; index += 1) {
     const candidate = index === 0 ? base : `${base}-${index + 1}`;
-    const [existing] = await db.select({ id: hackathons.id }).from(hackathons).where(eq(hackathons.slug, candidate)).limit(1);
 
-    if (!existing) {
+    if (!existingSlugs.has(candidate)) {
       return candidate;
     }
   }
@@ -119,7 +124,7 @@ export async function getApprovedOrganizationIdsForUser(userId: string) {
   return rows.map((row) => row.organizationId);
 }
 
-export async function isVerifiedOrganizerForOrganization(userId: string, role: string, organizationId: string | null | undefined) {
+async function isVerifiedOrganizerForOrganization(userId: string, role: string, organizationId: string | null | undefined) {
   if (!organizationId || (role !== "organizer" && role !== "admin")) {
     return false;
   }
@@ -177,11 +182,11 @@ function findBestDuplicateInCandidates(
   return best && best.score >= 0.55 ? best : null;
 }
 
-export async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
+async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
   return findBestDuplicateInCandidates(payload, await listDuplicateCandidates());
 }
 
-export async function createPublishedHackathon(
+async function createPublishedHackathon(
   payload: NormalizedHackathonPayload,
   options?: { syncDiscord?: boolean }
 ) {
@@ -243,10 +248,12 @@ export async function createPublishedHackathon(
     await syncHackathonDiscordChannelSafely(created.id);
   }
 
+  revalidateHackathonCaches();
+
   return created.id;
 }
 
-export async function mergeIntoHackathon(targetHackathonId: string, payload: NormalizedHackathonPayload) {
+async function mergeIntoHackathon(targetHackathonId: string, payload: NormalizedHackathonPayload) {
   payload = normalizeLocationPayload(payload);
   const [existing] = await db.select().from(hackathons).where(eq(hackathons.id, targetHackathonId)).limit(1);
 
@@ -327,6 +334,7 @@ export async function mergeIntoHackathon(targetHackathonId: string, payload: Nor
   });
 
   await syncHackathonDiscordChannelSafely(targetHackathonId);
+  revalidateHackathonCaches();
 
   return targetHackathonId;
 }

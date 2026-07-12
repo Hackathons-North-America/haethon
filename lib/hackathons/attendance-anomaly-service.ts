@@ -1,4 +1,5 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
+import { revalidateTag, unstable_cache } from "next/cache";
 
 import { db } from "@/lib/db";
 import { hackathonDates, hackathons, userHackathonAttendanceDays, userHackathons, users } from "@/lib/db/schema";
@@ -12,6 +13,7 @@ import {
 } from "@/lib/hackathons/attendance-anomalies";
 
 const CLAIM_STATUSES = ["attended", "won"] as const;
+const ATTENDANCE_ANOMALIES_CACHE_TAG = "attendance-anomalies";
 
 /**
  * Scans every attendance-day row and attended/won claim, groups them per user,
@@ -19,7 +21,7 @@ const CLAIM_STATUSES = ["attended", "won"] as const;
  * three queries — fine at the current ~1000-user scale; revisit with
  * pre-filtering SQL if that grows.
  */
-export async function detectAttendanceAnomalies(): Promise<AttendanceAnomalyFinding[]> {
+async function detectAttendanceAnomaliesUncached(): Promise<AttendanceAnomalyFinding[]> {
   const [dayRows, claimRows] = await Promise.all([
     db
       .select({
@@ -112,6 +114,12 @@ export async function detectAttendanceAnomalies(): Promise<AttendanceAnomalyFind
   );
 }
 
+export const detectAttendanceAnomalies = unstable_cache(
+  detectAttendanceAnomaliesUncached,
+  [ATTENDANCE_ANOMALIES_CACHE_TAG],
+  { revalidate: 300, tags: [ATTENDANCE_ANOMALIES_CACHE_TAG] }
+);
+
 export type AnomalyResolutionAction = "verify" | "revoke";
 
 export type AnomalyResolutionResult = {
@@ -147,6 +155,7 @@ export async function resolveAttendanceAnomaly(input: {
       .where(and(pairFilter, ne(userHackathonAttendanceDays.source, "admin_verified")))
       .returning({ id: userHackathonAttendanceDays.id });
 
+    revalidateTag(ATTENDANCE_ANOMALIES_CACHE_TAG, "max");
     return { action: "verify", affectedDayCount: upgraded.length, statusReset: false };
   }
 
@@ -167,5 +176,6 @@ export async function resolveAttendanceAnomaly(input: {
     )
     .returning({ id: userHackathons.id });
 
+  revalidateTag(ATTENDANCE_ANOMALIES_CACHE_TAG, "max");
   return { action: "revoke", affectedDayCount: deleted.length, statusReset: downgraded.length > 0 };
 }

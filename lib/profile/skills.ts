@@ -34,7 +34,7 @@ export const SKILL_LANGUAGES: readonly SkillLanguage[] = [
  * frameworks). Used both to validate incoming skills and to render selections
  * in a stable order regardless of the order the user clicked them.
  */
-export const SKILL_VALUES: readonly string[] = SKILL_LANGUAGES.flatMap((language) => [
+const SKILL_VALUES: readonly string[] = SKILL_LANGUAGES.flatMap((language) => [
   language.name,
   ...language.frameworks,
 ]);

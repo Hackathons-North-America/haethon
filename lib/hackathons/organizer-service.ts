@@ -18,7 +18,7 @@ export function serializeManagedHackathon(row: ManagedHackathonRow) {
   };
 }
 
-export type SerializedManagedHackathon = ReturnType<typeof serializeManagedHackathon>;
+type SerializedManagedHackathon = ReturnType<typeof serializeManagedHackathon>;
 
 /**
  * Splits managed hackathons into current/upcoming vs past. An event is "past"

@@ -13,7 +13,7 @@ function getDefaultPreferences() {
   return new Map<SelectableReminderType, boolean>(selectableReminderTypes.map((type) => [type, true]));
 }
 
-export function isSelectableReminderType(type: string): type is SelectableReminderType {
+function isSelectableReminderType(type: string): type is SelectableReminderType {
   return selectableReminderTypes.some((selectableType) => selectableType === type);
 }
 

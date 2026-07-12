@@ -57,7 +57,7 @@ const SYNC_CONCURRENCY = 4;
 
 const INELIGIBLE_REASON = "Only Canadian and US hackathons are synced to Discord.";
 
-export const categoryNames: Record<DiscordCategoryKey, string> = {
+const categoryNames: Record<DiscordCategoryKey, string> = {
   canada: "Canadian Hackathons",
   us: "US Hackathons",
   past: "Past Hackathons",

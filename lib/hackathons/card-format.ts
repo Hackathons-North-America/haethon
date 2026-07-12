@@ -72,22 +72,3 @@ export function formatLocation(input: LocationInput) {
 
   return [country, locality].filter(Boolean).join(", ") || "Location TBA";
 }
-
-export function buildBadges({
-  beginnerFriendly,
-  format,
-  status,
-  travelReimbursement,
-}: {
-  beginnerFriendly: boolean;
-  format: string;
-  status: string;
-  travelReimbursement: boolean;
-}) {
-  return [
-    status === "live" ? "Live now" : "Upcoming",
-    format.replace("_", " "),
-    beginnerFriendly ? "Beginner friendly" : null,
-    travelReimbursement ? "Travel support" : null,
-  ].filter(Boolean) as string[];
-}

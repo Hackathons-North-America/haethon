@@ -4,7 +4,7 @@ export type RegionPresetId = "north-america" | "international" | "online";
 
 // Countries counted as "International" — major European and Asian markets plus
 // the destinations that reliably host large hackathons (Singapore, Switzerland, UAE...).
-export const internationalCountries = [
+const internationalCountries = [
   // Europe
   "United Kingdom",
   "Germany",

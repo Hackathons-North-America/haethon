@@ -19,7 +19,7 @@ export function roleFromSessionClaims(sessionClaims: unknown) {
   return (metadata?.role ?? "user") as NonNullable<SessionMetadata["role"]>;
 }
 
-export const getCurrentRole = cache(async () => {
+const getCurrentRole = cache(async () => {
   const { sessionClaims } = await auth();
 
   return roleFromSessionClaims(sessionClaims);

@@ -47,15 +47,15 @@ function addMonths(date: Date, months: number) {
   return nextDate;
 }
 
-export function isDatePeriod(value: string): value is DatePeriod {
+function isDatePeriod(value: string): value is DatePeriod {
   return datePeriodValues.has(value as DatePeriod);
 }
 
-export function isFeatureFilter(value: string): value is FeatureFilter {
+function isFeatureFilter(value: string): value is FeatureFilter {
   return featureFilterValues.has(value as FeatureFilter);
 }
 
-export function isHackathonFormatFilter(value: string): value is HackathonFormatFilter {
+function isHackathonFormatFilter(value: string): value is HackathonFormatFilter {
   return hackathonFormatFilterValues.has(value as HackathonFormatFilter);
 }
 

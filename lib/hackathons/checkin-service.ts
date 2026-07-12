@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -89,12 +89,20 @@ export async function canManageHackathon(input: { userId: string; role: string; 
 }
 
 export async function getActiveCheckinCode(hackathonId: string, now = new Date()) {
-  const rows = await db
+  const [row] = await db
     .select()
     .from(hackathonCheckinCodes)
-    .where(and(eq(hackathonCheckinCodes.hackathonId, hackathonId), isNull(hackathonCheckinCodes.revokedAt)));
+    .where(
+      and(
+        eq(hackathonCheckinCodes.hackathonId, hackathonId),
+        isNull(hackathonCheckinCodes.revokedAt),
+        or(isNull(hackathonCheckinCodes.expiresAt), gt(hackathonCheckinCodes.expiresAt, now))
+      )
+    )
+    .orderBy(desc(hackathonCheckinCodes.createdAt))
+    .limit(1);
 
-  return rows.find((row) => isCheckinCodeActive(row, now)) ?? null;
+  return row && isCheckinCodeActive(row, now) ? row : null;
 }
 
 /** Creates a fresh code for the hackathon, revoking any previously active one. */

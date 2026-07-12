@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
 import { hackathonDates, hackathonLocations, hackathons } from "@/lib/db/schema";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { adminHackathonUpdateSchema } from "@/lib/validations/hackathon";
 
 export type AdminHackathonUpdatePayload = z.infer<typeof adminHackathonUpdateSchema>;
@@ -43,15 +44,13 @@ export function adminHackathonQuery() {
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id));
 }
 
-export type AdminHackathonRow = Awaited<ReturnType<typeof listPublishedHackathons>>[number];
-
 export async function listPublishedHackathons() {
   return adminHackathonQuery()
     .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, publicStatuses)))
     .orderBy(asc(hackathonDates.startsAt));
 }
 
-export async function getAdminHackathon(hackathonId: string) {
+async function getAdminHackathon(hackathonId: string) {
   const [row] = await adminHackathonQuery().where(eq(hackathons.id, hackathonId)).limit(1);
 
   return row ?? null;
@@ -128,6 +127,7 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
   }
 
   await syncHackathonDiscordChannelSafely(hackathonId);
+  revalidateHackathonCaches();
 
   return updated;
 }
@@ -138,6 +138,8 @@ export async function deleteHackathon(hackathonId: string) {
   if (!deleted) {
     throw new Error("Hackathon not found.");
   }
+
+  revalidateHackathonCaches();
 
   return deleted.id;
 }

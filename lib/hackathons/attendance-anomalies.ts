@@ -11,13 +11,13 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Users at or above this fraction of a rolling-window volume cap get flagged. */
-export const HIGH_VOLUME_ALERT_RATIO = 0.8;
+const HIGH_VOLUME_ALERT_RATIO = 0.8;
 /** ceil(0.8 * 5) = 4 distinct self-reported in-person hackathons in a 30-day window. */
 export const HIGH_VOLUME_IN_PERSON_THRESHOLD = Math.ceil(MAX_IN_PERSON_HACKATHONS_PER_WINDOW * HIGH_VOLUME_ALERT_RATIO);
 /** ceil(0.8 * 12) = 10 distinct self-reported hackathons of any format in a 30-day window. */
 export const HIGH_VOLUME_TOTAL_THRESHOLD = Math.ceil(MAX_TOTAL_HACKATHONS_PER_WINDOW * HIGH_VOLUME_ALERT_RATIO);
 /** Distinct in-person hackathons on one calendar day that constitute an overlap. */
-export const SAME_DAY_OVERLAP_MIN_HACKATHONS = 2;
+const SAME_DAY_OVERLAP_MIN_HACKATHONS = 2;
 /** Claims made within this many days of account creation count toward a signup burst. */
 export const POST_SIGNUP_BURST_WINDOW_DAYS = 7;
 /** Distinct back-filled hackathons (ended before signup) needed to flag a signup burst. */
@@ -25,7 +25,7 @@ export const POST_SIGNUP_BURST_MIN_CLAIMS = 5;
 /** Minimum distinct attended/won hackathons before the late-claim ratio applies. */
 export const LATE_CLAIM_MIN_CLAIMS = 5;
 /** Fraction of attendance-day rows with source `manual` above which a user is flagged. */
-export const LATE_CLAIM_MANUAL_RATIO = 0.6;
+const LATE_CLAIM_MANUAL_RATIO = 0.6;
 
 export const SELF_REPORTED_SOURCES: AttendanceSource[] = ["inferred", "manual"];
 
@@ -52,7 +52,7 @@ export type AnomalyClaim = {
   endsAt: Date | null;
 };
 
-export type AnomalyHackathonRef = { id: string; name: string };
+type AnomalyHackathonRef = { id: string; name: string };
 
 export type AttendanceAnomalyType = "high_volume" | "same_day_overlap" | "post_signup_burst" | "late_claim_ratio";
 

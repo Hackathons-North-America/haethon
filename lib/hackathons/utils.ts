@@ -39,7 +39,7 @@ export function dateToInputValue(value: Date | string | null | undefined) {
   return date.toISOString().slice(0, 10);
 }
 
-export function toDateOnly(value: Date) {
+function toDateOnly(value: Date) {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 }
 
@@ -93,7 +93,7 @@ export function payloadForJson(payload: NormalizedHackathonPayload & { submitter
   };
 }
 
-export function domainFromUrl(value: string | null | undefined) {
+function domainFromUrl(value: string | null | undefined) {
   if (!value) {
     return null;
   }

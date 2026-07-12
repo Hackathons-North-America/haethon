@@ -10,5 +10,3 @@ export const db = drizzle({
   client: sql,
   schema,
 });
-
-export { schema };

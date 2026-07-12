@@ -71,6 +71,13 @@
       "when": 1783885761155,
       "tag": "0009_cuddly_iron_fist",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783885978984,
+      "tag": "0010_famous_wraith",
+      "breakpoints": true
     }
   ]
 }

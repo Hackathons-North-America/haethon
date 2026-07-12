@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { and, asc, eq, gte, ilike, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -21,13 +21,14 @@ export const CATALOG_PAGE_SIZE = 30;
 /* Public catalog entries change on ingest/admin actions, not per request, so a
    10-minute window trades a little vote-score freshness for skipping the whole
    query fan-out on nearly every page view. */
-export const CATALOG_REVALIDATE_SECONDS = 600;
+const CATALOG_REVALIDATE_SECONDS = 600;
 
-export const CATALOG_CACHE_TAG = "hackathon-catalog";
+const CATALOG_CACHE_TAG = "hackathon-catalog";
+const DETAIL_CACHE_TAG = "hackathon-detail";
 
 const publicStatuses = ["upcoming", "live"] as const;
 
-export type CatalogQuery = {
+type CatalogQuery = {
   name: string;
   countries: string[];
   format: "online" | "in_person" | null;
@@ -43,7 +44,7 @@ export type CatalogQuery = {
 /* The user-independent portion of a hackathon card. Everything here is a
    plain string/number/boolean because it crosses the unstable_cache JSON
    boundary — dates are pre-formatted, no Date objects. */
-export type PublicHackathonCard = {
+type PublicHackathonCard = {
   country: string | null;
   date: string;
   hasDiscord: boolean;
@@ -157,6 +158,11 @@ const getCachedCatalogPage = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG
   revalidate: CATALOG_REVALIDATE_SECONDS,
   tags: [CATALOG_CACHE_TAG],
 });
+
+export function revalidateHackathonCaches() {
+  revalidateTag(CATALOG_CACHE_TAG, "max");
+  revalidateTag(DETAIL_CACHE_TAG, "max");
+}
 
 /**
  * Fetches one page of the public hackathon catalog through the shared cache.

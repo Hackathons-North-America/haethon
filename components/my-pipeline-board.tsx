@@ -17,7 +17,7 @@ function redirectToSignIn() {
 
 export type PipelineStage = "interested" | "applied" | "accepted";
 
-export type PipelineCard = {
+type PipelineCard = {
   /* The userHackathons row id — stable React key across stage moves. */
   userHackathonId: string;
   hackathonId: string;
@@ -160,7 +160,7 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
             </div>
 
             <div className="mt-2 space-y-3">
-              {column.cards.map((item, index) => (
+              {column.cards.map((item) => (
                 <div
                   className={`cursor-grab active:cursor-grabbing ${
                     dragging?.hackathonId === item.hackathonId ? "opacity-40" : ""

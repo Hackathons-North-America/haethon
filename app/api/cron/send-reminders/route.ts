@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import * as Sentry from "@sentry/nextjs";
-import { and, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
@@ -14,6 +14,7 @@ import { buildUnsubscribeUrl, unsubscribeHeaders } from "@/lib/notifications/uns
 // The Resend batch API accepts at most 100 emails per call, so the query limit
 // and the batch size are the same number.
 const BATCH_SIZE = 100;
+const CLAIM_LEASE_MS = 10 * 60 * 1000;
 
 export const maxDuration = 60;
 
@@ -24,6 +25,47 @@ export async function GET(request: Request) {
 
   if (!resend || !env.RESEND_AUDIENCE_FROM) {
     return NextResponse.json({ error: "Resend is not configured." }, { status: 503 });
+  }
+
+  const now = new Date();
+  const claimExpiredBefore = new Date(now.getTime() - CLAIM_LEASE_MS);
+  const candidates = await db
+    .select({ id: reminders.id })
+    .from(reminders)
+    .innerJoin(users, eq(users.id, reminders.userId))
+    .where(
+      and(
+        isNull(reminders.sentAt),
+        lte(reminders.scheduledFor, now),
+        eq(reminders.channel, "email"),
+        isNull(users.emailUnsubscribedAt),
+        or(isNull(reminders.claimedAt), lt(reminders.claimedAt, claimExpiredBefore))
+      )
+    )
+    .orderBy(asc(reminders.scheduledFor))
+    .limit(BATCH_SIZE);
+
+  if (!candidates.length) {
+    return NextResponse.json({ data: { due: 0, sent: 0, failed: 0 } });
+  }
+
+  // The eligibility predicate is repeated on the update so concurrent cron
+  // invocations cannot both claim the same reminder after selecting it.
+  const claimed = await db
+    .update(reminders)
+    .set({ claimedAt: now })
+    .where(
+      and(
+        inArray(reminders.id, candidates.map((candidate) => candidate.id)),
+        isNull(reminders.sentAt),
+        or(isNull(reminders.claimedAt), lt(reminders.claimedAt, claimExpiredBefore))
+      )
+    )
+    .returning({ id: reminders.id });
+  const claimedIds = claimed.map((row) => row.id);
+
+  if (!claimedIds.length) {
+    return NextResponse.json({ data: { due: 0, sent: 0, failed: 0 } });
   }
 
   const due = await db
@@ -40,19 +82,11 @@ export async function GET(request: Request) {
     .from(reminders)
     .innerJoin(users, eq(users.id, reminders.userId))
     .innerJoin(hackathons, eq(hackathons.id, reminders.hackathonId))
-    .where(
-      and(
-        isNull(reminders.sentAt),
-        lte(reminders.scheduledFor, new Date()),
-        eq(reminders.channel, "email"),
-        // Globally unsubscribed users are skipped here; their pending
-        // reminders are also deleted by the unsubscribe endpoint itself.
-        isNull(users.emailUnsubscribedAt)
-      )
-    )
-    .limit(BATCH_SIZE);
+    .where(inArray(reminders.id, claimedIds))
+    .orderBy(asc(reminders.scheduledFor));
 
   if (!due.length) {
+    await db.update(reminders).set({ claimedAt: null }).where(inArray(reminders.id, claimedIds));
     return NextResponse.json({ data: { due: 0, sent: 0, failed: 0 } });
   }
 
@@ -100,6 +134,7 @@ export async function GET(request: Request) {
     Sentry.captureException(new Error(`Reminder batch send failed: ${error.message}`), {
       extra: { due: due.length, idempotencyKey },
     });
+    await db.update(reminders).set({ claimedAt: null }).where(inArray(reminders.id, claimedIds));
 
     return NextResponse.json(
       { error: "Batch send failed.", data: { due: due.length, sent: 0, failed: due.length } },
@@ -119,7 +154,7 @@ export async function GET(request: Request) {
 
   if (sentIds.length) {
     try {
-      await db.update(reminders).set({ sentAt: new Date() }).where(inArray(reminders.id, sentIds));
+      await db.update(reminders).set({ claimedAt: null, sentAt: new Date() }).where(inArray(reminders.id, sentIds));
     } catch (updateError) {
       // Emails went out but the reminders are still marked pending. The next
       // run retries the same due set with the same idempotency key, so Resend
@@ -131,6 +166,11 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+  }
+
+  const failedIds = due.filter((_, index) => failedIndices.has(index)).map((reminder) => reminder.id);
+  if (failedIds.length) {
+    await db.update(reminders).set({ claimedAt: null }).where(inArray(reminders.id, failedIds));
   }
 
   return NextResponse.json({
