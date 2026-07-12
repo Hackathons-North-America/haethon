@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData, HackathonCardReminder } from "@/components/hackathon-card";
+import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
+
+const trashButtonClassName =
+  "grid size-8 place-items-center rounded-full bg-white/80 dark:bg-black/40 text-navy/60 dark:text-wheat/60 backdrop-blur transition-colors hover:bg-cabernet/15 hover:text-cabernet dark:hover:bg-white/10 dark:hover:text-[#e4a3ab] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 disabled:cursor-wait disabled:opacity-60";
 
 function redirectToSignIn() {
   window.location.href = "/sign-in";
@@ -96,6 +100,18 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
     }
   }
 
+  // The trash control itself deletes the tracking row; on success we just drop
+  // the card from the board and refresh so the server-side counts resync.
+  function removeCard(hackathonId: string) {
+    setColumns((current) =>
+      current.map((column) => ({
+        ...column,
+        cards: column.cards.filter((card) => card.hackathonId !== hackathonId),
+      }))
+    );
+    router.refresh();
+  }
+
   function handleDrop(event: DragEvent<HTMLElement>, to: PipelineStage) {
     event.preventDefault();
     setOverStage(null);
@@ -163,6 +179,15 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
                 >
                   <HackathonCard
                     compact
+                    cornerAction={
+                      <RemoveHackathonControl
+                        className={trashButtonClassName}
+                        hackathonId={item.hackathonId}
+                        hackathonName={item.card.name}
+                        listLabel={column.title}
+                        onRemoved={() => removeCard(item.hackathonId)}
+                      />
+                    }
                     hackathon={item.card}
                     index={index}
                     key={item.userHackathonId}

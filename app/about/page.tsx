@@ -1,3 +1,4 @@
+import { AboutPartners } from "@/components/about-partners";
 import { AboutScrollShowcase } from "@/components/about-scroll-showcase";
 import { PrimaryNav } from "@/components/primary-nav";
 
@@ -23,6 +24,8 @@ export default function AboutPage() {
       </section>
 
       <AboutScrollShowcase />
+
+      <AboutPartners />
     </main>
   );
 }

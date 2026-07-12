@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, eq, ne, or } from "drizzle-orm";
-import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import type { HackathonCardData, HackathonCardReminder } from "@/components/hackathon-card";
-import { HackathonResultActions } from "@/components/hackathon-result-actions";
 import { MyPipelineBoard } from "@/components/my-pipeline-board";
 import type { PipelineColumn } from "@/components/my-pipeline-board";
-import { MarkAttendedButton } from "@/components/mark-attended-button";
+import { PastHackathonCard } from "@/components/past-hackathon-card";
 import { getCurrentUserRecord } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
@@ -253,86 +251,27 @@ export default async function MyHackathonsPage() {
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-navy/55 dark:text-wheat/55">Past</h2>
             <div className="mt-4 space-y-3">
               {pastRows.map((row) => {
-                const won = row.applicationStatus === "won";
-                const attended = row.applicationStatus === "attended";
+                const status =
+                  row.applicationStatus === "won"
+                    ? "won"
+                    : row.applicationStatus === "attended"
+                      ? "attended"
+                      : "ended";
 
                 return (
-                  <article className="rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-5" key={row.id}>
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <Link
-                          className="text-lg font-semibold text-navy dark:text-wheat underline-offset-4 hover:text-cabernet dark:hover:text-[#e4a3ab] hover:underline"
-                          href={`/hackathons/${row.slug}`}
-                        >
-                          {row.hackathonName}
-                        </Link>
-                        <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-navy/55 dark:text-wheat/55">
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarDays aria-hidden="true" className="size-3.5 shrink-0" />
-                            {formatDateRange(row.startsAt, row.endsAt)}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-                            {formatLocation(row)}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                        {won ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-cabernet px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white">
-                            <Trophy aria-hidden="true" className="size-3.5" />
-                            Winner
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-navy/55 dark:text-wheat/55">
-                            {attended ? "Attended" : "Ended"}
-                          </span>
-                        )}
-                        {row.isPinned ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-cabernet/25 bg-white dark:bg-white/[0.06] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-cabernet dark:text-[#e4a3ab]">
-                            <Pin aria-hidden="true" className="size-3.5 fill-current" />
-                            Pinned
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {(won && row.awardName) || row.devpostUrl ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-                        {won && row.awardName ? (
-                          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-cabernet dark:text-[#e4a3ab]">
-                            <Trophy aria-hidden="true" className="size-3.5 shrink-0" />
-                            {row.awardName}
-                          </p>
-                        ) : null}
-                        {row.devpostUrl ? (
-                          <a
-                            className="inline-flex items-center gap-1.5 text-sm font-medium text-navy dark:text-wheat underline-offset-4 hover:text-cabernet dark:hover:text-[#e4a3ab] hover:underline"
-                            href={row.devpostUrl}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
-                            View project
-                          </a>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <div className="mt-4 border-t border-navy/10 dark:border-white/10 pt-4">
-                      {won || attended ? (
-                        <HackathonResultActions
-                          awardName={row.awardName}
-                          devpostUrl={row.devpostUrl}
-                          isPinned={row.isPinned}
-                          status={won ? "won" : "attended"}
-                          userHackathonId={row.id}
-                        />
-                      ) : (
-                        <MarkAttendedButton userHackathonId={row.id} />
-                      )}
-                    </div>
-                  </article>
+                  <PastHackathonCard
+                    awardName={row.awardName}
+                    dateRange={formatDateRange(row.startsAt, row.endsAt)}
+                    devpostUrl={row.devpostUrl}
+                    hackathonId={row.hackathonId}
+                    hackathonName={row.hackathonName}
+                    isPinned={row.isPinned}
+                    key={row.id}
+                    location={formatLocation(row)}
+                    slug={row.slug}
+                    status={status}
+                    userHackathonId={row.id}
+                  />
                 );
               })}
             </div>

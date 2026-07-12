@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowBigDown, ArrowBigUp, BellPlus, Bookmark, Check, ChevronDown } from "lucide-react";
@@ -708,6 +708,7 @@ function CardAccentEdges() {
 
 export function HackathonCard({
   compact = false,
+  cornerAction,
   hackathon,
   preview = false,
   reminder,
@@ -715,6 +716,9 @@ export function HackathonCard({
   /* Tightens padding, logo, and footer spacing so cards stack densely on the
      My Hackathons board. */
   compact?: boolean;
+  /* Optional control pinned to the card's top-right corner (e.g. the remove
+     trash button on the My Hackathons board). Sits above the full-card link. */
+  cornerAction?: ReactNode;
   hackathon: HackathonCardData;
   index: number;
   preview?: boolean;
@@ -765,6 +769,12 @@ export function HackathonCard({
         className={`${filmGrainClassName} pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-overlay dark:opacity-[0.09]`}
       />
       <CardAccentEdges />
+
+      {cornerAction ? (
+        <div className="absolute right-2.5 top-2.5 z-20 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
+          {cornerAction}
+        </div>
+      ) : null}
 
       <div className={`flex items-start ${compact ? "gap-3" : "gap-4"}`}>
         <HackathonLogoMark compact={compact} hackathon={hackathon} logoSrc={logoSrc} />

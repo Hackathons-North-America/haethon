@@ -2,10 +2,20 @@ import { z } from "zod";
 
 import { normalizeCountrySelections } from "@/lib/hackathons/countries";
 import { normalizeCountry, normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
+import { containsProfanity } from "@/lib/validations/profanity";
+import { parsePortfolioUrl, parseSocialInput, type SocialPlatformKey } from "@/lib/validations/social";
 
 const emptyToUndefined = (value: unknown) => (typeof value === "string" && value.trim() === "" ? undefined : value);
 
-const optionalUrl = z.preprocess(emptyToUndefined, z.string().trim().url().optional());
+// URLs are rendered into <a href> attributes, so only http(s) is allowed —
+// a bare .url() check would let javascript:/data: schemes through.
+const isHttpUrl = (value: string) => /^https?:\/\//i.test(value);
+const HTTP_URL_MESSAGE = "Only http(s) links are allowed";
+
+const optionalUrl = z.preprocess(
+  emptyToUndefined,
+  z.string().trim().url().refine(isHttpUrl, HTTP_URL_MESSAGE).optional()
+);
 const optionalString = (max: number) => z.preprocess(emptyToUndefined, z.string().trim().max(max).optional());
 
 // Scraped sources often carry a full event description that exceeds our short
@@ -27,8 +37,75 @@ const truncatedOptionalString = (max: number) =>
 
 // Like the optional variants, but empty strings clear the stored value instead of being ignored.
 const emptyToNull = (value: unknown) => (typeof value === "string" && value.trim() === "" ? null : value);
-const clearableUrl = z.preprocess(emptyToNull, z.string().trim().url().nullable().optional());
+const clearableUrl = z.preprocess(
+  emptyToNull,
+  z.string().trim().url().refine(isHttpUrl, HTTP_URL_MESSAGE).nullable().optional()
+);
 const clearableString = (max: number) => z.preprocess(emptyToNull, z.string().trim().max(max).nullable().optional());
+
+const PROFANITY_MESSAGE = "Please remove the inappropriate language.";
+
+// Clearable string that also rejects profanity — for profile text shown publicly.
+const cleanClearableString = (max: number) =>
+  z.preprocess(
+    emptyToNull,
+    z
+      .string()
+      .trim()
+      .max(max)
+      .refine((value) => !containsProfanity(value), PROFANITY_MESSAGE)
+      .nullable()
+      .optional()
+  );
+
+// Social links accept a bare handle or a pasted profile URL, verify the
+// domain belongs to the platform, screen the handle for profanity, and
+// normalize to a canonical https URL for storage.
+const socialLinkField = (platform: SocialPlatformKey) =>
+  z.preprocess(
+    emptyToNull,
+    z
+      .string()
+      .trim()
+      .max(300)
+      .transform((value, ctx) => {
+        const parsed = parseSocialInput(platform, value);
+
+        if (!parsed.ok) {
+          ctx.addIssue({ code: "custom", message: parsed.error });
+          return z.NEVER;
+        }
+
+        if (containsProfanity(parsed.handle)) {
+          ctx.addIssue({ code: "custom", message: PROFANITY_MESSAGE });
+          return z.NEVER;
+        }
+
+        return parsed.url;
+      })
+      .nullable()
+      .optional()
+  );
+
+const portfolioLinkField = z.preprocess(
+  emptyToNull,
+  z
+    .string()
+    .trim()
+    .max(300)
+    .transform((value, ctx) => {
+      const parsed = parsePortfolioUrl(value);
+
+      if (!parsed.ok) {
+        ctx.addIssue({ code: "custom", message: parsed.error });
+        return z.NEVER;
+      }
+
+      return parsed.url;
+    })
+    .nullable()
+    .optional()
+);
 const optionalBooleanQueryParam = z
   .enum(["true", "false"])
   .transform((value) => value === "true")
@@ -199,19 +276,21 @@ export const discordChannelDecisionSchema = z.object({
   action: z.enum(["approve", "deny"]),
 });
 
+// All profile fields are clearable: an empty string wipes the stored value
+// (the previous optional-only fields made saved links impossible to delete).
 export const profileUpdateSchema = z.object({
-  headline: optionalString(160),
-  bio: optionalString(2000),
-  locationCity: optionalString(120),
-  locationRegion: optionalString(120),
-  countryCode: optionalString(2),
-  school: optionalString(160),
-  githubUrl: optionalUrl,
-  linkedinUrl: optionalUrl,
-  instagramUrl: optionalUrl,
-  xUrl: optionalUrl,
-  devpostUrl: optionalUrl,
-  portfolioUrl: optionalUrl,
+  headline: cleanClearableString(160),
+  bio: cleanClearableString(2000),
+  locationCity: clearableString(120),
+  locationRegion: clearableString(120),
+  countryCode: clearableString(2),
+  school: cleanClearableString(160),
+  githubUrl: socialLinkField("githubUrl"),
+  linkedinUrl: socialLinkField("linkedinUrl"),
+  instagramUrl: socialLinkField("instagramUrl"),
+  xUrl: socialLinkField("xUrl"),
+  devpostUrl: socialLinkField("devpostUrl"),
+  portfolioUrl: portfolioLinkField,
 });
 
 export const userHackathonUpdateSchema = z.object({
