@@ -16,7 +16,7 @@ describe("attendance helpers", () => {
   it("only infers attendance for attended and won statuses", () => {
     expect(statusShouldInferAttendance("attended")).toBe(true);
     expect(statusShouldInferAttendance("won")).toBe(true);
-    expect(statusShouldInferAttendance("attending")).toBe(false);
+    expect(statusShouldInferAttendance("accepted")).toBe(false);
     expect(statusShouldInferAttendance("interested")).toBe(false);
   });
 });

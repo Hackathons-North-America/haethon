@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowBigDown, ArrowBigUp, BellPlus, Bookmark } from "lucide-react";
+import { ArrowBigDown, ArrowBigUp, BellPlus, Bookmark, Check, ChevronDown } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
+import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
+import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
 import { filmGrainClassName } from "@/lib/tailwind";
 
 type Vote = -1 | 0 | 1;
@@ -502,6 +504,187 @@ function HackathonLogoMark({
   );
 }
 
+export type ReminderOption = {
+  type: SelectableReminderType;
+  label: string;
+  /* ISO string of the send time, so this stays serializable from the server. */
+  scheduledFor: string;
+  enabled: boolean;
+};
+
+export type HackathonCardReminder = {
+  hackathonId: string;
+  /* The hacker's current pipeline stage — shown as the panel heading, since the
+     reminders offered depend on where they stand. */
+  statusLabel: string;
+  options: ReminderOption[];
+};
+
+/* Inline reminder picker used on the My Hackathons board. Clicking the footer
+   button expands a select panel below it — mirroring the search bar popovers —
+   where each reminder can be toggled on or off. Choices save instantly, and the
+   active ones surface as chips on the card once the panel is closed. */
+function ReminderControl({ hackathonId, statusLabel, options: initialOptions }: HackathonCardReminder) {
+  const [options, setOptions] = useState(initialOptions);
+  const [open, setOpen] = useState(false);
+  const [pendingType, setPendingType] = useState<SelectableReminderType | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const enabledOptions = options.filter((option) => option.enabled);
+
+  async function toggleReminder(type: SelectableReminderType, enabled: boolean) {
+    if (pendingType) {
+      return;
+    }
+
+    const previousOptions = options;
+    const nextOptions = options.map((option) => (option.type === type ? { ...option, enabled } : option));
+
+    setOptions(nextOptions);
+    setPendingType(type);
+
+    try {
+      const response = await fetch(`/api/hackathons/${encodeURIComponent(hackathonId)}/notifications`, {
+        body: JSON.stringify({
+          preferences: nextOptions.map((option) => ({ type: option.type, enabled: option.enabled })),
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+
+      if (response.status === 401) {
+        handleUnauthenticated();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error("Could not update reminders.");
+      }
+    } catch {
+      setOptions(previousOptions);
+    } finally {
+      setPendingType(null);
+    }
+  }
+
+  return (
+    <div className="relative z-10" ref={rootRef}>
+      <button
+        aria-expanded={open}
+        className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 ${
+          open
+            ? "bg-cabernet text-wheat dark:bg-[#e4a3ab]/15 dark:text-[#e4a3ab]"
+            : "text-cabernet hover:bg-cabernet/10 dark:text-[#e4a3ab] dark:hover:bg-[#e4a3ab]/10"
+        }`}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <BellPlus aria-hidden="true" className="size-3.5" />
+        {enabledOptions.length ? `Reminders · ${enabledOptions.length}` : "Add Reminder"}
+        <ChevronDown
+          aria-hidden="true"
+          className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {!open && enabledOptions.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {enabledOptions.map((option) => (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-cabernet/30 dark:border-[#e4a3ab]/40 bg-cabernet/5 dark:bg-[#e4a3ab]/10 px-2.5 py-1 text-xs font-semibold text-cabernet dark:text-[#e4a3ab]"
+              key={option.type}
+            >
+              <BellPlus aria-hidden="true" className="size-3" />
+              {option.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {open ? (
+        <div className="mt-2 rounded-2xl border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-3 shadow-[0_18px_45px_rgb(0_0_0/0.12)]">
+          <p className="px-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-cabernet dark:text-[#e4a3ab]">
+            {statusLabel}
+          </p>
+          {options.length ? (
+            <div className="mt-2 space-y-1.5">
+              {options.map((option) => {
+                const pending = pendingType === option.type;
+
+                return (
+                  <label
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                      option.enabled
+                        ? "border-cabernet/35 dark:border-[#e4a3ab]/40 bg-cabernet/5 dark:bg-[#e4a3ab]/10"
+                        : "border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] hover:border-navy/20 hover:bg-ivory dark:hover:bg-white/10"
+                    }`}
+                    key={option.type}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-navy dark:text-wheat">{option.label}</span>
+                      <span className="mt-0.5 block text-xs text-navy/55 dark:text-wheat/55">
+                        {formatReminderDate(new Date(option.scheduledFor))}
+                        {pending ? " · saving" : ""}
+                      </span>
+                    </span>
+                    <input
+                      checked={option.enabled}
+                      className="sr-only"
+                      disabled={pendingType !== null}
+                      onChange={(event) => toggleReminder(option.type, event.target.checked)}
+                      type="checkbox"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className={`grid size-6 shrink-0 place-items-center rounded-full border ${
+                        option.enabled
+                          ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414]"
+                          : "border-navy/15 dark:border-white/15 text-transparent"
+                      }`}
+                    >
+                      <Check className="size-3.5" strokeWidth={3} />
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 px-1 pb-1 text-xs text-navy/55 dark:text-wheat/55">
+              No reminders are available yet — we&apos;ll offer them once this hackathon&apos;s key dates are confirmed.
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CardAccentEdges() {
   return (
     <>
@@ -520,14 +703,14 @@ function CardAccentEdges() {
 export function HackathonCard({
   hackathon,
   preview = false,
-  reminderHref,
+  reminder,
 }: {
   hackathon: HackathonCardData;
   index: number;
   preview?: boolean;
-  /* When set, the footer swaps the vote/save controls for an Add Reminder
-     link opening this href in a new tab — used on the My Hackathons board. */
-  reminderHref?: string;
+  /* When set, the footer swaps the vote/save controls for an inline reminder
+     picker that expands below the card — used on the My Hackathons board. */
+  reminder?: HackathonCardReminder;
 }) {
   const fallbackRgb = useMemo(() => getFallbackAccentRgb(hackathon.name), [hackathon.name]);
   /* Logos are served through our own origin so their pixels stay readable on
@@ -603,15 +786,12 @@ export function HackathonCard({
       </div>
 
       <div className="mt-auto pt-5 text-base leading-6">
-        {reminderHref ? (
-          <Link
-            className="relative z-10 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full border border-cabernet dark:border-[#e4a3ab]/50 px-5 text-sm font-semibold text-cabernet dark:text-[#e4a3ab] transition-colors hover:bg-cabernet hover:text-wheat dark:hover:bg-[#e4a3ab]/10 dark:hover:text-[#e4a3ab] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40"
-            href={reminderHref}
-            target="_blank"
-          >
-            <BellPlus aria-hidden="true" className="size-4" />
-            Add Reminder
-          </Link>
+        {reminder ? (
+          <ReminderControl
+            hackathonId={reminder.hackathonId}
+            options={reminder.options}
+            statusLabel={reminder.statusLabel}
+          />
         ) : (
           <div className="flex items-center justify-between gap-3">
             <VoteControl

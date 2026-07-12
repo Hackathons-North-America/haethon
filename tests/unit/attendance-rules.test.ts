@@ -9,7 +9,7 @@ const endsAt = new Date("2026-06-14T22:00:00Z");
 
 describe("evaluateAttendanceClaim", () => {
   it("allows non-claim statuses at any time", () => {
-    for (const status of ["interested", "applied", "accepted", "attending", undefined]) {
+    for (const status of ["interested", "applied", "accepted", undefined]) {
       const result = evaluateAttendanceClaim({
         applicationStatus: status,
         endsAt,

@@ -53,7 +53,7 @@ export function AppSidebar({
       transition={{ delay: 0.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
     >
       <div className="flex items-center justify-between gap-4 px-5 pb-0 pt-5 lg:block lg:px-5">
-        <Link className="block" href={isSignedIn ? "/hackathons" : "/"}>
+        <Link className="block" href={isSignedIn ? "/?home" : "/"}>
           <span className="font-serif text-2xl font-semibold leading-none text-navy dark:text-wheat">HNA</span>
         </Link>
         {!isSignedIn ? (

@@ -101,7 +101,7 @@ export async function POST(request: Request, context: RouteContext) {
     .limit(1);
 
   const ended = hackathon.endsAt ? now > hackathon.endsAt : false;
-  const targetStatus = ended ? ("attended" as const) : ("attending" as const);
+  const targetStatus = ended ? ("attended" as const) : ("accepted" as const);
   // Never downgrade a richer status (e.g. `won`) that the user already holds.
   const finalStatus =
     existing && (existing.applicationStatus === "won" || existing.applicationStatus === "attended")

@@ -43,11 +43,7 @@ export type HackathonDatesInput = {
 export function getSelectableReminderTypesForStatus(
   applicationStatus: string | null
 ): SelectableReminderType[] {
-  if (
-    applicationStatus === "applied" ||
-    applicationStatus === "accepted" ||
-    applicationStatus === "attending"
-  ) {
+  if (applicationStatus === "applied" || applicationStatus === "accepted") {
     return ["hackathon_week_before", "hackathon_day_before"];
   }
 

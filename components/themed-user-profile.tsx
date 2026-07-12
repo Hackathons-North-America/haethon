@@ -1,7 +1,9 @@
 "use client";
 
 import { UserProfile } from "@clerk/nextjs";
+import { LogOut } from "lucide-react";
 
+import { AccountSignOutButton } from "@/components/account-sign-out-button";
 import { useTheme } from "@/components/providers/theme-provider";
 
 /* Clerk's appearance variables only take flat color values, so this wrapper
@@ -52,6 +54,18 @@ export function ThemedUserProfile() {
           accordionTriggerButton: "hover:bg-navy/10 dark:hover:bg-white/10",
         },
       }}
-    />
+    >
+      <UserProfile.Page label="Sign out" labelIcon={<LogOut aria-hidden="true" className="size-4" />} url="sign-out">
+        <div className="flex flex-col gap-4">
+          <div>
+            <h1 className="text-lg font-semibold text-navy dark:text-wheat">Sign out</h1>
+            <p className="mt-1 text-sm text-navy/55 dark:text-wheat/55">Sign out of your account on this device.</p>
+          </div>
+          <div>
+            <AccountSignOutButton />
+          </div>
+        </div>
+      </UserProfile.Page>
+    </UserProfile>
   );
 }

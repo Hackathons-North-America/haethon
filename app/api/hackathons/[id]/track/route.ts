@@ -72,7 +72,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   // Drop the tracking row entirely so the hackathon leaves the pipeline — this
-  // undoes the interested/applied/accepted/attending tag in one go — then clear
+  // undoes the interested/applied/accepted tag in one go — then clear
   // any reminders that were scheduled for it.
   await db
     .delete(userHackathons)

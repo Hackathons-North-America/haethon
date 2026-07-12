@@ -85,11 +85,18 @@ const faqs = [
 const surfaceCard =
   "rounded-[1.75rem] border border-navy/10 bg-navy/[0.03] p-6 sm:rounded-[2rem] sm:p-8 lg:p-10 dark:border-white/10 dark:bg-white/[0.04]";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { userId } = await auth();
 
-  // Logged-in visitors skip the marketing page and land straight in the app.
-  if (userId) {
+  // A fresh/typed visit to the bare root sends logged-in visitors straight
+  // into the app. Clicking the HNA logo adds ?home so they can still view the
+  // landing page on purpose without being bounced away.
+  const wantsLanding = "home" in ((await searchParams) ?? {});
+  if (userId && !wantsLanding) {
     redirect("/hackathons");
   }
 

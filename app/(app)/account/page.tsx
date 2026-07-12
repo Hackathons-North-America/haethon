@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { BadgeCheck, CalendarDays, MapPin, Trophy } from "lucide-react";
 
-import { AccountSignOutButton } from "@/components/account-sign-out-button";
 import { AccountProfileForm } from "@/components/forms/account-profile-form";
 import { HackathonCheckinForm } from "@/components/hackathon-checkin-form";
 import { ProfileActivity, type LatestAttended, type YearActivity } from "@/components/profile-activity";
@@ -257,9 +256,6 @@ export default async function AccountPage() {
 
   return (
     <main className="relative min-h-[calc(100vh-80px)] bg-white dark:bg-white/[0.06] px-5 py-8 text-navy dark:text-wheat sm:px-8 lg:px-12">
-      <div className="absolute right-5 top-8 sm:right-8 lg:right-12">
-        <AccountSignOutButton />
-      </div>
       <div className="mx-auto w-full max-w-[720px]">
         <div className="space-y-6">
           <section id="profile" className="pt-2">

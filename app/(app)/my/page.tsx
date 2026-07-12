@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, eq, ne, or } from "drizzle-orm";
-import { CalendarDays, ExternalLink, MapPin, Pin, Plus, Trophy } from "lucide-react";
+import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
-import type { HackathonCardData } from "@/components/hackathon-card";
+import type { HackathonCardData, HackathonCardReminder } from "@/components/hackathon-card";
 import { HackathonResultActions } from "@/components/hackathon-result-actions";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { getCurrentUserRecord } from "@/lib/auth";
@@ -14,6 +14,7 @@ import {
   hackathonDates,
   hackathonLocations,
   hackathons,
+  userHackathonNotificationPreferences,
   userHackathons,
 } from "@/lib/db/schema";
 import {
@@ -24,10 +25,15 @@ import {
   formatLocationParts,
 } from "@/lib/hackathons/card-format";
 import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
+import { reminderTypeLabels } from "@/lib/hackathons/reminder-labels";
+import {
+  computeSelectableReminderPlan,
+  getSelectableReminderTypesForStatus,
+} from "@/lib/hackathons/reminder-plan";
 
 export const metadata: Metadata = {
   title: "My Hackathons | Hackathons North America",
-  description: "Track where you stand with every hackathon — from interested to attending.",
+  description: "Track where you stand with every hackathon — from interested to accepted.",
 };
 
 type PipelineRow = {
@@ -54,15 +60,17 @@ type PipelineRow = {
   country: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  applicationOpensAt: Date | null;
+  applicationClosesAt: Date | null;
+  acceptanceAt: Date | null;
 };
 
-const stageOrder = ["interested", "applied", "accepted", "attending"] as const;
+const stageOrder = ["interested", "applied", "accepted"] as const;
 
 const stageTitles: Record<(typeof stageOrder)[number], string> = {
   interested: "Interested",
   applied: "Applied",
   accepted: "Accepted",
-  attending: "Attending",
 };
 
 function toCardData(row: PipelineRow, hasDiscord: boolean): HackathonCardData {
@@ -120,6 +128,9 @@ export default async function MyHackathonsPage() {
       country: hackathonLocations.country,
       startsAt: hackathonDates.startsAt,
       endsAt: hackathonDates.endsAt,
+      applicationOpensAt: hackathonDates.applicationOpensAt,
+      applicationClosesAt: hackathonDates.applicationClosesAt,
+      acceptanceAt: hackathonDates.acceptanceAt,
     })
     .from(userHackathons)
     .innerJoin(hackathons, eq(hackathons.id, userHackathons.hackathonId))
@@ -154,9 +165,54 @@ export default async function MyHackathonsPage() {
   pastRows.sort((a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0));
 
   const activeCount = stageOrder.reduce((total, stage) => total + (byStage.get(stage)?.length ?? 0), 0);
-  const discordHackathonIds = await getHackathonIdsWithDiscord(
-    rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))
+  const [discordHackathonIds, preferenceRows] = await Promise.all([
+    getHackathonIdsWithDiscord(rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))),
+    db
+      .select({
+        hackathonId: userHackathonNotificationPreferences.hackathonId,
+        type: userHackathonNotificationPreferences.type,
+        enabled: userHackathonNotificationPreferences.enabled,
+      })
+      .from(userHackathonNotificationPreferences)
+      .where(
+        and(
+          eq(userHackathonNotificationPreferences.userId, user.id),
+          eq(userHackathonNotificationPreferences.channel, "email")
+        )
+      ),
+  ]);
+
+  // Reminder toggles default to enabled (opt-out), matching the reminder sync;
+  // a stored row overrides that. Keyed by hackathon + reminder type.
+  const enabledByKey = new Map(
+    preferenceRows.map((preference) => [`${preference.hackathonId}:${preference.type}`, preference.enabled])
   );
+
+  // Offer the reminders that fit the hacker's current stage — interested hackers
+  // get application-open countdowns, applied/accepted ones get event-start
+  // countdowns — and only those still in the future.
+  function toReminder(row: PipelineRow, statusLabel: string): HackathonCardReminder {
+    const availableReminderTypes = new Set(getSelectableReminderTypesForStatus(row.applicationStatus));
+    const options = computeSelectableReminderPlan(
+      {
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        applicationOpensAt: row.applicationOpensAt,
+        applicationClosesAt: row.applicationClosesAt,
+        acceptanceAt: row.acceptanceAt,
+      },
+      now
+    )
+      .filter(({ type }) => availableReminderTypes.has(type))
+      .map(({ type, scheduledFor }) => ({
+        type,
+        label: reminderTypeLabels[type] ?? type,
+        scheduledFor: scheduledFor.toISOString(),
+        enabled: enabledByKey.get(`${row.hackathonId}:${type}`) ?? true,
+      }));
+
+    return { hackathonId: row.hackathonId, options, statusLabel };
+  }
 
   return (
     <main className="min-h-screen px-5 pb-20 pt-14 text-navy dark:text-wheat sm:px-8 sm:pt-16 lg:px-12">
@@ -200,17 +256,9 @@ export default async function MyHackathonsPage() {
                         hackathon={toCardData(row, discordHackathonIds.has(row.hackathonId))}
                         index={index}
                         key={row.id}
-                        reminderHref={`/my/reminders/${row.hackathonId}`}
+                        reminder={toReminder(row, stageTitles[stage])}
                       />
                     ))}
-
-                    <Link
-                      className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-dashed border-navy/15 dark:border-white/15 text-sm font-medium text-navy/55 dark:text-wheat/55 transition-colors hover:border-cabernet/40 dark:hover:border-[#e4a3ab]/40 hover:text-cabernet dark:hover:text-[#e4a3ab]"
-                      href="/hackathons"
-                    >
-                      <Plus aria-hidden="true" className="size-4" />
-                      Add hackathon
-                    </Link>
                   </div>
                 </section>
               );
@@ -219,7 +267,7 @@ export default async function MyHackathonsPage() {
         )}
 
         {pastRows.length ? (
-          <section className="mt-12 w-full max-w-[980px] border-t border-navy/10 dark:border-white/10 pt-8">
+          <section className="mt-12 w-full border-t border-navy/10 dark:border-white/10 pt-8">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-navy/55 dark:text-wheat/55">Past</h2>
             <div className="mt-4 space-y-3">
               {pastRows.map((row) => {

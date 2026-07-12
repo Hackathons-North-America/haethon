@@ -1,100 +1,90 @@
 "use client";
 
-import Image from "next/image";
-import type { CSSProperties } from "react";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-const aboutSections = [
+const companies = [
   {
     id: "hack-canada",
     name: "Hack Canada",
-    eyebrow: "Flagship event",
-    tabLabel: "001 · 2026 — Present",
-    folderColor: "#3150FF",
-    watermark: "Canada",
-    description:
-      "Hack Canada was one of the fastest-growing hackathons in Canada, bringing over 700 members together for a high-energy weekend of building, mentorship, and demos.",
-    photos: [
-      {
-        src: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=640&q=80",
-        alt: "Hackers building together at Hack Canada",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=640&q=80",
-        alt: "A workshop session at Hack Canada",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=640&q=80",
-        alt: "A team collaborating during the hackathon",
-      },
-    ],
-    stats: [
-      { value: "700+", label: "Community members" },
-      { value: "36", label: "Hours of hacking" },
-      { value: "100+", label: "Projects shipped" },
-    ],
-  },
-  {
-    id: "hackathons-canada",
-    name: "Hackathons Canada",
-    eyebrow: "Organizer network",
-    tabLabel: "002 · 2025 — Present",
-    folderColor: "#D83A2E",
-    watermark: "Canada",
-    description:
-      "Hackathons Canada helps Canadian organizers reach more hackers, sharpen their event positioning, and turn scattered promotion into a stronger application pipeline.",
-    photos: [
-      {
-        src: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=640&q=80",
-        alt: "A packed hackathon opening ceremony",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=640&q=80",
-        alt: "Organizers planning an event together",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=640&q=80",
-        alt: "A mentor helping a hacker debug",
-      },
-    ],
-    stats: [
-      { value: "10K+", label: "Hackers reached" },
-      { value: "40+", label: "Events supported" },
-      { value: "13", label: "Provinces & territories" },
-    ],
+    then: { caption: "Placeholder caption — Hack Canada in its early days." },
+    now: { caption: "Placeholder caption — Hack Canada today." },
   },
   {
     id: "hackathons-north-america",
     name: "Hackathons North America",
-    eyebrow: "Discovery platform",
-    tabLabel: "003 · Now",
-    folderColor: "#111111",
-    watermark: "North America",
-    description:
-      "Hackathons North America maps upcoming hackathons across the continent so hackers can search, compare, save events, and never miss a deadline.",
-    photos: [
-      {
-        src: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=640&q=80",
-        alt: "Hackers browsing events on their laptops",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=640&q=80",
-        alt: "Code on a screen during a build sprint",
-      },
-      {
-        src: "https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=640&q=80",
-        alt: "Students planning their next hackathon",
-      },
-    ],
-    stats: [
-      { value: "150+", label: "Hackathons tracked" },
-      { value: "30+", label: "Cities covered" },
-      { value: "1", label: "Home for hackers" },
-    ],
+    then: {
+      caption: "Placeholder caption — Hackathons North America at the start.",
+    },
+    now: { caption: "Placeholder caption — Hackathons North America now." },
+  },
+  {
+    id: "corporate",
+    name: "Corporate",
+    then: { caption: "Placeholder caption — the corporate arm, early on." },
+    now: { caption: "Placeholder caption — the corporate arm today." },
   },
 ] as const;
 
-const NAME_ROW_REM = 7;
+// Height of a single name row in the centered scrolling list.
+const NAME_ROW = "8rem";
+
+type Side = "then" | "now";
+
+function SideFigure({
+  activeIndex,
+  label,
+  side,
+}: {
+  activeIndex: number;
+  label: string;
+  side: Side;
+}) {
+  return (
+    <figure className="flex w-full flex-col items-center">
+      <figcaption className="font-serif text-lg italic text-navy/70 dark:text-wheat/70">
+        {label}
+      </figcaption>
+
+      <div className="relative mt-4 aspect-[3/4] w-full overflow-hidden rounded-2xl">
+        {companies.map((company, index) => {
+          const isActive = index === activeIndex;
+
+          return (
+            <div
+              className={`absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl border border-navy/10 bg-navy/[0.04] transition-[opacity,transform,visibility] duration-[600ms] ease-out motion-reduce:transition-none dark:border-wheat/10 dark:bg-wheat/[0.06] ${
+                isActive
+                  ? "visible scale-100 opacity-100"
+                  : "invisible scale-[1.03] opacity-0"
+              }`}
+              key={company.id}
+            >
+              <span className="font-mono text-[0.65rem] font-medium uppercase tracking-[0.16em] text-navy/40 dark:text-wheat/40">
+                Placeholder image
+              </span>
+              <span className="px-4 text-center font-serif text-lg text-navy/55 dark:text-wheat/55">
+                {company.name}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative mt-4 min-h-[3.5rem] w-full">
+        {companies.map((company, index) => (
+          <p
+            className={`absolute inset-x-0 top-0 text-center text-sm leading-6 text-navy/60 transition-opacity duration-[600ms] ease-out motion-reduce:transition-none dark:text-wheat/60 ${
+              index === activeIndex ? "opacity-100" : "opacity-0"
+            }`}
+            key={company.id}
+          >
+            {company[side].caption}
+          </p>
+        ))}
+      </div>
+    </figure>
+  );
+}
 
 export function AboutScrollShowcase() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -120,8 +110,8 @@ export function AboutScrollShowcase() {
 
       const progress = Math.min(Math.max(-rect.top / scrollable, 0), 1);
       const nextIndex = Math.min(
-        aboutSections.length - 1,
-        Math.floor(progress * aboutSections.length)
+        companies.length - 1,
+        Math.floor(progress * companies.length)
       );
 
       setActiveIndex((currentIndex) =>
@@ -158,150 +148,94 @@ export function AboutScrollShowcase() {
     const target =
       window.scrollY +
       rect.top +
-      ((index + 0.5) / aboutSections.length) * scrollable;
+      ((index + 0.5) / companies.length) * scrollable;
 
     setActiveIndex(index);
     window.scrollTo({ top: target, behavior: "smooth" });
   };
 
-  const activeSection = aboutSections[activeIndex];
+  const activeSection = companies[activeIndex];
 
   return (
-    <section aria-labelledby="about-showcase-heading" className="px-5 sm:px-8 lg:px-12">
+    <section
+      aria-labelledby="about-showcase-heading"
+      className="px-5 sm:px-8 lg:px-12"
+    >
       <h2 id="about-showcase-heading" className="sr-only">
-        HNA work areas
+        What we&apos;ve built
       </h2>
 
       <div
         className="relative"
         ref={wrapperRef}
-        style={{ height: `${aboutSections.length * 100}vh` }}
+        style={{ height: `${companies.length * 100}vh` }}
       >
         <div
-          className="sticky top-0 flex h-screen items-center"
+          className="sticky top-0 h-screen overflow-hidden"
           data-about-stage
           data-active-section={activeSection.id}
         >
-          <div className="mx-auto grid w-full max-w-[1240px] items-center gap-10 lg:grid-cols-[0.36fr_1fr] lg:gap-16">
-            <aside className="hidden lg:block">
-              <nav aria-label="About sections">
-                <div className="h-[7rem]">
-                  <div
-                    className="transition-transform duration-500 ease-out motion-reduce:transition-none"
-                    style={{
-                      transform: `translateY(${-activeIndex * NAME_ROW_REM}rem)`,
-                    }}
-                  >
-                    {aboutSections.map((section, index) => {
-                      const isActive = index === activeIndex;
-                      const distance = Math.abs(index - activeIndex);
+          <div className="relative mx-auto grid h-full max-w-[1300px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10">
+            {/* Left image — "During YC" equivalent */}
+            <div className="order-2 lg:order-1">
+              <SideFigure
+                activeIndex={activeIndex}
+                label="During YC"
+                side="then"
+              />
+            </div>
 
-                      return (
+            {/* Center — scrolling list of names + scroll hint */}
+            <div className="pointer-events-none relative order-1 col-span-2 h-[24rem] lg:order-2 lg:col-span-1 lg:h-full">
+              <ChevronDown
+                aria-hidden="true"
+                className="absolute left-1/2 -translate-x-1/2 text-navy/30 dark:text-wheat/30"
+                size={26}
+                strokeWidth={1.5}
+                style={{ top: "calc(50% - 5rem)" }}
+              />
+
+              <nav
+                aria-label="About sections"
+                className="pointer-events-auto absolute inset-0"
+              >
+                <ul
+                  className="absolute inset-x-0 top-1/2 transition-transform duration-500 ease-out motion-reduce:transition-none"
+                  style={{
+                    transform: `translateY(calc(${-(activeIndex + 0.5)} * ${NAME_ROW}))`,
+                  }}
+                >
+                  {companies.map((company, index) => {
+                    const isActive = index === activeIndex;
+                    const distance = Math.abs(index - activeIndex);
+
+                    return (
+                      <li
+                        className="flex items-center justify-center"
+                        key={company.id}
+                        style={{ height: NAME_ROW }}
+                      >
                         <button
                           aria-current={isActive ? "true" : undefined}
-                          className="flex h-[7rem] w-full items-center text-left font-serif text-[2.3rem] font-semibold leading-[0.95] text-[#57544e] transition duration-300 hover:text-black aria-[current=page]:text-black motion-reduce:transition-none xl:text-[2.7rem]"
-                          key={section.id}
+                          className="px-4 text-center font-serif text-3xl font-medium leading-tight tracking-tight text-navy transition-opacity duration-300 ease-out motion-reduce:transition-none sm:text-4xl lg:text-6xl dark:text-wheat"
                           onClick={() => scrollToSection(index)}
                           style={{
-                            opacity: isActive ? 1 : distance === 1 ? 0.35 : 0.14,
+                            opacity: isActive ? 1 : distance === 1 ? 0.25 : 0.12,
                           }}
                           type="button"
                         >
-                          {section.name}
+                          {company.name}
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </nav>
-            </aside>
+            </div>
 
-            <div
-              className="relative mt-12 filter-[drop-shadow(0_30px_72px_rgb(0_0_0_/_0.18))] motion-safe:transition-[--folder-color] motion-safe:duration-[600ms] motion-safe:ease-out before:absolute before:left-[clamp(1.5rem,8vw,3.75rem)] before:top-[-2.9rem] before:z-0 before:h-[3.4rem] before:w-[clamp(10rem,27vw,16.5rem)] before:origin-bottom before:rounded-t-[16px] before:bg-[color-mix(in_srgb,var(--folder-color)_86%,#000)] before:content-[''] before:[transform:perspective(3.5rem)_rotateX(5deg)] after:absolute after:left-[55%] after:right-9 after:top-[-0.9rem] after:z-0 after:h-[2.1rem] after:rounded-t-[10px] after:bg-[linear-gradient(180deg,#fffef8_0%,#ebe4d4_100%)] after:content-['']"
-              style={
-                {
-                  "--folder-color": activeSection.folderColor,
-                } as CSSProperties
-              }
-            >
-              <span
-                className="absolute left-[calc(clamp(1.5rem,8vw,3.75rem)+1.35rem)] top-[-2.05rem] z-[1] font-mono text-xs font-medium uppercase tracking-[0.14em] text-white/85"
-                key={activeSection.id}
-              >
-                {activeSection.tabLabel}
-              </span>
-
-              <div className="relative z-[1] h-[min(80vh,48rem)] min-h-[32rem] overflow-hidden rounded-[20px] bg-[linear-gradient(150deg,rgb(255_255_255_/_0.16),transparent_36%),var(--folder-color)] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-white/15 after:content-['']">
-                {aboutSections.map((section, index) => (
-                  <article
-                    className={`absolute inset-0 transition-[opacity,transform,visibility] duration-[450ms] ease-out motion-reduce:transition-none ${
-                      index === activeIndex
-                        ? "visible translate-y-0 opacity-100"
-                        : "pointer-events-none invisible translate-y-7 opacity-0"
-                    }`}
-                    key={section.id}
-                  >
-                    <div className="pointer-events-none absolute -left-6 top-20 select-none font-serif text-[5.5rem] font-semibold leading-none text-white/10 sm:text-[8rem]">
-                      {section.watermark}
-                    </div>
-
-                    <div className="relative z-10 flex h-full flex-col justify-between gap-6 p-6 sm:p-8 lg:p-10">
-                      <div
-                        className=""
-                        style={{ "--stagger": 0 } as CSSProperties}
-                      >
-                        <p className="font-mono text-xs font-medium uppercase tracking-[0.14em] text-white/70">
-                          {section.eyebrow}
-                        </p>
-                        <h3 className="mt-3 text-4xl font-semibold leading-[0.98] tracking-normal text-white sm:text-5xl lg:text-6xl">
-                          {section.name}
-                        </h3>
-                        <p className="mt-4 max-w-[580px] text-sm leading-6 text-white/80 sm:text-base sm:leading-7 lg:text-lg">
-                          {section.description}
-                        </p>
-                      </div>
-
-                      <div>
-                        <div
-                          className="grid grid-cols-3 gap-3 sm:gap-4"
-                          style={{ "--stagger": 1 } as CSSProperties}
-                        >
-                          {section.photos.map((photo) => (
-                            <div
-                              className="relative aspect-[4/3] overflow-hidden rounded-xl border border-white/25"
-                              key={photo.src}
-                            >
-                              <Image
-                                alt={photo.alt}
-                                className="object-cover"
-                                fill
-                                sizes="(min-width: 1024px) 220px, 30vw"
-                                src={photo.src}
-                              />
-                            </div>
-                          ))}
-                        </div>
-
-                        <div
-                          className="mt-5 grid grid-cols-3 gap-3 sm:mt-6 sm:gap-4"
-                          style={{ "--stagger": 2 } as CSSProperties}
-                        >
-                          {section.stats.map((stat) => (
-                            <div key={`${section.id}-${stat.label}`}>
-                              <p className="text-3xl font-semibold leading-none text-white sm:text-4xl lg:text-[3.2rem]">
-                                {stat.value}
-                              </p>
-                              <p className="mt-2 font-mono text-[0.65rem] font-medium uppercase tracking-[0.14em] text-white/65 sm:text-xs">
-                                {stat.label}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+            {/* Right image — "Now" */}
+            <div className="order-3">
+              <SideFigure activeIndex={activeIndex} label="Now" side="now" />
             </div>
           </div>
         </div>

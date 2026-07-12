@@ -81,7 +81,7 @@ export default async function DashboardPage() {
 
   const confirmed = tracked.filter(
     (row): row is (typeof tracked)[number] & { startsAt: Date; endsAt: Date } =>
-      (row.applicationStatus === "attending" || row.applicationStatus === "accepted") &&
+      row.applicationStatus === "accepted" &&
       row.startsAt !== null &&
       row.endsAt !== null
   );
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
     (row) => row.applicationStatus === "applied" && row.acceptanceAt && row.acceptanceAt <= now
   );
   const unloggedAttendance = tracked.filter(
-    (row) => row.applicationStatus === "attending" && row.endsAt && row.endsAt < now
+    (row) => row.applicationStatus === "accepted" && row.endsAt && row.endsAt < now
   );
 
   const trackedIds = tracked.map((row) => row.hackathonId);

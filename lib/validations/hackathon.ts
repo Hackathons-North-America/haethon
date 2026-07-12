@@ -215,7 +215,7 @@ export const profileUpdateSchema = z.object({
 });
 
 export const userHackathonUpdateSchema = z.object({
-  applicationStatus: z.enum(["interested", "applied", "accepted", "attending", "attended", "won"]).optional(),
+  applicationStatus: z.enum(["interested", "applied", "accepted", "attended", "won"]).optional(),
   isSaved: z.boolean().optional(),
   isPinned: z.boolean().optional(),
   awardName: clearableString(180),
@@ -228,7 +228,7 @@ export const hackathonSaveSchema = z.object({
 });
 
 export const hackathonTrackSchema = z.object({
-  applicationStatus: z.enum(["interested", "applied", "accepted", "attending"]),
+  applicationStatus: z.enum(["interested", "applied", "accepted"]),
 });
 
 export const hackathonNotificationPreferencesSchema = z.object({

@@ -26,7 +26,7 @@ export function PrimaryNav({
       >
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <Link
-            href="/"
+            href="/?home"
             className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-navy/[0.04] dark:hover:bg-white/5"
           >
             <Image
