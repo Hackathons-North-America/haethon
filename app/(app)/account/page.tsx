@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
-import { BadgeCheck, CalendarDays, MapPin, Trophy } from "lucide-react";
+import { and, desc, eq, isNotNull, or } from "drizzle-orm";
+import { CalendarDays, Trophy } from "lucide-react";
 
+import { AttendedHackathonsTable, type AttendedHackathonRow } from "@/components/attended-hackathons-table";
 import { AccountProfileForm } from "@/components/forms/account-profile-form";
 import { EmailPreferencesToggle } from "@/components/email-preferences-toggle";
-import { HackathonCheckinForm } from "@/components/hackathon-checkin-form";
 import { ProfileActivity, type LatestAttended, type YearActivity } from "@/components/profile-activity";
 import { getCurrentUserContext, syncCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -92,27 +92,6 @@ function formatLatestDate(value: Date | null) {
 
 const sectionTitleClassName = "font-serif text-4xl font-semibold tracking-[-0.035em] text-navy dark:text-wheat sm:text-5xl";
 
-function AttendanceTierBadge({ tier }: { tier: AttendanceTrustTier | null }) {
-  if (tier === "verified") {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cabernet/25 bg-cabernet/5 dark:bg-[#e4a3ab]/10 px-2 py-0.5 text-xs font-semibold text-cabernet dark:text-[#e4a3ab]">
-        <BadgeCheck aria-hidden="true" className="size-3.5" />
-        Verified
-      </span>
-    );
-  }
-
-  if (tier === "self_reported") {
-    return (
-      <span className="shrink-0 rounded-full border border-navy/10 dark:border-white/10 px-2 py-0.5 text-xs font-semibold text-navy/55 dark:text-wheat/55">
-        Self-reported
-      </span>
-    );
-  }
-
-  return null;
-}
-
 export default async function AccountPage() {
   // Most pages skip the Clerk profile sync for speed; the account page is
   // where profile data is shown/edited, so refresh it here explicitly.
@@ -124,11 +103,12 @@ export default async function AccountPage() {
     redirect("/sign-in");
   }
 
-  const [[profile], wins, pinnedSelfReported, attendance, attendedHackathons, winDates] = await Promise.all([
+  const [[profile], winRows, pinnedSelfReported, attendanceRows] = await Promise.all([
     db.select().from(userProfiles).where(eq(userProfiles.userId, context.user.id)).limit(1),
     db
       .select({
         id: hackathonResults.id,
+        hackathonId: hackathons.id,
         placement: hackathonResults.placement,
         awardName: hackathonResults.awardName,
         createdAt: hackathonResults.createdAt,
@@ -151,11 +131,11 @@ export default async function AccountPage() {
           or(isNotNull(hackathonResults.placement), isNotNull(hackathonResults.awardName))
         )
       )
-      .orderBy(desc(hackathonResults.createdAt))
-      .limit(8),
+      .orderBy(desc(hackathonResults.createdAt)),
     db
       .select({
         id: userHackathons.id,
+        hackathonId: hackathons.id,
         applicationStatus: userHackathons.applicationStatus,
         awardName: userHackathons.awardName,
         devpostUrl: userHackathons.devpostUrl,
@@ -175,55 +155,64 @@ export default async function AccountPage() {
       .select({
         hackathonId: userHackathonAttendanceDays.hackathonId,
         attendedOn: userHackathonAttendanceDays.attendedOn,
-      })
-      .from(userHackathonAttendanceDays)
-      .where(eq(userHackathonAttendanceDays.userId, context.user.id)),
-    db
-      .select({
-        id: hackathons.id,
         hackathonName: hackathons.name,
         city: hackathonLocations.city,
         region: hackathonLocations.region,
         country: hackathonLocations.country,
         startsAt: hackathonDates.startsAt,
-        attendedDays: sql<number>`count(${userHackathonAttendanceDays.id})::int`,
-        sources: sql<AttendanceSource[]>`array_agg(${userHackathonAttendanceDays.source})::text[]`,
+        source: userHackathonAttendanceDays.source,
       })
       .from(userHackathonAttendanceDays)
       .innerJoin(hackathons, eq(hackathons.id, userHackathonAttendanceDays.hackathonId))
       .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
       .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
       .where(eq(userHackathonAttendanceDays.userId, context.user.id))
-      .groupBy(
-        hackathons.id,
-        hackathonLocations.city,
-        hackathonLocations.region,
-        hackathonLocations.country,
-        hackathonDates.startsAt
-      )
-      .orderBy(desc(sql`max(${userHackathonAttendanceDays.attendedOn})`))
-      .limit(8),
-    db
-      .select({
-        id: hackathonResults.id,
-        startsAt: hackathonDates.startsAt,
-        createdAt: hackathonResults.createdAt,
-      })
-      .from(hackathonResults)
-      .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathonResults.hackathonId))
-      .where(
-        and(
-          eq(hackathonResults.userId, context.user.id),
-          or(isNotNull(hackathonResults.placement), isNotNull(hackathonResults.awardName))
-        )
-      ),
+      .orderBy(desc(userHackathonAttendanceDays.attendedOn)),
   ]);
+  const wins = winRows.slice(0, 8);
+  const attendance = attendanceRows.map(({ hackathonId, attendedOn }) => ({ hackathonId, attendedOn }));
+  const attendedByHackathon = new Map<
+    string,
+    {
+      id: string;
+      hackathonName: string;
+      city: string | null;
+      region: string | null;
+      country: string | null;
+      startsAt: Date | null;
+      attendedDays: number;
+      sources: AttendanceSource[];
+    }
+  >();
+
+  for (const row of attendanceRows) {
+    const existing = attendedByHackathon.get(row.hackathonId);
+
+    if (existing) {
+      existing.attendedDays += 1;
+      existing.sources.push(row.source);
+      continue;
+    }
+
+    attendedByHackathon.set(row.hackathonId, {
+      id: row.hackathonId,
+      hackathonName: row.hackathonName,
+      city: row.city,
+      region: row.region,
+      country: row.country,
+      startsAt: row.startsAt,
+      attendedDays: 1,
+      sources: [row.source],
+    });
+  }
+
+  const attendedHackathons = [...attendedByHackathon.values()].slice(0, 8);
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1, currentYear - 2];
 
   const winDatesByYear = new Map<number, number>();
   const seenWinIds = new Set<string>();
-  for (const win of winDates) {
+  for (const win of winRows) {
     if (seenWinIds.has(win.id)) {
       continue;
     }
@@ -242,10 +231,23 @@ export default async function AccountPage() {
     ? { name: attendedHackathons[0].hackathonName, dateLabel: formatLatestDate(latestAttendedOn) }
     : null;
 
+  // Rows for the Notion-style attended table. A hackathon is a "Winner" when the
+  // user has a recorded win for it, taking visual priority over the trust tier.
+  const wonHackathonIds = new Set(winRows.map((win) => win.hackathonId));
+  const attendedRows: AttendedHackathonRow[] = attendedHackathons.map((hackathon) => ({
+    id: hackathon.id,
+    name: hackathon.hackathonName,
+    date: hackathon.startsAt ? dateToInputValue(hackathon.startsAt) : null,
+    location: [hackathon.city, hackathon.region, hackathon.country].filter(Boolean).join(", ") || "Location TBD",
+    tier: deriveAttendanceTrustTier(hackathon.sources ?? []),
+    isWinner: wonHackathonIds.has(hackathon.id),
+  }));
+
   const displayName = [context.user.firstName, context.user.lastName].filter(Boolean).join(" ") || context.user.email;
   const pinnedItems = [
     ...wins.map((win) => ({
       id: `win-${win.id}`,
+      hackathonId: win.hackathonId,
       hackathonName: win.hackathonName,
       detail: win.awardName ?? win.placement ?? "Verified win",
       tier: "verified" as AttendanceTrustTier,
@@ -257,6 +259,7 @@ export default async function AccountPage() {
     })),
     ...pinnedSelfReported.map((row) => ({
       id: `pin-${row.id}`,
+      hackathonId: row.hackathonId,
       hackathonName: row.hackathonName,
       detail: row.applicationStatus === "won" ? row.awardName ?? "Winner" : "Attended",
       tier: "self_reported" as AttendanceTrustTier,
@@ -305,8 +308,7 @@ export default async function AccountPage() {
                             className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                             fill
                             sizes="(min-width: 768px) 400px, 100vw"
-                            src={item.imageUrl}
-                            unoptimized
+                            src={`/api/hackathons/${encodeURIComponent(item.hackathonId)}/logo`}
                           />
                         ) : (
                           // No cover image: fall back to a hackathon-specific branded tile
@@ -373,38 +375,14 @@ export default async function AccountPage() {
               </div>
             </section>
 
-            <ProfileActivity latestAttended={latestAttended} years={yearActivity}>
-              {attendedHackathons.length ? (
-                attendedHackathons.map((hackathon) => {
-                  const tier = deriveAttendanceTrustTier(hackathon.sources ?? []);
+            <ProfileActivity latestAttended={latestAttended} years={yearActivity} />
 
-                  return (
-                    <article className="w-full rounded-xl bg-ivory dark:bg-white/5 p-4 sm:w-[320px]" key={hackathon.id}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-2">
-                          <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-cabernet dark:text-[#e4a3ab]" />
-                          <div className="min-w-0">
-                            <p className="font-semibold text-navy dark:text-wheat">{hackathon.hackathonName}</p>
-                            <p className="mt-1 text-sm text-navy/55 dark:text-wheat/55">
-                              {hackathon.attendedDays} attended day{hackathon.attendedDays === 1 ? "" : "s"}
-                              {hackathon.startsAt ? ` · ${dateToInputValue(hackathon.startsAt)}` : ""}
-                            </p>
-                            <p className="mt-1 flex items-center gap-1 text-sm text-navy/55 dark:text-wheat/55">
-                              <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
-                              <span>{[hackathon.city, hackathon.region, hackathon.country].filter(Boolean).join(", ") || "Location TBD"}</span>
-                            </p>
-                          </div>
-                        </div>
-                        <AttendanceTierBadge tier={tier} />
-                      </div>
-                      {tier !== "verified" ? <HackathonCheckinForm hackathonId={hackathon.id} /> : null}
-                    </article>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-navy/55 dark:text-wheat/55">Hackathons attended will appear here.</p>
-              )}
-            </ProfileActivity>
+            <section id="hackathons-attended" className="pb-2 pt-5">
+              <h2 className={sectionTitleClassName}>Hackathons attended</h2>
+              <div className="mt-4">
+                <AttendedHackathonsTable rows={attendedRows} />
+              </div>
+            </section>
           </div>
         </div>
       </div>

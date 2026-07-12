@@ -9,7 +9,7 @@ import {
   userHackathons,
   userHackathonVotes,
 } from "@/lib/db/schema";
-import { buildBadges, formatDateRange, formatDuration, formatLocationParts } from "@/lib/hackathons/card-format";
+import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
 import { getPrimarySourceByHackathon } from "@/lib/hackathons/source-badges";
 import type { HackathonSource } from "@/lib/hackathons/source-badges";
@@ -44,11 +44,8 @@ export type CatalogQuery = {
    plain string/number/boolean because it crosses the unstable_cache JSON
    boundary — dates are pre-formatted, no Date objects. */
 export type PublicHackathonCard = {
-  badges: string[];
   country: string | null;
   date: string;
-  description: string;
-  duration: string;
   hasDiscord: boolean;
   id: string;
   image: string | null;
@@ -57,7 +54,6 @@ export type PublicHackathonCard = {
   slug: string;
   source: HackathonSource | null;
   voteScore: number;
-  websiteUrl: string | null;
 };
 
 export type CatalogPage = {
@@ -95,14 +91,9 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       seriesId: hackathons.seriesId,
       name: hackathons.name,
       slug: hackathons.slug,
-      shortDescription: hackathons.shortDescription,
-      websiteUrl: hackathons.websiteUrl,
       imageUrl: hackathons.imageUrl,
       venue: hackathons.venue,
       format: hackathons.format,
-      status: hackathons.status,
-      beginnerFriendly: hackathons.beginnerFriendly,
-      travelReimbursement: hackathons.travelReimbursement,
       voteScore: hackathons.voteScore,
       city: hackathonLocations.city,
       region: hackathonLocations.region,
@@ -146,11 +137,8 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       const location = formatLocationParts(row);
 
       return {
-        badges: buildBadges(row),
         country: location.country,
         date: formatDateRange(row.startsAt, row.endsAt),
-        description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
-        duration: formatDuration(row.startsAt, row.endsAt, row.format),
         hasDiscord: discordHackathonIds.has(row.id),
         id: row.id,
         image: row.imageUrl,
@@ -159,7 +147,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         slug: row.slug,
         source: sourceByHackathon.get(row.id) ?? null,
         voteScore: row.voteScore,
-        websiteUrl: row.websiteUrl,
       };
     }),
     hasMore,

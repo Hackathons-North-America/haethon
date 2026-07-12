@@ -46,7 +46,6 @@ Recommended to fully wire the stack:
 - `DISCORD_CANADA_CATEGORY_ID`
 - `DISCORD_US_CATEGORY_ID`
 - `DISCORD_PAST_CATEGORY_ID`
-- `UPLOADTHING_TOKEN`
 - `CRON_SECRET`
 
 ## Neon Setup

@@ -29,18 +29,6 @@ function dateText(value: unknown) {
   }).format(date);
 }
 
-function durationText(startDate: string, endDate: string) {
-  if (!startDate && !endDate) {
-    return "Dates to be announced";
-  }
-
-  if (!startDate || startDate === endDate) {
-    return startDate || endDate;
-  }
-
-  return `${startDate} to ${endDate}`;
-}
-
 function locationText(payload: PreviewPayload) {
   const format = text(payload.format, "in_person");
 
@@ -57,37 +45,13 @@ function locationText(payload: PreviewPayload) {
   return "Location to be announced";
 }
 
-function badges(payload: PreviewPayload) {
-  const format = text(payload.format, "in_person");
-  const items = [format === "online" ? "online" : "in person"];
-
-  if (payload.beginnerFriendly === true || text(payload.beginnerFriendly) === "true") {
-    items.push("Beginner friendly");
-  }
-
-  if (payload.travelReimbursement === true || text(payload.travelReimbursement) === "true") {
-    items.push("Travel support");
-  }
-
-  const prizeAmountUsd = text(payload.prizeAmountUsd);
-
-  if (prizeAmountUsd) {
-    items.push(`$${prizeAmountUsd} prizes`);
-  }
-
-  return items;
-}
-
 export function previewPayloadToCard(payload: PreviewPayload, id = "admin-preview"): HackathonCardData {
   const name = text(payload.name, "Untitled hackathon");
   const startDate = dateText(payload.startDate);
   const endDate = dateText(payload.endDate);
 
   return {
-    badges: badges(payload),
     date: startDate || "Date to be announced",
-    description: text(payload.shortDescription, text(payload.websiteUrl, "No description provided.")),
-    duration: durationText(startDate, endDate),
     id,
     image: text(payload.imageUrl) || null,
     isSaved: false,
@@ -106,7 +70,7 @@ export function HackathonCardPreview({
   payload: PreviewPayload;
   previewId?: string;
 }) {
-  return <HackathonCard hackathon={previewPayloadToCard(payload, previewId)} index={0} preview />;
+  return <HackathonCard hackathon={previewPayloadToCard(payload, previewId)} preview />;
 }
 
 const knownFieldLabels: Record<string, string> = {

@@ -153,7 +153,6 @@ function AdminHackathonRow({
         <div className="xl:sticky xl:top-6 xl:self-start">
           <HackathonCard
             hackathon={{ ...previewPayloadToCard(previewPayload, item.id), isSaved: false, voteScore: item.voteScore }}
-            index={0}
             preview
           />
           <div className="mt-4 flex flex-wrap items-center gap-3">

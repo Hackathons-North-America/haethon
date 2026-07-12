@@ -179,6 +179,7 @@ export const hackathons = pgTable(
     index("hackathons_series_idx").on(table.seriesId),
     index("hackathons_status_idx").on(table.status),
     index("hackathons_format_idx").on(table.format),
+    index("hackathons_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
     uniqueIndex("hackathons_name_slug_idx").on(table.name, table.slug),
   ]
 );
@@ -200,6 +201,8 @@ export const hackathonLocations = pgTable(
   },
   (table) => [
     index("hackathon_locations_hackathon_idx").on(table.hackathonId),
+    uniqueIndex("hackathon_locations_hackathon_unique_idx").on(table.hackathonId),
+    index("hackathon_locations_country_idx").on(table.country),
     index("hackathon_locations_coordinates_idx").using("gist", table.coordinates),
   ]
 );
@@ -219,6 +222,7 @@ export const hackathonDates = pgTable(
   },
   (table) => [
     index("hackathon_dates_hackathon_idx").on(table.hackathonId),
+    uniqueIndex("hackathon_dates_hackathon_unique_idx").on(table.hackathonId),
     index("hackathon_dates_start_idx").on(table.startsAt),
   ]
 );
@@ -339,6 +343,9 @@ export const reminders = pgTable(
   },
   (table) => [
     index("reminders_due_idx").on(table.scheduledFor),
+    index("reminders_pending_due_idx")
+      .on(table.channel, table.scheduledFor)
+      .where(sql`${table.sentAt} is null`),
     index("reminders_user_hackathon_idx").on(table.userId, table.hackathonId),
     uniqueIndex("reminders_pending_delivery_unique_idx")
       .on(table.userId, table.hackathonId, table.type, table.channel, table.scheduledFor)
@@ -462,18 +469,22 @@ export const hackathonSubmissions = pgTable(
   ]
 );
 
-export const organizerClaims = pgTable("organizer_claims", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  hackathonId: uuid("hackathon_id")
-    .notNull()
-    .references(() => hackathons.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  message: text("message"),
-  status: importStatusEnum("status").notNull().default("pending"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const organizerClaims = pgTable(
+  "organizer_claims",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    message: text("message"),
+    status: importStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("organizer_claims_user_status_hackathon_idx").on(table.userId, table.status, table.hackathonId)]
+);
 
 export const sponsorLeads = pgTable("sponsor_leads", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -548,7 +559,7 @@ export const hackathonResults = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    index("hackathon_results_user_idx").on(table.userId),
+    index("hackathon_results_user_hackathon_idx").on(table.userId, table.hackathonId),
     index("hackathon_results_hackathon_idx").on(table.hackathonId),
   ]
 );

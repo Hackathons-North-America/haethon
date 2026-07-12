@@ -16,7 +16,7 @@ import {
   userHackathons,
   userProfiles,
 } from "@/lib/db/schema";
-import { buildBadges, formatDateRange, formatDuration, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
+import { formatDateRange, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
 import { getPrimarySourceByHackathon } from "@/lib/hackathons/source-badges";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 
@@ -115,14 +115,9 @@ export default async function DashboardPage() {
       id: hackathons.id,
       name: hackathons.name,
       slug: hackathons.slug,
-      shortDescription: hackathons.shortDescription,
-      websiteUrl: hackathons.websiteUrl,
       imageUrl: hackathons.imageUrl,
       venue: hackathons.venue,
       format: hackathons.format,
-      status: hackathons.status,
-      beginnerFriendly: hackathons.beginnerFriendly,
-      travelReimbursement: hackathons.travelReimbursement,
       voteScore: hackathons.voteScore,
       city: hackathonLocations.city,
       region: hackathonLocations.region,
@@ -152,11 +147,8 @@ export default async function DashboardPage() {
     const location = formatLocationParts(row);
 
     return {
-      badges: buildBadges(row),
       country: location.country,
       date: formatDateRange(row.startsAt, row.endsAt),
-      description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
-      duration: formatDuration(row.startsAt, row.endsAt, row.format),
       id: row.id,
       image: row.imageUrl,
       isSaved: false,
@@ -166,7 +158,6 @@ export default async function DashboardPage() {
       source: suggestionSourceByHackathon.get(row.id) ?? null,
       userVote: 0,
       voteScore: row.voteScore,
-      websiteUrl: row.websiteUrl,
     };
   });
 
@@ -308,8 +299,8 @@ export default async function DashboardPage() {
               </Link>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-              {suggestions.map((hackathon, index) => (
-                <HackathonCard hackathon={hackathon} index={index} key={hackathon.id} />
+              {suggestions.map((hackathon) => (
+                <HackathonCard hackathon={hackathon} key={hackathon.id} />
               ))}
             </div>
           </section>

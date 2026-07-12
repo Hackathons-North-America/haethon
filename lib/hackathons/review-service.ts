@@ -139,8 +139,10 @@ export async function isVerifiedOrganizerForOrganization(userId: string, role: s
   return Boolean(membership);
 }
 
-export async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
-  const rows = await db
+type DuplicateCandidate = { id: string; name: string; websiteUrl: string | null };
+
+async function listDuplicateCandidates(): Promise<DuplicateCandidate[]> {
+  return db
     .select({
       id: hackathons.id,
       name: hackathons.name,
@@ -149,6 +151,12 @@ export async function findBestDuplicate(payload: { name: string; websiteUrl?: st
     .from(hackathons)
     .orderBy(desc(hackathons.createdAt))
     .limit(100);
+}
+
+function findBestDuplicateInCandidates(
+  payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null },
+  rows: DuplicateCandidate[]
+) {
 
   let best: { id: string; score: number } | null = null;
 
@@ -167,6 +175,10 @@ export async function findBestDuplicate(payload: { name: string; websiteUrl?: st
   }
 
   return best && best.score >= 0.55 ? best : null;
+}
+
+export async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
+  return findBestDuplicateInCandidates(payload, await listDuplicateCandidates());
 }
 
 export async function createPublishedHackathon(
@@ -505,10 +517,11 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
     sourceUrl: string;
     submissionId: string;
   }> = [];
+  const duplicateCandidates = await listDuplicateCandidates();
 
   for (const [index, item] of input.items.entries()) {
     const payload = deriveFixPayload(item, index);
-    const duplicate = await findBestDuplicate(payload);
+    const duplicate = findBestDuplicateInCandidates(payload, duplicateCandidates);
     const duplicateScore = Number((duplicate?.score ?? 0).toFixed(2));
 
     const [submission] = await db
@@ -558,10 +571,11 @@ export async function importAdminHackathons(input: { payloads: AdminHackathonImp
     status: "imported" | "duplicate_queued";
     submissionId: string;
   }> = [];
+  const duplicateCandidates = await listDuplicateCandidates();
 
   for (const [index, rawPayload] of input.payloads.entries()) {
     const payload = payloadWithValidOrganizationId(rawPayload);
-    const duplicate = await findBestDuplicate(payload);
+    const duplicate = findBestDuplicateInCandidates(payload, duplicateCandidates);
     const duplicateScore = Number((duplicate?.score ?? 0).toFixed(2));
 
     if (duplicate) {
@@ -595,6 +609,7 @@ export async function importAdminHackathons(input: { payloads: AdminHackathonImp
 
     // Do not create the Discord channel yet — the admin approves that separately.
     const hackathonId = await createPublishedHackathon(payload, { syncDiscord: false });
+    duplicateCandidates.unshift({ id: hackathonId, name: payload.name, websiteUrl: payload.websiteUrl });
     const discord = await previewHackathonDiscordChannel(hackathonId);
     const [submission] = await db
       .insert(hackathonSubmissions)

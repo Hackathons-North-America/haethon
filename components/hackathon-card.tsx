@@ -13,14 +13,10 @@ import type { HackathonSource } from "@/lib/hackathons/source-badges";
 import { filmGrainClassName } from "@/lib/tailwind";
 
 type Vote = -1 | 0 | 1;
-type Rgb = [number, number, number];
 
 export type HackathonCardData = {
-  badges?: string[];
   country?: string | null;
   date: string;
-  description: string;
-  duration: string;
   hasDiscord?: boolean;
   id: string;
   image?: string | null;
@@ -33,7 +29,6 @@ export type HackathonCardData = {
   source?: HackathonSource | null;
   userVote: Vote;
   voteScore: number;
-  websiteUrl?: string | null;
 };
 
 /* Human labels for the provenance badge. mlh/devpost read as their brand; the
@@ -96,8 +91,8 @@ function getInitials(name: string) {
     .join("");
 }
 
-function getFallbackAccentRgb(name: string): Rgb {
-  const palette: Rgb[] = [
+function getAccentStyle(name: string) {
+  const palette = [
     [102, 0, 0],
     [217, 4, 61],
     [31, 93, 135],
@@ -105,241 +100,13 @@ function getFallbackAccentRgb(name: string): Rgb {
     [138, 83, 18],
     [86, 64, 148],
     [160, 62, 43],
-  ];
+  ] as const;
   const hash = Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0);
-
-  return palette[hash % palette.length] ?? palette[0];
-}
-
-/* Pull every accent into a common band so no single logo reads louder than the
-   rest. Capping luminance alone doesn't work: the luminance formula scores red
-   very low, so saturated reds/oranges slip under any cap and still shout. We
-   instead cap both lightness and saturation in HSL — keeping the hue, so a
-   bright or vivid color becomes a deep, muted version of itself while an
-   already-calm color is barely touched. */
-const MAX_ACCENT_LIGHTNESS = 0.32;
-const MAX_ACCENT_SATURATION = 0.5;
-
-function rgbToHsl(rgb: Rgb): [number, number, number] {
-  const r = rgb[0] / 255;
-  const g = rgb[1] / 255;
-  const b = rgb[2] / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const lightness = (max + min) / 2;
-  const delta = max - min;
-
-  if (delta === 0) {
-    return [0, 0, lightness];
-  }
-
-  const saturation = delta / (1 - Math.abs(2 * lightness - 1));
-  let hue: number;
-
-  if (max === r) {
-    hue = ((g - b) / delta) % 6;
-  } else if (max === g) {
-    hue = (b - r) / delta + 2;
-  } else {
-    hue = (r - g) / delta + 4;
-  }
-
-  hue *= 60;
-  if (hue < 0) {
-    hue += 360;
-  }
-
-  return [hue, saturation, lightness];
-}
-
-function hslToRgb(hue: number, saturation: number, lightness: number): Rgb {
-  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = lightness - c / 2;
-
-  let rp = 0;
-  let gp = 0;
-  let bp = 0;
-
-  if (hue < 60) {
-    [rp, gp, bp] = [c, x, 0];
-  } else if (hue < 120) {
-    [rp, gp, bp] = [x, c, 0];
-  } else if (hue < 180) {
-    [rp, gp, bp] = [0, c, x];
-  } else if (hue < 240) {
-    [rp, gp, bp] = [0, x, c];
-  } else if (hue < 300) {
-    [rp, gp, bp] = [x, 0, c];
-  } else {
-    [rp, gp, bp] = [c, 0, x];
-  }
-
-  return [
-    Math.round((rp + m) * 255),
-    Math.round((gp + m) * 255),
-    Math.round((bp + m) * 255),
-  ];
-}
-
-function normalizeAccentRgb(rgb: Rgb): Rgb {
-  const [hue, saturation, lightness] = rgbToHsl(rgb);
-
-  return hslToRgb(
-    hue,
-    Math.min(saturation, MAX_ACCENT_SATURATION),
-    Math.min(lightness, MAX_ACCENT_LIGHTNESS),
-  );
-}
-
-/* The inline Tailwind aurora gradients read this per-card accent variable. */
-function getAccentStyle(rgb: Rgb) {
-  const [r, g, b] = normalizeAccentRgb(rgb);
+  const [r, g, b] = palette[hash % palette.length] ?? palette[0];
 
   return {
     "--hackathon-accent-rgb": `${r} ${g} ${b}`,
   } as CSSProperties & { "--hackathon-accent-rgb": string };
-}
-
-function findProminentColor(image: HTMLImageElement): Rgb | null {
-  const canvas = document.createElement("canvas");
-  const size = 32;
-  canvas.width = size;
-  canvas.height = size;
-
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) {
-    return null;
-  }
-
-  try {
-    context.drawImage(image, 0, 0, size, size);
-    const pixels = context.getImageData(0, 0, size, size).data;
-    const buckets = new Map<string, { b: number; count: number; g: number; r: number; score: number }>();
-
-    for (let index = 0; index < pixels.length; index += 4) {
-      const alpha = pixels[index + 3] / 255;
-      if (alpha < 0.45) {
-        continue;
-      }
-
-      const r = pixels[index];
-      const g = pixels[index + 1];
-      const b = pixels[index + 2];
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const saturation = max === 0 ? 0 : (max - min) / max;
-      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-      if (luminance > 245 || luminance < 12 || (saturation < 0.12 && (luminance > 210 || luminance < 45))) {
-        continue;
-      }
-
-      const bucketR = Math.round(r / 32) * 32;
-      const bucketG = Math.round(g / 32) * 32;
-      const bucketB = Math.round(b / 32) * 32;
-      const key = `${bucketR},${bucketG},${bucketB}`;
-      const score = alpha * (0.55 + saturation) * (luminance > 225 ? 0.45 : 1);
-      const bucket = buckets.get(key) ?? { b: 0, count: 0, g: 0, r: 0, score: 0 };
-
-      bucket.r += r;
-      bucket.g += g;
-      bucket.b += b;
-      bucket.count += 1;
-      bucket.score += score;
-      buckets.set(key, bucket);
-    }
-
-    const best = Array.from(buckets.values()).sort((a, b) => b.score - a.score)[0];
-    if (!best) {
-      return null;
-    }
-
-    return [
-      Math.round(best.r / best.count),
-      Math.round(best.g / best.count),
-      Math.round(best.b / best.count),
-    ];
-  } catch {
-    return null;
-  }
-}
-
-/* Session-wide accent caches so each logo is decoded and sampled at most once,
-   no matter how often cards remount across pages. Results (including failed
-   samples, stored as null) land in accentCache; accentPending dedupes
-   concurrent mounts of the same src so only the first one runs the canvas
-   work while the rest await its promise. */
-const accentCache = new Map<string, Rgb | null>();
-const accentPending = new Map<string, Promise<Rgb | null>>();
-
-function sampleLogoAccent(src: string): Promise<Rgb | null> {
-  if (accentCache.has(src)) {
-    return Promise.resolve(accentCache.get(src) ?? null);
-  }
-
-  const pending = accentPending.get(src);
-  if (pending) {
-    return pending;
-  }
-
-  const promise = new Promise<Rgb | null>((resolve) => {
-    const image = new window.Image();
-
-    /* Same-origin proxy URLs don't need CORS; absolute URLs do, or the
-       canvas is tainted and getImageData throws. */
-    if (!src.startsWith("/")) {
-      image.crossOrigin = "anonymous";
-    }
-    image.decoding = "async";
-    image.onload = () => resolve(findProminentColor(image));
-    image.onerror = () => resolve(null);
-    image.src = src;
-  }).then((rgb) => {
-    accentCache.set(src, rgb);
-    accentPending.delete(src);
-
-    return rgb;
-  });
-
-  accentPending.set(src, promise);
-
-  return promise;
-}
-
-function useLogoAccentRgb(src: string | null | undefined, fallbackRgb: Rgb) {
-  const [sampledColor, setSampledColor] = useState<{ rgb: Rgb; src: string } | null>(() => {
-    const cached = src ? accentCache.get(src) : undefined;
-
-    return cached && src ? { rgb: cached, src } : null;
-  });
-
-  useEffect(() => {
-    if (!src) {
-      return;
-    }
-
-    let canceled = false;
-
-    /* sampleLogoAccent resolves straight from the module cache when this src
-       was already sampled (by this or another card), so this never redoes
-       canvas work — it just syncs state on the microtask after render. */
-    void sampleLogoAccent(src).then((rgb) => {
-      if (!canceled && rgb) {
-        setSampledColor((current) => (current?.src === src ? current : { rgb, src }));
-      }
-    });
-
-    return () => {
-      canceled = true;
-    };
-  }, [src]);
-
-  if (sampledColor && sampledColor.src === src) {
-    return sampledColor.rgb;
-  }
-
-  return fallbackRgb;
 }
 
 function BookmarkButton({
@@ -765,25 +532,17 @@ export function HackathonCard({
      trash button on the My Hackathons board). Sits above the full-card link. */
   cornerAction?: ReactNode;
   hackathon: HackathonCardData;
-  index: number;
   preview?: boolean;
   /* When set, the footer swaps the vote/save controls for an inline reminder
      picker that expands below the card — used on the My Hackathons board. */
   reminder?: HackathonCardReminder;
 }) {
-  const fallbackRgb = useMemo(() => getFallbackAccentRgb(hackathon.name), [hackathon.name]);
-  /* Logos are served through our own origin so their pixels stay readable on
-     canvas — most logo CDNs don't send CORS headers, which used to force the
-     card back to the name-hash accent. Previews aren't in the DB yet, so they
-     keep the raw URL. */
+  const accentStyle = useMemo(() => getAccentStyle(hackathon.name), [hackathon.name]);
   const logoSrc = hackathon.image
     ? preview
       ? hackathon.image
       : `/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`
     : null;
-  const accentRgb = useLogoAccentRgb(logoSrc, fallbackRgb);
-  const accentStyle = useMemo(() => getAccentStyle(accentRgb), [accentRgb]);
-
   return (
     <article
       className={`group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-navy/10 bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.1),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.1)),radial-gradient(circle_130px_at_10%_8%,rgb(178_142_100_/_0.05),transparent_72%),radial-gradient(circle_150px_at_65%_130%,rgb(178_142_100_/_0.05),transparent_72%),linear-gradient(160deg,#ffffff_0%,#f7f3ea_100%)] shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out hover:z-10 hover:scale-105 after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.08),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.08))] after:opacity-0 after:transition-opacity after:duration-[450ms] after:ease-out after:content-[''] group-hover:after:opacity-100 group-focus-within:after:opacity-100 dark:border-white/10 dark:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.14),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.14)),radial-gradient(circle_130px_at_10%_8%,rgb(178_142_100_/_0.07),transparent_72%),radial-gradient(circle_150px_at_65%_130%,rgb(178_142_100_/_0.07),transparent_72%),linear-gradient(160deg,#181a19_0%,#0f1110_100%)] dark:shadow-[0_18px_45px_rgb(0_0_0/0.5)] dark:after:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.1),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.1))] ${
@@ -797,15 +556,6 @@ export function HackathonCard({
           className="absolute inset-0 z-[1]"
           draggable={false}
           href={`/hackathons/${hackathon.slug}`}
-        />
-      ) : hackathon.websiteUrl && !preview ? (
-        <a
-          aria-label={`Visit ${hackathon.name} website`}
-          className="absolute inset-0 z-[1]"
-          draggable={false}
-          href={hackathon.websiteUrl}
-          rel="noopener noreferrer"
-          target="_blank"
         />
       ) : null}
       {/* Film grain keeps the aurora tactile, matching the hero. */}

@@ -16,13 +16,7 @@ import {
   userHackathonNotificationPreferences,
   userHackathons,
 } from "@/lib/db/schema";
-import {
-  buildBadges,
-  formatDateRange,
-  formatDuration,
-  formatLocation,
-  formatLocationParts,
-} from "@/lib/hackathons/card-format";
+import { formatDateRange, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
 import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
 import { getPrimarySourceByHackathon } from "@/lib/hackathons/source-badges";
 import type { HackathonSource } from "@/lib/hackathons/source-badges";
@@ -47,14 +41,9 @@ type PipelineRow = {
   seriesId: string | null;
   hackathonName: string;
   slug: string;
-  shortDescription: string | null;
-  websiteUrl: string | null;
   imageUrl: string | null;
   venue: string | null;
   format: "online" | "in_person";
-  status: string;
-  beginnerFriendly: boolean;
-  travelReimbursement: boolean;
   voteScore: number;
   city: string | null;
   region: string | null;
@@ -78,12 +67,8 @@ function toCardData(row: PipelineRow, hasDiscord: boolean, source: HackathonSour
   const location = formatLocationParts(row);
 
   return {
-    badges: buildBadges(row),
     country: location.country,
     date: formatDateRange(row.startsAt, row.endsAt),
-    description:
-      row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
-    duration: formatDuration(row.startsAt, row.endsAt, row.format),
     hasDiscord,
     id: row.hackathonId,
     image: row.imageUrl,
@@ -94,7 +79,6 @@ function toCardData(row: PipelineRow, hasDiscord: boolean, source: HackathonSour
     source,
     userVote: 0,
     voteScore: row.voteScore,
-    websiteUrl: row.websiteUrl,
   };
 }
 
@@ -116,14 +100,9 @@ export default async function MyHackathonsPage() {
       seriesId: hackathons.seriesId,
       hackathonName: hackathons.name,
       slug: hackathons.slug,
-      shortDescription: hackathons.shortDescription,
-      websiteUrl: hackathons.websiteUrl,
       imageUrl: hackathons.imageUrl,
       venue: hackathons.venue,
       format: hackathons.format,
-      status: hackathons.status,
-      beginnerFriendly: hackathons.beginnerFriendly,
-      travelReimbursement: hackathons.travelReimbursement,
       voteScore: hackathons.voteScore,
       city: hackathonLocations.city,
       region: hackathonLocations.region,

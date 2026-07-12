@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { CalendarDays } from "lucide-react";
 
 export type ActivityWeek = { key: string; count: number };
@@ -30,11 +30,9 @@ function formatChartDate(value: string | undefined) {
 export function ProfileActivity({
   years,
   latestAttended,
-  children,
 }: {
   years: YearActivity[];
   latestAttended: LatestAttended;
-  children?: ReactNode;
 }) {
   const [selectedYear, setSelectedYear] = useState(years[0]?.year);
   const active = years.find((year) => year.year === selectedYear) ?? years[0];
@@ -115,13 +113,6 @@ export function ProfileActivity({
             <span className="font-semibold text-navy dark:text-wheat">{latestAttended.name}</span>
             {latestAttended.dateLabel ? ` · ${latestAttended.dateLabel}` : ""}
           </span>
-        </div>
-      ) : null}
-
-      {children ? (
-        <div className="mt-6 pt-6">
-          <h3 className={sectionTitleClassName}>Hackathons attended</h3>
-          <div className="mt-4 flex flex-wrap gap-3">{children}</div>
         </div>
       ) : null}
     </section>

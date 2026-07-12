@@ -341,8 +341,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
                 className="object-contain p-2.5"
                 fill
                 sizes="80px"
-                src={hackathon.imageUrl}
-                unoptimized
+                src={`/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`}
               />
             ) : (
               <span className="text-xl font-semibold text-cabernet dark:text-[#e4a3ab]">{getInitials(hackathon.name) || "HN"}</span>

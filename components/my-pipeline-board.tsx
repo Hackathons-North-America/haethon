@@ -189,7 +189,6 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
                       />
                     }
                     hackathon={item.card}
-                    index={index}
                     key={item.userHackathonId}
                     reminder={item.reminder}
                   />
