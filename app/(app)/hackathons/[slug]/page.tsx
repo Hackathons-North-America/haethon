@@ -382,47 +382,6 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        <section className="mt-8 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">Your status</h2>
-          <p className="mt-2 text-sm text-navy/55 dark:text-wheat/55">
-            Set where you are with this hackathon and we&apos;ll remind you about the right deadlines — applications,
-            acceptance, and check-in.
-          </p>
-          <div className="mt-4">
-            {user ? (
-              <HackathonStatusTracker
-                hackathonId={hackathon.id}
-                initialStatus={tracked?.applicationStatus ?? null}
-              />
-            ) : (
-              <Link
-                className="inline-flex rounded-full min-h-10 items-center justify-center border border-cabernet dark:border-[#e4a3ab]/50 px-5 text-sm font-semibold text-cabernet dark:text-[#e4a3ab] transition-colors hover:bg-cabernet hover:text-wheat"
-                href="/sign-in"
-              >
-                Sign in to track this hackathon
-              </Link>
-            )}
-          </div>
-          {user && notificationPreferences.length ? (
-            <HackathonNotificationPreferences
-              hackathonId={hackathon.id}
-              initialPreferences={notificationPreferences}
-            />
-          ) : null}
-          {upcomingReminders.length ? (
-            <ul className="mt-5 space-y-2 border-t border-navy/10 dark:border-white/10 pt-4">
-              {upcomingReminders.map((reminder) => (
-                <li className="flex items-center gap-2 text-sm text-navy/70 dark:text-wheat/70" key={reminder.id}>
-                  <BellRing aria-hidden="true" className="size-3.5 shrink-0 text-cabernet dark:text-[#e4a3ab]" />
-                  <span>
-                    {reminderTypeLabels[reminder.type] ?? reminder.type} · {formatReminderDate(reminder.scheduledFor)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-
         <div className="mt-8 flex flex-wrap gap-3">
           {hackathon.startsAt ? (
             <AddToCalendarButton
@@ -474,6 +433,47 @@ export default async function HackathonDetailPage({ params }: PageProps) {
             </a>
           ) : null}
         </div>
+
+        <section className="mt-8 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">Your status</h2>
+          <p className="mt-2 text-sm text-navy/55 dark:text-wheat/55">
+            Set where you are with this hackathon and we&apos;ll remind you about the right deadlines — applications,
+            acceptance, and check-in.
+          </p>
+          <div className="mt-4">
+            {user ? (
+              <HackathonStatusTracker
+                hackathonId={hackathon.id}
+                initialStatus={tracked?.applicationStatus ?? null}
+              />
+            ) : (
+              <Link
+                className="inline-flex rounded-full min-h-10 items-center justify-center border border-cabernet dark:border-[#e4a3ab]/50 px-5 text-sm font-semibold text-cabernet dark:text-[#e4a3ab] transition-colors hover:bg-cabernet hover:text-wheat"
+                href="/sign-in"
+              >
+                Sign in to track this hackathon
+              </Link>
+            )}
+          </div>
+          {user && notificationPreferences.length ? (
+            <HackathonNotificationPreferences
+              hackathonId={hackathon.id}
+              initialPreferences={notificationPreferences}
+            />
+          ) : null}
+          {upcomingReminders.length ? (
+            <ul className="mt-5 space-y-2 border-t border-navy/10 dark:border-white/10 pt-4">
+              {upcomingReminders.map((reminder) => (
+                <li className="flex items-center gap-2 text-sm text-navy/70 dark:text-wheat/70" key={reminder.id}>
+                  <BellRing aria-hidden="true" className="size-3.5 shrink-0 text-cabernet dark:text-[#e4a3ab]" />
+                  <span>
+                    {reminderTypeLabels[reminder.type] ?? reminder.type} · {formatReminderDate(reminder.scheduledFor)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
       </div>
     </main>
   );

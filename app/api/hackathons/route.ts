@@ -190,6 +190,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     data: rows.map((row) => ({
       badges: buildBadges(row),
+      country: row.format === "online" ? null : row.country,
       date: formatDateRange(row.startsAt, row.endsAt),
       description: row.shortDescription ?? "Event details are being verified by the Hackathons North America team.",
       duration: formatDuration(row.startsAt, row.endsAt, row.format),

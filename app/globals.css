@@ -85,7 +85,7 @@ select {
 .app-shell-wipe {
   align-items: center;
   animation: app-shell-wipe 0.7s cubic-bezier(0.76, 0, 0.24, 1) 0.08s both;
-  background: linear-gradient(105deg, #5c151c 0%, #721c24 55%, #8a2830 100%);
+  background: #000000;
   display: flex;
   inset: 0;
   justify-content: center;
@@ -352,86 +352,34 @@ select {
   }
 }
 
-/* ---------- App atmosphere ----------
-   Faint version of the hero's aurora for the app shell. Layers are static
-   (no animation) so the workspace stays calm; the .dark overrides deepen
-   the wash into the night-sky look from the landing hero. */
-
-.app-atmosphere-wash {
-  background: radial-gradient(
-    115% 75% at 50% 0%,
-    rgb(244 235 217 / 0.4) 0%,
-    transparent 65%
-  );
-}
-
-.dark .app-atmosphere-wash {
-  background: radial-gradient(
-    120% 85% at 50% 0%,
-    rgb(16 23 34 / 0.7) 0%,
-    transparent 70%
-  );
-}
-
-.app-atmosphere-aurora {
-  background:
-    radial-gradient(ellipse 60% 50% at 70% 35%, rgb(45 74 34 / 0.1), transparent 68%),
-    radial-gradient(ellipse 50% 45% at 88% 55%, rgb(70 120 110 / 0.08), transparent 65%),
-    radial-gradient(ellipse 45% 40% at 55% 25%, rgb(114 28 36 / 0.07), transparent 70%),
-    radial-gradient(ellipse 35% 30% at 40% 70%, rgb(29 42 68 / 0.06), transparent 60%);
-  filter: blur(48px);
-}
-
-.dark .app-atmosphere-aurora {
-  background:
-    radial-gradient(ellipse 60% 50% at 70% 35%, rgb(45 74 34 / 0.38), transparent 68%),
-    radial-gradient(ellipse 50% 45% at 88% 55%, rgb(70 120 110 / 0.26), transparent 65%),
-    radial-gradient(ellipse 45% 40% at 55% 25%, rgb(114 28 36 / 0.2), transparent 70%),
-    radial-gradient(ellipse 35% 30% at 40% 70%, rgb(29 42 68 / 0.28), transparent 60%);
-}
-
-.app-atmosphere-glow {
-  background:
-    radial-gradient(ellipse 55% 45% at 30% 35%, rgb(70 120 110 / 0.07), transparent 66%),
-    radial-gradient(ellipse 45% 40% at 15% 60%, rgb(45 74 34 / 0.06), transparent 68%);
-  filter: blur(52px);
-}
-
-.dark .app-atmosphere-glow {
-  background:
-    radial-gradient(ellipse 55% 45% at 30% 35%, rgb(70 120 110 / 0.2), transparent 66%),
-    radial-gradient(ellipse 45% 40% at 15% 60%, rgb(45 74 34 / 0.22), transparent 68%),
-    radial-gradient(ellipse 38% 32% at 42% 22%, rgb(29 42 68 / 0.26), transparent 62%);
-}
-
 /* ---------- Hackathon card aurora ----------
    Card surface painted from --hackathon-accent-rgb (sampled from the event
    logo). Light theme reads as a pale daylight sky; dark theme becomes a
    night-sky aurora — accent curtain up top, boreal/teal/navy glows below.
    A ::after overlay carries a stronger pass that fades in on hover. */
 
+/* Diagonal sheen painted from the logo's primary color (sampled into
+   --hackathon-accent-rgb), with a uniform low transparency across all cards so
+   no single logo reads louder than the rest — tuned to the calm Backblaze card. */
 .hackathon-card-aurora {
   background:
-    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.16), transparent 42%),
-    radial-gradient(90% 70% at 88% 12%, rgb(70 120 110 / 0.1), transparent 50%),
-    radial-gradient(80% 60% at 70% 100%, rgb(45 74 34 / 0.07), transparent 55%),
+    linear-gradient(to bottom left, rgb(var(--hackathon-accent-rgb) / 0.1), transparent 45%, transparent 55%, rgb(var(--hackathon-accent-rgb) / 0.1)),
+    radial-gradient(circle 130px at 10% 8%, rgb(178 142 100 / 0.05), transparent 72%),
+    radial-gradient(circle 150px at 65% 130%, rgb(178 142 100 / 0.05), transparent 72%),
     linear-gradient(160deg, #ffffff 0%, #f7f3ea 100%);
 }
 
 .dark .hackathon-card-aurora {
   background:
-    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.34), transparent 48%),
-    linear-gradient(115deg, transparent 24%, rgb(var(--hackathon-accent-rgb) / 0.08) 40%, transparent 62%),
-    radial-gradient(90% 75% at 85% 8%, rgb(70 120 110 / 0.28), transparent 52%),
-    radial-gradient(85% 70% at 75% 96%, rgb(45 74 34 / 0.26), transparent 58%),
-    radial-gradient(70% 55% at 28% 82%, rgb(29 42 68 / 0.3), transparent 60%),
+    linear-gradient(to bottom left, rgb(var(--hackathon-accent-rgb) / 0.14), transparent 45%, transparent 55%, rgb(var(--hackathon-accent-rgb) / 0.14)),
+    radial-gradient(circle 130px at 10% 8%, rgb(178 142 100 / 0.07), transparent 72%),
+    radial-gradient(circle 150px at 65% 130%, rgb(178 142 100 / 0.07), transparent 72%),
     linear-gradient(160deg, #181a19 0%, #0f1110 100%);
 }
 
 .hackathon-card-aurora::after {
   background:
-    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.12), transparent 46%),
-    radial-gradient(90% 70% at 88% 12%, rgb(70 120 110 / 0.1), transparent 52%);
+    linear-gradient(to bottom left, rgb(var(--hackathon-accent-rgb) / 0.08), transparent 45%, transparent 55%, rgb(var(--hackathon-accent-rgb) / 0.08));
   content: "";
   inset: 0;
   opacity: 0;
@@ -442,9 +390,7 @@ select {
 
 .dark .hackathon-card-aurora::after {
   background:
-    radial-gradient(120% 90% at 14% 0%, rgb(var(--hackathon-accent-rgb) / 0.2), transparent 50%),
-    radial-gradient(90% 75% at 85% 8%, rgb(70 120 110 / 0.18), transparent 54%),
-    radial-gradient(85% 70% at 75% 96%, rgb(45 74 34 / 0.16), transparent 60%);
+    linear-gradient(to bottom left, rgb(var(--hackathon-accent-rgb) / 0.1), transparent 45%, transparent 55%, rgb(var(--hackathon-accent-rgb) / 0.1));
 }
 
 .hackathon-card-aurora:hover::after,
