@@ -44,6 +44,29 @@ function importReason(payload: Record<string, unknown>) {
   return value(payload, "importReason") || value(payload, "reason");
 }
 
+// Maps the payload's field keys to the labels the reviewer sees on the form, so
+// a validation error names "start date" rather than the raw "startDate" key.
+const reviewFieldLabels: Record<string, string> = {
+  name: "name",
+  organizationName: "organization",
+  websiteUrl: "website URL",
+  imageUrl: "image URL",
+  sourceUrl: "source URL",
+  applicationUrl: "application URL",
+  city: "city",
+  region: "region",
+  country: "country",
+  venue: "venue",
+  startDate: "start date",
+  endDate: "end date",
+  applicationOpensAt: "applications open",
+  applicationClosesAt: "applications close",
+  acceptanceAt: "acceptance",
+  format: "format",
+  shortDescription: "description",
+  prizeAmountUsd: "prize",
+};
+
 export function submissionReviewErrorMessage(error: unknown) {
   if (typeof error === "string") {
     return error;
@@ -54,14 +77,15 @@ export function submissionReviewErrorMessage(error: unknown) {
       fieldErrors?: Record<string, string[] | undefined>;
       formErrors?: string[];
     };
-    const [field, issues] = Object.entries(fieldErrors ?? {}).find(([, issues]) => issues?.length) ?? [];
+    const fields = Object.keys(fieldErrors ?? {}).filter((field) => fieldErrors?.[field]?.length);
 
-    if (field && issues) {
-      if (field === "rejectionReason") {
-        return "Enter a rejection reason of at least 3 characters before rejecting.";
-      }
+    if (fields.includes("rejectionReason")) {
+      return "Enter a rejection reason of at least 3 characters before rejecting.";
+    }
 
-      return `${field}: ${issues[0]}`;
+    if (fields.length) {
+      const labels = fields.map((field) => reviewFieldLabels[field] ?? field);
+      return `Fill in these fields before approving: ${labels.join(", ")}.`;
     }
 
     if (formErrors?.[0]) {

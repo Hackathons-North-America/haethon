@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
+
+import { DiscordIcon } from "@/components/discord-icon";
 import {
   Building2,
   CalendarDays,
@@ -86,6 +88,18 @@ export function AppSidebar({
           );
         })}
       </nav>
+
+      <div className="px-3 pb-3 lg:px-3">
+        <Link
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#5865F2] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#4752c4]"
+          href="https://discord.gg/wcNfUUVgqe"
+          rel="noreferrer"
+          target="_blank"
+        >
+          Join our Discord
+          <DiscordIcon className="h-4 w-auto" />
+        </Link>
+      </div>
 
       {!isSignedIn ? (
         <div className="hidden px-5 pb-6 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:block">

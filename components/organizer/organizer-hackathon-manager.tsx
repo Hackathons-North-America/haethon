@@ -123,7 +123,7 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
   }
 
   return (
-    <section className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-5">
+    <section className="rounded-xl p-5">
       <h3 className={panelTitleClassName}>
         <KeyRound aria-hidden="true" className="size-4" />
         Attendance check-in code
@@ -288,7 +288,7 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
   const selectable = attendees?.filter((attendee) => attendee.tier === "self_reported") ?? [];
 
   return (
-    <section className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-5">
+    <section className="rounded-xl p-5">
       <h3 className={panelTitleClassName}>
         <Users aria-hidden="true" className="size-4" />
         Attendees
@@ -439,7 +439,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
   }
 
   return (
-    <article className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06]">
+    <article className="rounded-xl">
       <button
         aria-expanded={open}
         className="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left"
@@ -711,7 +711,7 @@ export function OrganizerHackathonManager({
 
   if (!current.length && !past.length) {
     return (
-      <p className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6 text-sm leading-6 text-navy/55 dark:text-wheat/55">
+      <p className="rounded-xl p-6 text-sm leading-6 text-navy/55 dark:text-wheat/55">
         No hackathons are linked to your organizer account yet. Submit your hackathon from the{" "}
         <a className="font-semibold text-cabernet dark:text-[#e4a3ab] underline-offset-4 hover:underline" href="/submit">
           submit page
@@ -752,7 +752,7 @@ export function OrganizerHackathonManager({
       ) : null}
 
       {normalizedQuery && !filteredCurrent.length && !filteredPast.length ? (
-        <p className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6 text-sm text-navy/55 dark:text-wheat/55">
+        <p className="rounded-xl p-6 text-sm text-navy/55 dark:text-wheat/55">
           No hackathons match &ldquo;{query}&rdquo;.
         </p>
       ) : null}

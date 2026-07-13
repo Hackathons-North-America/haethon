@@ -21,7 +21,7 @@ export function OrganizerPreview({ hackathons }: { hackathons: OrganizerHackatho
 
   if (!hackathons.length) {
     return (
-      <p className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6 text-sm leading-6 text-navy/55 dark:text-wheat/55">
+      <p className="rounded-xl p-6 text-sm leading-6 text-navy/55 dark:text-wheat/55">
         There are no published hackathons to preview yet.
       </p>
     );
@@ -29,9 +29,9 @@ export function OrganizerPreview({ hackathons }: { hackathons: OrganizerHackatho
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-5">
+      <div className="rounded-xl p-5">
         <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-navy/55 dark:text-wheat/55" htmlFor="preview-hackathon">
-          Example hackathon
+          Hackathon
         </label>
         <select
           className={`${inputClassName} max-w-md`}

@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { DiscordIcon } from "@/components/discord-icon";
+
 const navItems = [{ label: "About", href: "/about" }];
 
 type PrimaryNavProps = {
@@ -49,6 +51,15 @@ export function PrimaryNav({ activeHref }: PrimaryNavProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <Link
+            className="inline-flex items-center gap-2 rounded-full bg-[#5865F2] px-4 py-2 text-[0.8rem] font-semibold text-white transition-colors hover:bg-[#4752c4] sm:px-5"
+            href="https://discord.gg/wcNfUUVgqe"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Join our Discord
+            <DiscordIcon className="h-4 w-auto" />
+          </Link>
           <Link
             className="rounded-full bg-cabernet px-4 py-2 text-[0.8rem] font-semibold text-wheat transition-colors hover:bg-[#5c151c] sm:px-5 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
             href="/hackathons"

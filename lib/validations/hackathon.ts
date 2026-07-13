@@ -274,6 +274,27 @@ export const reviewActionSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+// Zod's flatten() collapses every nested issue under the top-level key, so a
+// missing normalizedPayload.country surfaces as an opaque "normalizedPayload"
+// error. Key errors by the deepest field name instead so the reviewer sees
+// which field ("country", "startDate", …) actually failed.
+export function reviewActionErrorPayload(error: z.ZodError) {
+  const fieldErrors: Record<string, string[]> = {};
+  const formErrors: string[] = [];
+
+  for (const issue of error.issues) {
+    const field = issue.path.filter((segment) => typeof segment === "string").at(-1);
+
+    if (typeof field === "string") {
+      (fieldErrors[field] ??= []).push(issue.message);
+    } else {
+      formErrors.push(issue.message);
+    }
+  }
+
+  return { fieldErrors, formErrors };
+}
+
 export const discordChannelDecisionSchema = z.object({
   action: z.enum(["approve", "deny"]),
 });

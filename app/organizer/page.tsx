@@ -16,7 +16,7 @@ export default async function OrganizerHackathonsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6">
+      <section className="rounded-xl p-6">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">Organizer console</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>

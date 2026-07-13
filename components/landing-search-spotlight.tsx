@@ -198,7 +198,7 @@ function SpotlightSearchCard() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-cabernet/30 blur-3xl"
+        className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,1),rgba(0,0,0,0.85)_55%,transparent_80%)] blur-3xl"
       />
 
       <div className="relative rounded-[1.75rem] border border-white/15 bg-[#1b1b1b] p-4 shadow-[0_45px_90px_-25px_rgba(0,0,0,0.85)] sm:p-5">
