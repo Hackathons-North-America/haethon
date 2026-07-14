@@ -20,10 +20,12 @@ The build uses non-secret placeholder values because several server modules init
 
 The same quality gates run first. Only when all of them pass does the `Deploy production` job run:
 
-1. Vercel CLI pulls the project's production settings and environment variables.
-2. Vercel CLI creates the deployable output with the real production configuration.
-3. The already-built output is uploaded as a production deployment.
+1. Vercel CLI uploads the source to the linked project.
+2. Vercel creates the production build remotely with the project's real production configuration.
+3. Vercel promotes the successful build as a production deployment.
 4. The deployment URL is attached to the GitHub Actions environment.
+
+The remote build is intentional. Sensitive Vercel environment variables cannot be decrypted by `vercel pull`, so a local `vercel build` in GitHub Actions would receive empty values. Vercel's remote build can access those values without exposing them to the runner.
 
 The `needs: checks` dependency is the release gate: a lint, type, test, or build failure prevents deployment. Concurrency also cancels an older run on the same branch when a newer commit arrives.
 
