@@ -193,7 +193,7 @@ export function evaluateAttendancePlausibility(input: {
     if (conflict) {
       return {
         plausible: false,
-        error: `This claim conflicts with your recorded attendance at ${conflict.name} on ${formatDayKey(conflict.dayKey)}. You can't attend two in person hackathons on the same day.`,
+        error: `This claim conflicts with your recorded attendance at ${conflict.name} on ${formatDayKey(conflict.dayKey)}. You can't attend two in-person hackathons on the same day.`,
       };
     }
   }
@@ -244,7 +244,7 @@ export function evaluateAttendancePlausibility(input: {
     if (inPersonCount > MAX_IN_PERSON_HACKATHONS_PER_WINDOW) {
       return {
         plausible: false,
-        error: `This claim would put you at ${inPersonCount} in person hackathons between ${formatDayKey(windowStart)} and ${formatDayKey(windowEnd)}. The limit is ${MAX_IN_PERSON_HACKATHONS_PER_WINDOW} in any ${ATTENDANCE_VOLUME_WINDOW_DAYS} day period.`,
+        error: `This claim would put you at ${inPersonCount} in-person hackathons between ${formatDayKey(windowStart)} and ${formatDayKey(windowEnd)}. The limit is ${MAX_IN_PERSON_HACKATHONS_PER_WINDOW} in any ${ATTENDANCE_VOLUME_WINDOW_DAYS} day period.`,
       };
     }
 
