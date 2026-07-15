@@ -7,6 +7,7 @@ import {
   hackathonDates,
   hackathonLocations,
   hackathons,
+  hackathonSeries,
   hackathonSubmissions,
   organizationMemberships,
   organizations,
@@ -194,7 +195,7 @@ async function findBestDuplicate(payload: { name: string; websiteUrl?: string | 
   return findBestDuplicateInCandidates(payload, await listDuplicateCandidates());
 }
 
-async function createPublishedHackathon(
+export async function createPublishedHackathon(
   payload: NormalizedHackathonPayload,
   options?: { syncDiscord?: boolean }
 ) {
@@ -220,6 +221,7 @@ async function createPublishedHackathon(
       status: deriveHackathonStatus(payload.startDate, payload.endDate, now),
       beginnerFriendly: payload.beginnerFriendly,
       travelReimbursement: payload.travelReimbursement,
+      highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd,
       lastVerifiedAt: now,
       dataConfidenceScore: "0.85",
@@ -271,6 +273,15 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
 
   const seriesId = existing.seriesId ?? (await ensureHackathonSeries(payload));
 
+  // When the target already had a series, ensureHackathonSeries was skipped
+  // above, so the recurring toggle has to be applied to that series directly.
+  if (payload.recurring && existing.seriesId) {
+    await db
+      .update(hackathonSeries)
+      .set({ isRecurring: true, updatedAt: new Date() })
+      .where(eq(hackathonSeries.id, existing.seriesId));
+  }
+
   await db
     .update(hackathons)
     .set({
@@ -282,6 +293,7 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
       venue: existing.venue ?? payload.venue,
       beginnerFriendly: existing.beginnerFriendly || payload.beginnerFriendly,
       travelReimbursement: existing.travelReimbursement || payload.travelReimbursement,
+      highSchoolersOnly: existing.highSchoolersOnly || payload.highSchoolersOnly,
       prizeAmountUsd: existing.prizeAmountUsd ?? payload.prizeAmountUsd,
       lastVerifiedAt: new Date(),
       updatedAt: new Date(),
@@ -513,6 +525,7 @@ function deriveFixPayload(item: AdminHackathonFixImportItem, index: number) {
     shortDescription: firstString(raw.description, event.description),
     beginnerFriendly: false,
     travelReimbursement: false,
+    highSchoolersOnly: false,
     importReason: item.reason,
     importSource: item.source ?? "unknown",
     importSourceUrl: sourceUrl,

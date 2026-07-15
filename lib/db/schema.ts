@@ -131,6 +131,10 @@ export const hackathonSeries = pgTable(
     name: varchar("name", { length: 180 }).notNull(),
     slug: varchar("slug", { length: 200 }).notNull().unique(),
     websiteUrl: text("website_url"),
+    /* Marks a series (e.g. Hack the North) as returning annually. Past
+       editions of recurring series stay in the public catalog until the next
+       edition is published. */
+    isRecurring: boolean("is_recurring").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -175,6 +179,7 @@ export const hackathons = pgTable(
     status: hackathonStatusEnum("status").notNull().default("draft"),
     beginnerFriendly: boolean("beginner_friendly").notNull().default(false),
     travelReimbursement: boolean("travel_reimbursement").notNull().default(false),
+    highSchoolersOnly: boolean("high_schoolers_only").notNull().default(false),
     prizeAmountUsd: integer("prize_amount_usd"),
     voteScore: integer("vote_score").notNull().default(0),
     // Beta-only presentation value. Keep it separate from the real vote score
@@ -593,6 +598,9 @@ export const discordChannels = pgTable("discord_channels", {
   hackathonId: uuid("hackathon_id").references(() => hackathons.id, { onDelete: "set null" }),
   channelSnowflake: text("channel_snowflake").notNull().unique(),
   name: varchar("name", { length: 180 }).notNull(),
+  /* Admin-chosen channel name. While set, the sync still moves the channel
+     between categories and refreshes its topic but never renames it. */
+  nameOverride: varchar("name_override", { length: 100 }),
   category: varchar("category", { length: 120 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 
 import { HackathonSearch } from "@/components/hackathon-search";
 import { getCurrentUserRecord } from "@/lib/auth";
-import { CATALOG_PAGE_SIZE, applyUserCardState, getPublicHackathonCatalog } from "@/lib/hackathons/catalog";
-import { dateRangeForPeriod, normalizeSearchFilters } from "@/lib/hackathons/search-filters";
+import { applyUserCardState, getPublicHackathonCatalogSnapshot } from "@/lib/hackathons/catalog";
+import { normalizeSearchFilters } from "@/lib/hackathons/search-filters";
 
 export const metadata: Metadata = {
   title: "Hackathons | Hackathons North America",
@@ -16,22 +16,12 @@ export default async function HackathonsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const filters = normalizeSearchFilters((await searchParams) ?? {});
-  const dateRange = dateRangeForPeriod(filters.datePeriod);
 
-  // The public catalog page comes out of the shared cross-request cache; only
-  // the signed-in user's saved/vote overlay is computed per request.
-  const [{ cards, hasMore }, user] = await Promise.all([
-    getPublicHackathonCatalog({
-      name: filters.name,
-      countries: filters.countries,
-      format: filters.format === "any" ? null : filters.format,
-      beginnerFriendly: filters.beginnerFriendly === "any" ? null : filters.beginnerFriendly === "on",
-      travelReimbursement: filters.travelReimbursement === "any" ? null : filters.travelReimbursement === "on",
-      startsAfter: dateRange?.startsAfter ?? null,
-      startsBefore: dateRange?.startsBefore ?? null,
-      limit: CATALOG_PAGE_SIZE,
-      offset: 0,
-    }),
+  // Send one shared catalog snapshot to the browser. All interactive filters
+  // are then derived locally; only the signed-in user's card state is queried
+  // per page request.
+  const [{ cards }, user] = await Promise.all([
+    getPublicHackathonCatalogSnapshot(),
     getCurrentUserRecord(),
   ]);
 
@@ -39,7 +29,7 @@ export default async function HackathonsPage({
 
   return (
     <main className="min-h-screen text-navy dark:text-wheat">
-      <HackathonSearch initialFilters={filters} initialHackathons={hackathonCards} initialHasMore={hasMore} />
+      <HackathonSearch initialFilters={filters} initialHackathons={hackathonCards} />
     </main>
   );
 }

@@ -4,6 +4,11 @@
    manager and the organizer dashboard. */
 export type AdminHackathonListItem = {
   id: string;
+  seriesId: string | null;
+  /** Recurring flag of the hackathon's series; false when it has no series. */
+  isRecurring: boolean;
+  /** Existing channel managed for this hackathon's series in the configured guild. */
+  discordChannelId?: string | null;
   name: string;
   shortDescription: string | null;
   websiteUrl: string | null;
@@ -14,6 +19,7 @@ export type AdminHackathonListItem = {
   status: string;
   beginnerFriendly: boolean;
   travelReimbursement: boolean;
+  highSchoolersOnly: boolean;
   prizeAmountUsd: number | null;
   voteDisplayOffset: number;
   voteScore: number;

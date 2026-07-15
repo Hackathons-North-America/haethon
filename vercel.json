@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/sync-discord",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-hackathons",
+      "schedule": "0 14 * * *"
     }
   ]
 }

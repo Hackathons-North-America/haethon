@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adminHackathonCreateSchema,
+  adminHackathonEditSchema,
   adminHackathonFixImportSchema,
   adminHackathonImportSchema,
+  adminHackathonRecurringSchema,
+  adminHackathonUpdateSchema,
   communitySubmissionSchema,
   hackathonSearchSchema,
   organizerSubmissionSchema,
@@ -241,6 +245,24 @@ describe("adminHackathonImportSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts an optional recurring flag on imported hackathons", () => {
+    const result = adminHackathonImportSchema.parse([{ ...payload, recurring: true }]);
+
+    expect(result.hackathons[0].recurring).toBe(true);
+  });
+
+  it("imports the scraper's high-school-only classification", () => {
+    const result = adminHackathonImportSchema.parse([{ ...payload, highSchoolersOnly: true }]);
+
+    expect(result.hackathons[0].highSchoolersOnly).toBe(true);
+  });
+
+  it("treats older imports without a high-school classification as false", () => {
+    const result = adminHackathonImportSchema.parse([payload]);
+
+    expect(result.hackathons[0].highSchoolersOnly).toBe(false);
+  });
+
   it("accepts a wrapped hackathons array", () => {
     const result = adminHackathonImportSchema.safeParse({ hackathons: [payload] });
 
@@ -321,6 +343,134 @@ describe("reviewActionSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("carries the recurring toggle inside the normalized payload, defaulting off", () => {
+    const normalizedPayload = {
+      name: "Hack the North",
+      websiteUrl: "https://example.com",
+      country: "Canada",
+      startDate: "2026-09-12",
+      endDate: "2026-09-14",
+      format: "in_person",
+    };
+
+    const withToggle = reviewActionSchema.parse({
+      action: "approve_new",
+      normalizedPayload: { ...normalizedPayload, recurring: true },
+    });
+    const withoutToggle = reviewActionSchema.parse({
+      action: "approve_new",
+      normalizedPayload,
+    });
+
+    expect(withToggle).toMatchObject({ normalizedPayload: { recurring: true } });
+    expect(withoutToggle).toMatchObject({ normalizedPayload: { recurring: false } });
+  });
+});
+
+describe("adminHackathonUpdateSchema", () => {
+  it("strips the recurring flag so full-payload edits cannot change it", () => {
+    const result = adminHackathonUpdateSchema.parse({
+      name: "Hack the North",
+      websiteUrl: "https://example.com",
+      country: "Canada",
+      startDate: "2026-09-12",
+      endDate: "2026-09-14",
+      format: "in_person",
+      recurring: true,
+    });
+
+    expect(result).not.toHaveProperty("recurring");
+  });
+});
+
+describe("adminHackathonEditSchema", () => {
+  const payload = {
+    name: "Hack the North",
+    websiteUrl: "https://example.com",
+    country: "Canada",
+    startDate: "2026-09-12",
+    endDate: "2026-09-14",
+    format: "in_person",
+  };
+
+  it("accepts a Discord channel snowflake for admin edits", () => {
+    expect(
+      adminHackathonEditSchema.parse({ ...payload, discordChannelId: "123456789012345678" })
+        .discordChannelId
+    ).toBe("123456789012345678");
+  });
+
+  it("rejects malformed Discord channel IDs", () => {
+    expect(adminHackathonEditSchema.safeParse({ ...payload, discordChannelId: "not-an-id" }).success).toBe(false);
+  });
+});
+
+describe("adminHackathonCreateSchema", () => {
+  it("accepts past dates and keeps the recurring flag for one-shot publishing", () => {
+    const result = adminHackathonCreateSchema.parse({
+      name: "Hack the North",
+      websiteUrl: "https://example.com",
+      country: "Canada",
+      startDate: "2025-09-12",
+      endDate: "2025-09-14",
+      format: "in_person",
+      recurring: true,
+    });
+
+    expect(result.recurring).toBe(true);
+    expect(result.createDiscordChannel).toBe(false);
+  });
+
+  it("rejects an end date before the start date", () => {
+    expect(
+      adminHackathonCreateSchema.safeParse({
+        name: "Hack the North",
+        websiteUrl: "https://example.com",
+        country: "Canada",
+        startDate: "2025-09-14",
+        endDate: "2025-09-12",
+        format: "in_person",
+      }).success
+    ).toBe(false);
+  });
+
+  it("accepts an existing Discord channel ID instead of creating one", () => {
+    const result = adminHackathonCreateSchema.parse({
+      name: "Hack the North",
+      websiteUrl: "https://example.com",
+      country: "Canada",
+      startDate: "2026-09-12",
+      endDate: "2026-09-14",
+      format: "in_person",
+      discordChannelId: "123456789012345678",
+    });
+
+    expect(result.discordChannelId).toBe("123456789012345678");
+  });
+
+  it("does not allow adopting and creating a Discord channel together", () => {
+    expect(
+      adminHackathonCreateSchema.safeParse({
+        name: "Hack the North",
+        websiteUrl: "https://example.com",
+        country: "Canada",
+        startDate: "2026-09-12",
+        endDate: "2026-09-14",
+        format: "in_person",
+        createDiscordChannel: true,
+        discordChannelId: "123456789012345678",
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe("adminHackathonRecurringSchema", () => {
+  it("requires an explicit boolean", () => {
+    expect(adminHackathonRecurringSchema.safeParse({ isRecurring: true }).success).toBe(true);
+    expect(adminHackathonRecurringSchema.safeParse({ isRecurring: "yes" }).success).toBe(false);
+    expect(adminHackathonRecurringSchema.safeParse({}).success).toBe(false);
   });
 });
 

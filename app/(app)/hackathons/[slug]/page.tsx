@@ -76,6 +76,7 @@ async function getHackathon(slug: string) {
       status: hackathons.status,
       beginnerFriendly: hackathons.beginnerFriendly,
       travelReimbursement: hackathons.travelReimbursement,
+      highSchoolersOnly: hackathons.highSchoolersOnly,
       prizeAmountUsd: hackathons.prizeAmountUsd,
       organizationName: organizations.name,
       city: hackathonLocations.city,
@@ -289,6 +290,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
   const propertyTags = [
     hackathon.beginnerFriendly ? "Beginner friendly" : null,
     hackathon.travelReimbursement ? "Travel support" : null,
+    hackathon.highSchoolersOnly ? "High school only" : null,
     ...tagRows.map((tag) => tag.name),
   ].filter(Boolean) as string[];
   const selectableReminderPlan = computeSelectableReminderPlan(

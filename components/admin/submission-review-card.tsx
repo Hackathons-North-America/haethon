@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { AlertTriangle, Check, GitMerge, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, GitMerge, Repeat, Trash2, X } from "lucide-react";
 
 import { HackathonCardPreview } from "@/components/admin/hackathon-card-preview";
 
@@ -127,6 +127,9 @@ export function SubmissionReviewCard({
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [previewPayload, setPreviewPayload] = useState<Record<string, unknown>>(() => initialPreviewPayload(submission));
+  const [recurring, setRecurring] = useState(
+    () => value(submission.payload, "recurring") === "true" || submission.payload.recurring === true
+  );
   const disabled = status === "submitting" || submission.status !== "pending";
   const fixReason = importReason(submission.payload);
   const hasDuplicate = Boolean(submission.matchedHackathonId);
@@ -177,7 +180,9 @@ export function SubmissionReviewCard({
       shortDescription: formData.get("shortDescription")?.toString() ?? "",
       beginnerFriendly: formData.get("beginnerFriendly") === "on",
       travelReimbursement: formData.get("travelReimbursement") === "on",
+      highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
+      recurring,
     };
     const body =
       intent === "reject"
@@ -471,6 +476,18 @@ export function SubmissionReviewCard({
             />
             Travel support
           </label>
+          <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+            <input
+              className={checkboxClassName}
+              defaultChecked={
+                value(submission.payload, "highSchoolersOnly") === "true" ||
+                submission.payload.highSchoolersOnly === true
+              }
+              name="highSchoolersOnly"
+              type="checkbox"
+            />
+            High school only
+          </label>
           <div>
             <label className={labelClassName} htmlFor={`${submission.id}-rejectionReason`}>
               Rejection reason
@@ -493,6 +510,25 @@ export function SubmissionReviewCard({
             {JSON.stringify(submission.payload, null, 2)}
           </pre>
         </details>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Marks the whole series (e.g. Hack the North) as returning yearly
+              when this submission is approved or merged. */}
+          <button
+            aria-pressed={recurring}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold disabled:opacity-50 ${
+              recurring
+                ? "border-cabernet bg-cabernet text-wheat dark:border-wheat dark:bg-wheat dark:text-[#141414]"
+                : "border-navy/20 dark:border-white/20 text-navy/70 dark:text-wheat/70"
+            }`}
+            disabled={disabled}
+            onClick={() => setRecurring((current) => !current)}
+            type="button"
+          >
+            <Repeat aria-hidden="true" className="size-4" />
+            {recurring ? "Repeats yearly" : "Not repeating"}
+          </button>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button

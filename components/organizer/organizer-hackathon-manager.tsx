@@ -46,6 +46,7 @@ function itemToPreviewPayload(item: OrganizerHackathonItem): Record<string, unkn
     format: item.format,
     beginnerFriendly: item.beginnerFriendly,
     travelReimbursement: item.travelReimbursement,
+    highSchoolersOnly: item.highSchoolersOnly,
     prizeAmountUsd: item.prizeAmountUsd ?? "",
   };
 }
@@ -410,6 +411,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
       format: formData.get("format")?.toString() ?? item.format,
       beginnerFriendly: formData.get("beginnerFriendly") === "on",
       travelReimbursement: formData.get("travelReimbursement") === "on",
+      highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
     };
 
@@ -666,6 +668,15 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
                     type="checkbox"
                   />
                   Travel support
+                </label>
+                <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+                  <input
+                    className={checkboxClassName}
+                    defaultChecked={item.highSchoolersOnly}
+                    name="highSchoolersOnly"
+                    type="checkbox"
+                  />
+                  High school only
                 </label>
               </div>
 

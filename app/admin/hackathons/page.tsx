@@ -25,7 +25,7 @@ export default async function AdminHackathonsPage() {
             </p>
           </div>
           <div className="rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-4 py-3 text-sm font-semibold text-navy dark:text-wheat">
-            {items.length} live
+            {items.length} listed
           </div>
         </div>
       </section>

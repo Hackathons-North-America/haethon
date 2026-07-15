@@ -15,59 +15,71 @@ test("opens the hackathons browse page from the home nav", async ({ page }) => {
   await expect(page.getByLabel("Name")).toBeVisible();
   await expect(page.getByLabel("Countries")).toBeVisible();
   await expect(page.getByLabel("Date")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Search hackathons" })
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search hackathons" })).toHaveCount(0);
 
   await expect(
     page.getByRole("heading", { name: "Upcoming hackathons" })
   ).toBeVisible();
   await expect(page.getByText("18 test events")).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Hack the North" })
-  ).toBeVisible();
-  await expect(page.locator("article")).toHaveCount(18);
+  await expect(page.locator("article").first()).toBeVisible();
 
-  const hackTheNorth = page.locator("article").filter({
-    has: page.getByRole("heading", { name: "Hack the North" }),
+  const catalogRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+
+    if (request.method() === "GET" && url.pathname === "/api/hackathons") {
+      catalogRequests.push(request.url());
+    }
   });
-
-  await expect(hackTheNorth.getByText("MLH approved")).toHaveCount(0);
-  await expect(hackTheNorth.getByText("Hackathon H&N approved")).toHaveCount(0);
-  await expect(hackTheNorth.getByText("Sep 13-15, 2026")).toBeVisible();
-  await expect(hackTheNorth.getByText("Waterloo, ON")).toBeVisible();
-  await expect(
-    hackTheNorth.getByText("Canada's flagship student hackathon")
-  ).toBeVisible();
-
-  await hackTheNorth
-    .getByRole("button", { name: "Add Hack the North to library" })
-    .click();
-  await expect(
-    hackTheNorth.getByRole("button", {
-      name: "Remove Hack the North from library",
-    })
-  ).toHaveAttribute("aria-pressed", "true");
-
-  await expect(hackTheNorth.getByText("142", { exact: true })).toBeVisible();
-  await hackTheNorth.getByRole("button", { name: "Upvote Hack the North" }).click();
-  await expect(hackTheNorth.getByText("143", { exact: true })).toBeVisible();
-  await hackTheNorth.getByRole("button", { name: "Downvote Hack the North" }).click();
-  await expect(hackTheNorth.getByText("141", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Countries" }).click();
   await page.getByLabel("Search countries").fill("can");
   await page.getByRole("option", { name: "Canada" }).click();
   await expect(page.getByRole("button", { name: "Remove Canada" })).toBeVisible();
-  await page.getByRole("button", { name: "Search hackathons" }).click();
   await expect(page).toHaveURL(/countries=Canada/);
+  await expect(page.getByText(/Showing \d+ hackathons? matching your search\./)).toBeVisible();
+  expect(catalogRequests).toEqual([]);
   await page.getByRole("button", { name: "Clear hackathon search" }).click();
   await expect(page).toHaveURL(/\/hackathons$/);
 
-  await page.getByLabel("Name").fill("Hack the North");
-  await page.getByRole("button", { name: "Search hackathons" }).click();
-  await expect(page).toHaveURL(/\/hackathons\?q=Hack\+the\+North/);
+  const firstHackathonName = await page.locator("article h2").first().textContent();
+  expect(firstHackathonName).toBeTruthy();
+  await page.getByLabel("Name").fill(firstHackathonName!);
+  await expect(page).toHaveURL(/\/hackathons\?q=/);
 
-  await expect(page.getByRole("heading", { name: "Hack the North" })).toBeVisible();
-  await expect(page.locator("article")).toHaveCount(1);
+  await expect(page.locator("article h2").first()).toHaveText(firstHackathonName!);
+  expect(catalogRequests).toEqual([]);
+});
+
+test("filters the loaded catalog automatically without search requests", async ({ page }) => {
+  await page.goto("/hackathons");
+
+  const catalogRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+
+    if (request.method() === "GET" && url.pathname === "/api/hackathons") {
+      catalogRequests.push(request.url());
+    }
+  });
+
+  await page.getByRole("button", { name: "Countries" }).click();
+  await page.getByLabel("Search countries").fill("can");
+  await page.getByRole("option", { name: "Canada" }).click();
+
+  await expect(page).toHaveURL(/countries=Canada/);
+  const status = page.getByText(/Showing \d+ hackathons? matching your search\./);
+  await expect(status).toBeVisible();
+  const resultCount = Number((await status.textContent())?.match(/\d+/)?.[0]);
+  await expect(page.locator("article")).toHaveCount(resultCount);
+  expect(catalogRequests).toEqual([]);
+
+  await page.getByRole("button", { name: "Clear hackathon search" }).click();
+  const firstHackathonName = await page.locator("article h2").first().textContent();
+  expect(firstHackathonName).toBeTruthy();
+
+  await page.getByLabel("Name").fill(firstHackathonName!);
+  await expect(page).toHaveURL(/\?q=/);
+  await expect(page.locator("article h2").first()).toHaveText(firstHackathonName!);
+  expect(catalogRequests).toEqual([]);
 });

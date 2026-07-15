@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { categoryForHackathon, channelNameForHackathon } from "@/lib/discord/channel-rules";
+import {
+  categoryForHackathon,
+  channelNameForHackathon,
+  channelReuseKey,
+  normalizeChannelName,
+} from "@/lib/discord/channel-rules";
 
 describe("Discord channel rules", () => {
   it("prefixes the channel with the UTC start month and day", () => {
@@ -52,5 +57,39 @@ describe("Discord channel rules", () => {
         status: "completed",
       })
     ).toBeNull();
+  });
+});
+
+describe("Discord channel reuse key", () => {
+  it("matches channel names for the same event across years", () => {
+    expect(channelReuseKey("sep-13-hack-north-2026")).toBe("hack-north");
+    expect(channelReuseKey(channelNameForHackathon({ name: "Hack North 2027", startsAt: null }))).toBe("hack-north");
+  });
+
+  it("strips only the leading date prefix and year tokens", () => {
+    expect(channelReuseKey("jan-05-delta-hacks")).toBe("delta-hacks");
+    expect(channelReuseKey("delta-hacks-2027")).toBe("delta-hacks");
+  });
+
+  it("returns an empty key when nothing but a date or year remains", () => {
+    expect(channelReuseKey("sep-13-2026")).toBe("");
+  });
+});
+
+describe("Discord channel name normalization", () => {
+  it("lowercases and dashes whitespace like Discord does", () => {
+    expect(normalizeChannelName("  Hack The North  ")).toBe("hack-the-north");
+  });
+
+  it("collapses repeated separators", () => {
+    expect(normalizeChannelName("hack -- the -- north")).toBe("hack-the-north");
+  });
+
+  it("keeps unicode characters", () => {
+    expect(normalizeChannelName("hack-the-north-🍁")).toBe("hack-the-north-🍁");
+  });
+
+  it("returns null when nothing usable remains", () => {
+    expect(normalizeChannelName("  -- ")).toBeNull();
   });
 });

@@ -1,0 +1,1 @@
+ALTER TABLE "hackathons" ADD COLUMN "high_schoolers_only" boolean DEFAULT false NOT NULL;

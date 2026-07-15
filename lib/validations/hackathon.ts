@@ -18,6 +18,14 @@ const optionalUrl = z.preprocess(
   z.string().trim().url().refine(isHttpUrl, HTTP_URL_MESSAGE).optional()
 );
 const optionalString = (max: number) => z.preprocess(emptyToUndefined, z.string().trim().max(max).optional());
+const optionalDiscordChannelId = z.preprocess(
+  emptyToUndefined,
+  z
+    .string()
+    .trim()
+    .regex(/^\d{17,20}$/, "Enter a valid Discord channel ID (17 to 20 digits).")
+    .optional()
+);
 
 // Scraped sources often carry a full event description that exceeds our short
 // description cap. For imports we truncate to fit rather than reject the card.
@@ -180,6 +188,12 @@ const normalizedHackathonPayloadBaseSchema = z.object({
     shortDescription: optionalString(500),
     beginnerFriendly: z.coerce.boolean().optional().default(false),
     travelReimbursement: z.coerce.boolean().optional().default(false),
+    // Scraper exports this exact camel-cased field. Older exports omit it and
+    // safely import as a general-audience event.
+    highSchoolersOnly: z.coerce.boolean().optional().default(false),
+    /* One-way at publish time: true marks the hackathon's series as recurring;
+       false/absent leaves the series flag untouched. */
+    recurring: z.coerce.boolean().optional().default(false),
     prizeAmountUsd: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).optional()),
     timeNote: optionalString(160),
 });
@@ -204,14 +218,51 @@ export const adminHackathonImportSchema = z.preprocess(
   }).strip()
 );
 
-export const adminHackathonUpdateSchema = normalizedHackathonPayloadBaseSchema
-  .omit({ organizationId: true, organizationName: true, sourceUrl: true, timeNote: true })
+const adminHackathonUpdatePayloadSchema = normalizedHackathonPayloadBaseSchema
+  // `recurring` is managed by the dedicated admin toggle route, never by
+  // full-payload edits (this schema is shared with the organizer editor).
+  .omit({ organizationId: true, organizationName: true, sourceUrl: true, timeNote: true, recurring: true })
   .extend({
     // Beta-only display override. This intentionally does not modify voteScore.
     voteDisplayOffset: z.coerce.number().int().min(-100_000).max(100_000).optional(),
-  })
+  });
+
+export const adminHackathonUpdateSchema = adminHackathonUpdatePayloadSchema
   .strip()
   .superRefine(dateRangeRefinement)
+  .transform((payload) => normalizeLocationPayload(payload));
+
+/* Admin-only edit payload. Organizers continue to use the schema above and
+   cannot change which Discord channel the automation manages. */
+export const adminHackathonEditSchema = adminHackathonUpdatePayloadSchema
+  .extend({ discordChannelId: optionalDiscordChannelId })
+  .strip()
+  .superRefine(dateRangeRefinement)
+  .transform((payload) => normalizeLocationPayload(payload));
+
+/* Admin instant-add: the hackathon publishes immediately, skipping the review
+   queue. Past dates are allowed on purpose — backfilled events publish as
+   "completed" (and only surface publicly while their series is recurring).
+   Unlike edits, `recurring` is accepted here so the series flag can be set in
+   the same step. */
+export const adminHackathonCreateSchema = normalizedHackathonPayloadBaseSchema
+  .omit({ organizationId: true, organizationName: true, sourceUrl: true, timeNote: true })
+  .extend({
+    createDiscordChannel: z.coerce.boolean().optional().default(false),
+    discordChannelId: optionalDiscordChannelId,
+  })
+  .strip()
+  .superRefine((payload, ctx) => {
+    dateRangeRefinement(payload, ctx);
+
+    if (payload.createDiscordChannel && payload.discordChannelId) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Choose either an existing Discord channel ID or create a new channel.",
+        path: ["discordChannelId"],
+      });
+    }
+  })
   .transform((payload) => normalizeLocationPayload(payload));
 
 export const adminHackathonFixImportItemSchema = z.object({
@@ -297,6 +348,21 @@ export function reviewActionErrorPayload(error: z.ZodError) {
 
 export const discordChannelDecisionSchema = z.object({
   action: z.enum(["approve", "deny"]),
+});
+
+/* A string pins the channel to that name (Discord-normalized server-side);
+   null clears the pin and returns the channel to automatic naming. */
+export const discordChannelNameSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Channel name is required.")
+    .max(100, "Discord channel names are limited to 100 characters.")
+    .nullable(),
+});
+
+export const adminHackathonRecurringSchema = z.object({
+  isRecurring: z.boolean(),
 });
 
 // All profile fields are clearable: an empty string wipes the stored value

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 
 import { serializeAdminHackathon } from "@/components/admin/hackathon-admin-item";
 import { requireAdminUser } from "@/lib/auth";
+import { assignExistingDiscordChannel } from "@/lib/discord/sync";
 import { deleteHackathon, getAdminHackathon, updatePublishedHackathon } from "@/lib/hackathons/admin-service";
-import { adminHackathonUpdateSchema } from "@/lib/validations/hackathon";
+import { adminHackathonEditSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -33,7 +34,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: gate.reason }, { status: gate.reason === "unauthenticated" ? 401 : 403 });
   }
 
-  const parsed = adminHackathonUpdateSchema.safeParse(await request.json());
+  const parsed = adminHackathonEditSchema.safeParse(await request.json());
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -42,9 +43,15 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const data = await updatePublishedHackathon(id, parsed.data);
+    const { discordChannelId, ...payload } = parsed.data;
 
-    return NextResponse.json({ data });
+    if (discordChannelId) {
+      await assignExistingDiscordChannel(id, discordChannelId);
+    }
+
+    const data = await updatePublishedHackathon(id, payload);
+
+    return NextResponse.json({ data: serializeAdminHackathon(data) });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to update hackathon." },

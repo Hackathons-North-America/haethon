@@ -22,6 +22,7 @@ export async function ensureHackathonSeries(payload: Pick<NormalizedHackathonPay
   seriesName?: string | null;
   seriesSlug?: string | null;
   websiteUrl?: string | null;
+  recurring?: boolean | null;
 }) {
   const name = deriveSeriesName(payload.seriesName || payload.name);
   const slug = deriveSeriesSlug(payload);
@@ -34,10 +35,18 @@ export async function ensureHackathonSeries(payload: Pick<NormalizedHackathonPay
     .limit(1);
 
   if (existing) {
-    if (!existing.websiteUrl && payload.websiteUrl) {
+    const websiteUrlBackfill = !existing.websiteUrl && payload.websiteUrl ? payload.websiteUrl : null;
+
+    // `recurring` only ever turns the flag on here — publishing an edition
+    // without the toggle must not clear a series already marked recurring.
+    if (websiteUrlBackfill || payload.recurring) {
       await db
         .update(hackathonSeries)
-        .set({ websiteUrl: payload.websiteUrl, updatedAt: now })
+        .set({
+          ...(websiteUrlBackfill ? { websiteUrl: websiteUrlBackfill } : {}),
+          ...(payload.recurring ? { isRecurring: true } : {}),
+          updatedAt: now,
+        })
         .where(eq(hackathonSeries.id, existing.id));
     }
 
@@ -50,6 +59,7 @@ export async function ensureHackathonSeries(payload: Pick<NormalizedHackathonPay
       name,
       slug,
       websiteUrl: payload.websiteUrl,
+      isRecurring: payload.recurring ?? false,
       updatedAt: now,
     })
     .onConflictDoNothing()
@@ -69,6 +79,13 @@ export async function ensureHackathonSeries(payload: Pick<NormalizedHackathonPay
     throw new Error("Unable to create hackathon series.");
   }
 
+  if (payload.recurring) {
+    await db
+      .update(hackathonSeries)
+      .set({ isRecurring: true, updatedAt: now })
+      .where(eq(hackathonSeries.id, fallback.id));
+  }
+
   return fallback.id;
 }
 
@@ -78,6 +95,7 @@ export async function assignHackathonSeries(
     seriesName?: string | null;
     seriesSlug?: string | null;
     websiteUrl?: string | null;
+    recurring?: boolean | null;
   }
 ) {
   const seriesId = await ensureHackathonSeries(payload);

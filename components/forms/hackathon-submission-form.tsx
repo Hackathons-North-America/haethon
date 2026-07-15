@@ -81,6 +81,7 @@ export function HackathonSubmissionForm() {
             venue: fieldValue(formData, "venue"),
             beginnerFriendly: formData.get("beginnerFriendly") === "on",
             travelReimbursement: formData.get("travelReimbursement") === "on",
+            highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
             prizeAmountUsd: optionalNumber(formData, "prizeAmountUsd"),
           }
         : {
@@ -287,6 +288,10 @@ export function HackathonSubmissionForm() {
               <label className="inline-flex items-center gap-2.5 text-sm text-navy dark:text-wheat">
                 <input name="travelReimbursement" type="checkbox" className="size-4 accent-cabernet" />
                 Travel reimbursement
+              </label>
+              <label className="inline-flex items-center gap-2.5 text-sm text-navy dark:text-wheat">
+                <input name="highSchoolersOnly" type="checkbox" className="size-4 accent-cabernet" />
+                High school only
               </label>
             </div>
           </div>

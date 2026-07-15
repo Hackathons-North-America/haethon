@@ -8,25 +8,16 @@ import { CalendarDays, Check, Globe2, MapPin, PlusSquare, Search, Settings2, X }
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
 import { countryOptions } from "@/lib/hackathons/countries";
+import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
-import { datePeriodOptions, dateRangeForPeriod } from "@/lib/hackathons/search-filters";
+import { datePeriodOptions } from "@/lib/hackathons/search-filters";
 import type {
   DatePeriod,
   FeatureFilter,
   HackathonFormatFilter,
   HackathonSearchFilters,
 } from "@/lib/hackathons/search-filters";
-
-type HackathonSearchResponse = {
-  data?: HackathonCardData[];
-  hasMore?: boolean;
-  error?: unknown;
-};
-
-/* Cards fetched per request. Mirrors CATALOG_PAGE_SIZE on the server so the
-   grid loads in light pages instead of one big render. */
-const PAGE_SIZE = 30;
 
 const countryListboxId = "hackathon-country-options";
 const countryPopoverId = "hackathon-country-popover";
@@ -41,51 +32,6 @@ const formatOptions: { label: string; value: HackathonFormatFilter; detail: stri
   { label: "Online", value: "online", detail: "Remote hackathons you can join anywhere" },
   { label: "In person", value: "in_person", detail: "Venue based hackathons and local events" },
 ];
-
-function buildSearchParams(
-  {
-    beginnerFriendly,
-    countries,
-    datePeriod,
-    format,
-    name,
-    travelReimbursement,
-  }: HackathonSearchFilters,
-  offset = 0
-) {
-  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-
-  if (offset > 0) {
-    params.set("offset", String(offset));
-  }
-  const trimmedName = name.trim();
-  const range = dateRangeForPeriod(datePeriod);
-
-  if (trimmedName) {
-    params.set("q", trimmedName);
-  }
-
-  countries.forEach((country) => params.append("countries", country));
-
-  if (range) {
-    params.set("startsAfter", range.startsAfter.toISOString());
-    params.set("startsBefore", range.startsBefore.toISOString());
-  }
-
-  if (format !== "any") {
-    params.set("format", format);
-  }
-
-  if (beginnerFriendly !== "any") {
-    params.set("beginnerFriendly", beginnerFriendly === "on" ? "true" : "false");
-  }
-
-  if (travelReimbursement !== "any") {
-    params.set("travelReimbursement", travelReimbursement === "on" ? "true" : "false");
-  }
-
-  return params;
-}
 
 function hasActiveFilters({
   beginnerFriendly,
@@ -147,13 +93,11 @@ export type HackathonCardHelpers = {
 export function HackathonSearch({
   initialFilters,
   initialHackathons,
-  initialHasMore = false,
   basePath = "/hackathons",
   renderCard,
 }: {
   initialFilters: HackathonSearchFilters;
   initialHackathons: HackathonCardData[];
-  initialHasMore?: boolean;
   /* Path the filter state is written back to via history.replaceState. Defaults
      to the public page; the admin view passes its own route. */
   basePath?: string;
@@ -168,12 +112,7 @@ export function HackathonSearch({
   const [format, setFormat] = useState<HackathonFormatFilter>(initialFilters.format);
   const [beginnerFriendly, setBeginnerFriendly] = useState<FeatureFilter>(initialFilters.beginnerFriendly);
   const [travelReimbursement, setTravelReimbursement] = useState<FeatureFilter>(initialFilters.travelReimbursement);
-  const [hackathons, setHackathons] = useState(initialHackathons);
-  const [hasMore, setHasMore] = useState(initialHasMore);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasSearched, setHasSearched] = useState(() => hasActiveFilters(initialFilters));
-  const [isSearching, setIsSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState(initialHackathons);
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
   const filterFormRef = useRef<HTMLFormElement>(null);
   const countrySearchRef = useRef<HTMLInputElement>(null);
@@ -245,6 +184,10 @@ export function HackathonSearch({
     [beginnerFriendly, countries, datePeriod, format, name, travelReimbursement]
   );
   const activeFilters = useMemo(() => hasActiveFilters(currentFilters), [currentFilters]);
+  const filteredHackathons = useMemo(
+    () => filterLocalHackathonCatalog(catalog, currentFilters),
+    [catalog, currentFilters]
+  );
   const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
   const filteredCountries = useMemo(() => {
     const query = countryQuery.trim().toLowerCase();
@@ -252,10 +195,14 @@ export function HackathonSearch({
     return countryOptions.filter((option) => !query || option.toLowerCase().includes(query));
   }, [countryQuery]);
 
+  useEffect(() => {
+    replaceSearchUrl(currentFilters, basePath);
+  }, [basePath, currentFilters]);
+
   const cardHelpers = useMemo<HackathonCardHelpers>(
     () => ({
-      updateCard: (next) => setHackathons((current) => current.map((entry) => (entry.id === next.id ? next : entry))),
-      removeCard: (id) => setHackathons((current) => current.filter((entry) => entry.id !== id)),
+      updateCard: (next) => setCatalog((current) => current.map((entry) => (entry.id === next.id ? next : entry))),
+      removeCard: (id) => setCatalog((current) => current.filter((entry) => entry.id !== id)),
     }),
     []
   );
@@ -297,72 +244,6 @@ export function HackathonSearch({
     return "International destination";
   }
 
-  async function runSearch(nextFilters = currentFilters, options = { markSearched: true }) {
-    setIsSearching(true);
-    setError(null);
-
-    try {
-      const params = buildSearchParams(nextFilters);
-      const response = await fetch(`/api/hackathons?${params.toString()}`, {
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error("Search failed.");
-      }
-
-      const payload = (await response.json()) as HackathonSearchResponse;
-
-      if (!Array.isArray(payload.data)) {
-        throw new Error("Search returned an unexpected response.");
-      }
-
-      setHackathons(payload.data);
-      setHasMore(payload.hasMore ?? false);
-      setHasSearched(options.markSearched);
-      replaceSearchUrl(nextFilters, basePath);
-    } catch {
-      setError("Search is unavailable right now. Try again in a moment.");
-    } finally {
-      setIsSearching(false);
-    }
-  }
-
-  async function loadMore() {
-    setIsLoadingMore(true);
-    setError(null);
-
-    try {
-      const params = buildSearchParams(currentFilters, hackathons.length);
-      const response = await fetch(`/api/hackathons?${params.toString()}`, {
-        headers: { Accept: "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error("Search failed.");
-      }
-
-      const payload = (await response.json()) as HackathonSearchResponse;
-
-      if (!Array.isArray(payload.data)) {
-        throw new Error("Search returned an unexpected response.");
-      }
-
-      const nextPage = payload.data;
-
-      setHackathons((current) => {
-        // Guard against overlap if the catalog shifted between pages.
-        const seen = new Set(current.map((hackathon) => hackathon.id));
-        return [...current, ...nextPage.filter((hackathon) => !seen.has(hackathon.id))];
-      });
-      setHasMore(payload.hasMore ?? false);
-    } catch {
-      setError("Could not load more hackathons. Try again in a moment.");
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }
-
   function applyRegionPreset(presetId: RegionPresetId) {
     const preset = regionPresets.find((option) => option.id === presetId);
 
@@ -377,7 +258,6 @@ export function HackathonSearch({
     setCountries(nextCountries);
     setCountryQuery("");
     setFormat(nextFormat);
-    void runSearch({ ...currentFilters, countries: nextCountries, format: nextFormat });
   }
 
   function clearSearch() {
@@ -388,12 +268,6 @@ export function HackathonSearch({
     setFormat("any");
     setBeginnerFriendly("any");
     setTravelReimbursement("any");
-    setHasSearched(false);
-    setError(null);
-    void runSearch(
-      { beginnerFriendly: "any", countries: [], datePeriod: "any", format: "any", name: "", travelReimbursement: "any" },
-      { markSearched: false }
-    );
   }
 
   return (
@@ -445,11 +319,9 @@ export function HackathonSearch({
 
           <form
             className="relative z-30 flex flex-col rounded-[2.35rem] border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-2 shadow-[0_10px_36px_rgba(0,0,0,0.14)] md:flex-row md:items-stretch"
-            method="get"
             ref={filterFormRef}
             onSubmit={(event) => {
               event.preventDefault();
-              void runSearch();
             }}
           >
             <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3 text-left focus-within:bg-ivory dark:focus-within:bg-white/10 hover:bg-ivory dark:hover:bg-white/10">
@@ -787,24 +659,13 @@ export function HackathonSearch({
                   <X aria-hidden="true" className="size-5" />
                 </button>
               ) : null}
-              <button
-                aria-label="Search hackathons"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-cabernet px-5 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white hover:bg-[#5c151c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 disabled:cursor-wait disabled:bg-cabernet/70 md:size-12 md:min-h-0 md:px-0"
-                disabled={isSearching}
-                type="submit"
-              >
-                <Search aria-hidden="true" className="size-5" strokeWidth={2.5} />
-                <span className="md:sr-only">{isSearching ? "Searching" : "Search"}</span>
-              </button>
             </div>
           </form>
 
           <div className="mt-4 min-h-6 px-2 text-sm text-navy/55 dark:text-wheat/55" role="status">
-            {error ? (
-              <span className="font-semibold text-cabernet dark:text-[#e4a3ab]">{error}</span>
-            ) : hasSearched ? (
+            {activeFilters ? (
               <span>
-                Showing {hackathons.length} {hackathons.length === 1 ? "hackathon" : "hackathons"} matching your search.
+                Showing {filteredHackathons.length} {filteredHackathons.length === 1 ? "hackathon" : "hackathons"} matching your search.
               </span>
             ) : null}
           </div>
@@ -817,25 +678,13 @@ export function HackathonSearch({
             <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em] text-navy dark:text-wheat sm:text-4xl">Upcoming hackathons</h1>
           </div>
 
-          {hackathons.length ? (
+          {filteredHackathons.length ? (
             <>
               <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-                {hackathons.map((hackathon) => (
+                {filteredHackathons.map((hackathon) => (
                   <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                 ))}
               </div>
-              {hasMore ? (
-                <div className="mt-12 flex justify-center">
-                  <button
-                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-navy/15 dark:border-white/15 px-8 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:border-navy dark:hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 disabled:cursor-wait disabled:opacity-60"
-                    disabled={isLoadingMore}
-                    onClick={() => void loadMore()}
-                    type="button"
-                  >
-                    {isLoadingMore ? "Loading more hackathons…" : "Load more hackathons"}
-                  </button>
-                </div>
-              ) : null}
             </>
           ) : (
             <div className="rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-8 text-center">

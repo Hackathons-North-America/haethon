@@ -54,3 +54,37 @@ export function channelNameForHackathon(input: {
 
   return `${month}-${day}-${eventName}`.slice(0, 100);
 }
+
+const channelDatePrefixPattern = new RegExp(`^(?:${monthAbbreviations.join("|")})-\\d{2}-`);
+
+/**
+ * Key used to match a retired channel to a new edition of the same event.
+ * Generated channel names carry the start date and often the year, so both are
+ * stripped: "sep-13-hack-north-2026" and "hack-north-2027" reduce to
+ * "hack-north". An empty key means the name was nothing but a date/year and
+ * must not be matched on.
+ */
+export function channelReuseKey(channelName: string) {
+  return channelName
+    .replace(channelDatePrefixPattern, "")
+    .replace(/(?:19|20)\d{2}/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Shapes an admin-typed channel name the way Discord shapes text channel
+ * names (lowercase, no spaces) without stripping unicode, so names like
+ * "hack-the-north-🍁" survive. Returns null when nothing usable remains.
+ */
+export function normalizeChannelName(value: string) {
+  const name = value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100);
+
+  return name || null;
+}

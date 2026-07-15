@@ -62,6 +62,7 @@ const sampleJson = `[
     "startDate": "2026-09-12",
     "endDate": "2026-09-14",
     "format": "in_person",
+    "highSchoolersOnly": true,
     "shortDescription": "A weekend hackathon for students building useful software."
   }
 ]`;

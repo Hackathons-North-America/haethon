@@ -28,6 +28,7 @@ function itemToPreviewPayload(item: AdminHackathonListItem): Record<string, unkn
     format: item.format,
     beginnerFriendly: item.beginnerFriendly,
     travelReimbursement: item.travelReimbursement,
+    highSchoolersOnly: item.highSchoolersOnly,
     prizeAmountUsd: item.prizeAmountUsd ?? "",
   };
 }
@@ -101,8 +102,10 @@ export function HackathonEditDialog({
       format: formData.get("format")?.toString() ?? item.format,
       beginnerFriendly: formData.get("beginnerFriendly") === "on",
       travelReimbursement: formData.get("travelReimbursement") === "on",
+      highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
       voteDisplayOffset: formData.get("voteDisplayOffset")?.toString() ?? "0",
+      discordChannelId: formData.get("discordChannelId")?.toString() ?? "",
     };
 
     const response = await fetch(`/api/admin/hackathons/${item.id}`, {
@@ -360,6 +363,32 @@ export function HackathonEditDialog({
                   Beta testing only: this changes the displayed upvote/downvote total, not real votes. Remove this before production.
                 </p>
               </div>
+              <div className="sm:col-span-2">
+                <label className={labelClassName} htmlFor={`${item.id}-discordChannelId`}>
+                  Discord channel ID
+                </label>
+                <input
+                  aria-describedby={`${item.id}-discordChannelId-note`}
+                  autoComplete="off"
+                  className={inputClassName}
+                  defaultValue={item.discordChannelId ?? ""}
+                  id={`${item.id}-discordChannelId`}
+                  inputMode="numeric"
+                  maxLength={20}
+                  name="discordChannelId"
+                  pattern="[0-9]{17,20}"
+                  placeholder="123456789012345678"
+                  required={item.discordChannelId !== null}
+                />
+                <p
+                  id={`${item.id}-discordChannelId-note`}
+                  className="mt-1 text-xs leading-5 text-navy/55 dark:text-wheat/55"
+                >
+                  {item.discordChannelId
+                    ? "Paste a different channel ID to reassign this hackathon. The old Discord channel is left untouched."
+                    : "Paste the ID of an existing text channel in the configured Discord server."}
+                </p>
+              </div>
               <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
                 <input className={checkboxClassName} defaultChecked={item.beginnerFriendly} name="beginnerFriendly" type="checkbox" />
                 Beginner friendly
@@ -372,6 +401,15 @@ export function HackathonEditDialog({
                   type="checkbox"
                 />
                 Travel support
+              </label>
+              <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+                <input
+                  className={checkboxClassName}
+                  defaultChecked={item.highSchoolersOnly}
+                  name="highSchoolersOnly"
+                  type="checkbox"
+                />
+                High school only
               </label>
             </div>
 

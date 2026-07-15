@@ -15,11 +15,18 @@ import { filmGrainClassName } from "@/lib/tailwind";
 type Vote = -1 | 0 | 1;
 
 export type HackathonCardData = {
+  /** Search metadata sent with the cached catalog snapshot. */
+  beginnerFriendly?: boolean;
   country?: string | null;
   date: string;
+  format?: "online" | "in_person";
   hasDiscord?: boolean;
+  highSchoolersOnly?: boolean;
   id: string;
   image?: string | null;
+  /** The event's dates have passed; shown only for recurring (annual) series
+      until the next edition is published. */
+  isPast?: boolean;
   isSaved: boolean;
   location: string;
   name: string;
@@ -27,6 +34,8 @@ export type HackathonCardData = {
   /* Where this hackathon's data came from — surfaced as a small provenance
      badge under the card text. Absent when we have no source on file. */
   source?: HackathonSourceBadge | null;
+  startsAt?: string | null;
+  travelReimbursement?: boolean;
   userVote: Vote;
   /** Beta-only presentation override; never included in vote calculations. */
   voteDisplayOffset?: number;
@@ -551,9 +560,15 @@ export function HackathonCard({
           >
             {hackathon.name}
           </h2>
-          <p className="mt-2 text-[15px] font-semibold leading-5 text-navy/55 dark:text-wheat/55">
-            {hackathon.date}
-          </p>
+          {hackathon.isPast ? (
+            <p className="mt-2 text-[15px] font-semibold leading-5 text-navy/40 dark:text-wheat/40">
+              Last held {hackathon.date} · next edition TBA
+            </p>
+          ) : (
+            <p className="mt-2 text-[15px] font-semibold leading-5 text-navy/55 dark:text-wheat/55">
+              {hackathon.date}
+            </p>
+          )}
           <p
             className="mt-1 truncate text-[15px] font-semibold leading-5 text-navy/55 dark:text-wheat/55"
             title={[hackathon.country ? getCountryDisplay(hackathon.country).label : null, hackathon.location]
@@ -574,8 +589,27 @@ export function HackathonCard({
               : null}
             {hackathon.location}
           </p>
-          {hackathon.source || hackathon.hasDiscord ? (
+          {hackathon.beginnerFriendly ||
+          hackathon.travelReimbursement ||
+          hackathon.highSchoolersOnly ||
+          hackathon.source ||
+          hackathon.hasDiscord ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
+              {hackathon.beginnerFriendly ? (
+                <span className="relative z-10 inline-flex items-center rounded-full border border-cabernet/20 bg-cabernet/[0.05] px-2.5 py-1 text-[11px] font-semibold text-cabernet dark:border-[#e4a3ab]/30 dark:bg-[#e4a3ab]/10 dark:text-[#e4a3ab]">
+                  Beginner friendly
+                </span>
+              ) : null}
+              {hackathon.travelReimbursement ? (
+                <span className="relative z-10 inline-flex items-center rounded-full border border-cabernet/20 bg-cabernet/[0.05] px-2.5 py-1 text-[11px] font-semibold text-cabernet dark:border-[#e4a3ab]/30 dark:bg-[#e4a3ab]/10 dark:text-[#e4a3ab]">
+                  Travel support
+                </span>
+              ) : null}
+              {hackathon.highSchoolersOnly ? (
+                <span className="relative z-10 inline-flex items-center rounded-full border border-cabernet/20 bg-cabernet/[0.05] px-2.5 py-1 text-[11px] font-semibold text-cabernet dark:border-[#e4a3ab]/30 dark:bg-[#e4a3ab]/10 dark:text-[#e4a3ab]">
+                  High school only
+                </span>
+              ) : null}
               {/* Provenance badge — names where this hackathon's data came from.
                   Sits under the location, to the left of the Discord badge when both
                   are present. Absent when we have no source on file. */}

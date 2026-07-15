@@ -1,19 +1,35 @@
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import * as Sentry from "@sentry/nextjs";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { retireHackathonDiscordChannel, syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
-import { hackathonDates, hackathonLocations, hackathons } from "@/lib/db/schema";
+import {
+  discordChannels,
+  discordGuilds,
+  hackathonDates,
+  hackathonLocations,
+  hackathons,
+  hackathonSeries,
+} from "@/lib/db/schema";
+import { env } from "@/lib/env";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
+import { orderAdminHackathonRows } from "@/lib/hackathons/admin-ordering";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
+import { ensureHackathonSeries } from "@/lib/hackathons/series";
 import { adminHackathonUpdateSchema } from "@/lib/validations/hackathon";
 
 export type AdminHackathonUpdatePayload = z.infer<typeof adminHackathonUpdateSchema>;
 
-const publicStatuses = ["upcoming", "live"] as const;
+/* Includes "completed" so events whose dates have already passed (status is
+   derived once at approval, never re-derived) stay manageable — e.g. to mark
+   a past edition's series as recurring. */
+const publicStatuses = ["upcoming", "live", "completed"] as const;
 
 const adminHackathonSelection = {
   id: hackathons.id,
+  seriesId: hackathons.seriesId,
+  isRecurring: sql<boolean>`coalesce(${hackathonSeries.isRecurring}, false)`,
   name: hackathons.name,
   shortDescription: hackathons.shortDescription,
   websiteUrl: hackathons.websiteUrl,
@@ -24,6 +40,7 @@ const adminHackathonSelection = {
   status: hackathons.status,
   beginnerFriendly: hackathons.beginnerFriendly,
   travelReimbursement: hackathons.travelReimbursement,
+  highSchoolersOnly: hackathons.highSchoolersOnly,
   prizeAmountUsd: hackathons.prizeAmountUsd,
   voteScore: hackathons.voteScore,
   voteDisplayOffset: hackathons.voteDisplayOffset,
@@ -42,19 +59,59 @@ export function adminHackathonQuery() {
     .select(adminHackathonSelection)
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
-    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id));
+    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId));
+}
+
+async function withDiscordChannelIds<T extends { seriesId: string | null }>(rows: T[]) {
+  const seriesIds = [...new Set(rows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])))];
+
+  if (!env.DISCORD_GUILD_ID || seriesIds.length === 0) {
+    return rows.map((row) => ({ ...row, discordChannelId: null as string | null }));
+  }
+
+  const mappings = await db
+    .select({
+      channelSnowflake: discordChannels.channelSnowflake,
+      seriesId: discordChannels.seriesId,
+    })
+    .from(discordChannels)
+    .innerJoin(discordGuilds, eq(discordGuilds.id, discordChannels.guildId))
+    .where(
+      and(
+        eq(discordGuilds.guildSnowflake, env.DISCORD_GUILD_ID),
+        inArray(discordChannels.seriesId, seriesIds)
+      )
+    );
+  const channelIdBySeries = new Map(
+    mappings.flatMap((mapping) =>
+      mapping.seriesId ? [[mapping.seriesId, mapping.channelSnowflake] as const] : []
+    )
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    discordChannelId: row.seriesId ? channelIdBySeries.get(row.seriesId) ?? null : null,
+  }));
 }
 
 export async function listPublishedHackathons() {
-  return adminHackathonQuery()
+  const rows = await adminHackathonQuery()
     .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, publicStatuses)))
     .orderBy(asc(hackathonDates.startsAt));
+
+  // Past editions sink to the bottom, ordered by their assumed next-year date.
+  return withDiscordChannelIds(orderAdminHackathonRows(rows, new Date()));
 }
 
 export async function getAdminHackathon(hackathonId: string) {
   const [row] = await adminHackathonQuery().where(eq(hackathons.id, hackathonId)).limit(1);
 
-  return row ?? null;
+  if (!row) {
+    return null;
+  }
+
+  return (await withDiscordChannelIds([row]))[0];
 }
 
 export async function updatePublishedHackathon(hackathonId: string, payload: AdminHackathonUpdatePayload) {
@@ -79,6 +136,7 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
       status: deriveHackathonStatus(payload.startDate, payload.endDate, now),
       beginnerFriendly: payload.beginnerFriendly,
       travelReimbursement: payload.travelReimbursement,
+      highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd ?? null,
       // Omitted updates (for example, the organizer editor) preserve this
       // admin-only beta setting instead of silently resetting it.
@@ -134,6 +192,95 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
   revalidateHackathonCaches();
 
   return updated;
+}
+
+/**
+ * Flips the recurring flag on a published hackathon's series. Toggling on a
+ * series-less hackathon first creates (or adopts) its series; toggling off a
+ * series-less hackathon is a no-op — there is no flag to clear.
+ */
+export async function setHackathonSeriesRecurring(hackathonId: string, isRecurring: boolean) {
+  const [existing] = await db
+    .select({
+      id: hackathons.id,
+      seriesId: hackathons.seriesId,
+      name: hackathons.name,
+      websiteUrl: hackathons.websiteUrl,
+    })
+    .from(hackathons)
+    .where(eq(hackathons.id, hackathonId))
+    .limit(1);
+
+  if (!existing) {
+    throw new Error("Hackathon not found.");
+  }
+
+  if (existing.seriesId) {
+    await db
+      .update(hackathonSeries)
+      .set({ isRecurring, updatedAt: new Date() })
+      .where(eq(hackathonSeries.id, existing.seriesId));
+  } else if (isRecurring) {
+    const seriesId = await ensureHackathonSeries({
+      name: existing.name,
+      websiteUrl: existing.websiteUrl,
+      recurring: true,
+    });
+
+    await db.update(hackathons).set({ seriesId, updatedAt: new Date() }).where(eq(hackathons.id, hackathonId));
+  }
+
+  const updated = await getAdminHackathon(hackathonId);
+
+  if (!updated) {
+    throw new Error("Hackathon not found after update.");
+  }
+
+  revalidateHackathonCaches();
+
+  return updated;
+}
+
+/* Grace window before a past, non-repeating hackathon is deleted outright.
+   Repeating (recurring-series) events are never deleted by the cleanup cron —
+   they stay listed until their next edition is published. */
+export const PAST_HACKATHON_RETENTION_DAYS = 30;
+
+/**
+ * Deletes hackathons whose dates ended more than PAST_HACKATHON_RETENTION_DAYS
+ * ago, unless their series is marked recurring. Run daily by the
+ * cleanup-hackathons cron. A per-row failure (e.g. Discord channel retirement)
+ * skips that row and is retried on the next run.
+ */
+export async function deleteExpiredHackathons(now = new Date()) {
+  const cutoff = new Date(now.getTime() - PAST_HACKATHON_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+  const expired = await db
+    .select({ id: hackathons.id, name: hackathons.name })
+    .from(hackathons)
+    .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
+    .where(
+      and(
+        lt(hackathonDates.endsAt, cutoff),
+        or(isNull(hackathons.seriesId), eq(hackathonSeries.isRecurring, false))
+      )
+    );
+
+  const deleted: string[] = [];
+  const failed: string[] = [];
+
+  for (const row of expired) {
+    try {
+      await deleteHackathon(row.id);
+      deleted.push(row.name);
+    } catch (error) {
+      failed.push(row.name);
+      Sentry.captureException(error, { extra: { hackathonId: row.id, hackathonName: row.name } });
+    }
+  }
+
+  return { expired: expired.length, deleted, failed };
 }
 
 export async function deleteHackathon(hackathonId: string) {

@@ -50,13 +50,16 @@ export function previewPayloadToCard(payload: PreviewPayload, id = "admin-previe
   const startDate = dateText(payload.startDate);
 
   return {
+    beginnerFriendly: payload.beginnerFriendly === true,
     date: startDate || "Date to be announced",
+    highSchoolersOnly: payload.highSchoolersOnly === true,
     id,
     image: text(payload.imageUrl) || null,
     isSaved: false,
     country: text(payload.format, "in_person") === "online" ? null : text(payload.country) || null,
     location: locationText(payload),
     name,
+    travelReimbursement: payload.travelReimbursement === true,
     userVote: 0,
     voteScore: 0,
   };
@@ -94,6 +97,7 @@ const knownFieldLabels: Record<string, string> = {
   timeNote: "Time note",
   beginnerFriendly: "Beginner friendly",
   travelReimbursement: "Travel reimbursement",
+  highSchoolersOnly: "High school only",
   prizeAmountUsd: "Prizes",
   shortDescription: "Description",
 };

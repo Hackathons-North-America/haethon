@@ -1,0 +1,1 @@
+ALTER TABLE "discord_channels" ADD COLUMN "name_override" varchar(100);
