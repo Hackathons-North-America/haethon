@@ -27,6 +27,97 @@ const stars = [
   { top: "58%", left: "34%", size: 1.5, delay: 3.4, duration: 5.2, max: 0.5 },
 ] as const;
 
+/* Meteors: each starts in the upper sky and flies along its own angle. Cycle
+   lengths (duration + repeatDelay) are co-prime-ish so they never sync up and
+   the shower stays unpredictable. The last one is the rare bright showpiece. */
+const meteors = [
+  {
+    top: "9%",
+    left: "12%",
+    angle: 16,
+    distance: 520,
+    tail: 110,
+    duration: 1.3,
+    delay: 4,
+    repeatDelay: 19,
+    brightness: 0.85,
+  },
+  {
+    top: "4%",
+    left: "54%",
+    angle: 26,
+    distance: 400,
+    tail: 75,
+    duration: 1.05,
+    delay: 11,
+    repeatDelay: 23,
+    brightness: 0.65,
+  },
+  {
+    top: "16%",
+    left: "28%",
+    angle: 11,
+    distance: 660,
+    tail: 160,
+    duration: 1.8,
+    delay: 17.5,
+    repeatDelay: 29,
+    brightness: 1,
+  },
+] as const;
+
+type Meteor = (typeof meteors)[number];
+
+function ShootingStar({ meteor }: { meteor: Meteor }) {
+  const { top, left, angle, distance, tail, duration, delay, repeatDelay, brightness } = meteor;
+  /* The wrapper sets the flight angle; the inner span only ever translates
+     along local x, so the whole meteor moves along that angle. */
+  const cycle = { duration, delay, repeat: Infinity, repeatDelay } as const;
+
+  return (
+    <span
+      data-meteor
+      className="absolute block"
+      style={{ top, left, transform: `rotate(${angle}deg)` }}
+    >
+      <motion.span
+        className="relative block h-px w-px"
+        initial={{ x: 0, opacity: 0 }}
+        animate={{ x: distance, opacity: [0, brightness, brightness, 0] }}
+        transition={{
+          ...cycle,
+          x: { ...cycle, ease: "linear" },
+          opacity: { ...cycle, times: [0, 0.12, 0.68, 1] },
+        }}
+      >
+        {/* Tail — stretches out of the head, then draws back in as it dies.
+            Same clock as the flight, so the two stay in step forever. */}
+        <motion.span
+          className="absolute right-0 top-1/2 block origin-right -translate-y-1/2 rounded-full"
+          initial={{ scaleX: 0.2 }}
+          animate={{ scaleX: [0.2, 1, 1, 0.5] }}
+          transition={{ ...cycle, times: [0, 0.25, 0.7, 1] }}
+          style={{
+            width: tail,
+            height: 2,
+            background:
+              "linear-gradient(90deg, transparent, rgb(134 227 190 / 0.28) 45%, rgb(244 235 217 / 0.9))",
+          }}
+        />
+        {/* White-hot head with a wheat core and a cool aurora halo. */}
+        <span
+          className="absolute right-0 top-1/2 block size-[3px] -translate-y-1/2 rounded-full"
+          style={{
+            background: "rgb(255 250 242)",
+            boxShadow:
+              "0 0 6px 2px rgb(244 235 217 / 0.55), 0 0 18px 6px rgb(134 227 190 / 0.22)",
+          }}
+        />
+      </motion.span>
+    </span>
+  );
+}
+
 /* Vertical light shafts, blurred into soft aurora rays. Two different stripe
    periods so the layers shimmer against each other as they drift. */
 const raysA =
@@ -177,26 +268,13 @@ export function HeroAurora() {
         />
       ))}
 
-      {/* A shooting star every so often — blink and you miss it. */}
-      {still ? null : (
-        <motion.span
-          className="absolute left-[16%] top-[9%] h-px w-[70px]"
-          animate={{ x: [0, 420], y: [0, 120], opacity: [0, 0.9, 0] }}
-          transition={{
-            duration: 1.4,
-            delay: 5,
-            repeat: Infinity,
-            repeatDelay: 13,
-            ease: "easeOut",
-          }}
-          style={{
-            rotate: 16,
-            background:
-              "linear-gradient(90deg, transparent, rgb(244 235 217 / 0.9))",
-            boxShadow: "0 0 8px rgb(244 235 217 / 0.4)",
-          }}
-        />
-      )}
+      {/* Shooting stars — every so often one crosses the sky. Blink and you
+          miss it; watch long enough and the bright one rewards you. */}
+      {still
+        ? null
+        : meteors.map((meteor) => (
+            <ShootingStar key={`${meteor.top}-${meteor.left}`} meteor={meteor} />
+          ))}
 
       {/* Readability halo — quietly lifts the copy off the atmosphere. */}
       <div
