@@ -91,8 +91,20 @@ jobs:
       # Production variables are sensitive in Vercel, so `vercel pull` cannot
       # decrypt them for a local `vercel build` on the GitHub runner. Let
       # Vercel build remotely, where those variables are available securely.
+      # Vercel's API occasionally drops connections from GitHub runners
+      # (read ETIMEDOUT), so retry transient failures before giving up.
       - name: Build and deploy on Vercel
         id: deploy
         run: |
-          deployment_url="$(pnpm dlx vercel@55.0.0 deploy --yes --prod --token="$VERCEL_TOKEN")"
-          echo "url=${deployment_url}" >> "$GITHUB_OUTPUT"
+          for attempt in 1 2 3; do
+            if deployment_url="$(pnpm dlx vercel@55.0.0 deploy --yes --prod --token="$VERCEL_TOKEN")"; then
+              echo "url=${deployment_url}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Deploy attempt ${attempt} failed; retrying in 30s..." >&2
+              sleep 30
+            fi
+          done
+          echo "Vercel deploy failed after 3 attempts." >&2
+          exit 1
