@@ -11,12 +11,17 @@ export type DatePeriod =
 
 export type FeatureFilter = "any" | "on" | "off";
 export type HackathonFormatFilter = "any" | "online" | "in_person";
+/* "any" or a radius in km around the user's position. The position itself is
+   ephemeral browser state (IP lookup or geolocation), never part of the URL. */
+export type DistanceFilter = "any" | number;
 
 export type HackathonSearchFilters = {
   beginnerFriendly: FeatureFilter;
   countries: string[];
   datePeriod: DatePeriod;
+  distanceKm: DistanceFilter;
   format: HackathonFormatFilter;
+  highSchoolersOnly: FeatureFilter;
   name: string;
   travelReimbursement: FeatureFilter;
 };
@@ -30,6 +35,17 @@ export const datePeriodOptions: { label: string; value: DatePeriod }[] = [
   { label: "This year", value: "this-year" },
   { label: "Next year", value: "next-year" },
 ];
+
+export const distanceOptions: { label: string; value: DistanceFilter }[] = [
+  { label: "Any distance", value: "any" },
+  { label: "Within 25 km", value: 25 },
+  { label: "Within 50 km", value: 50 },
+  { label: "Within 100 km", value: 100 },
+  { label: "Within 250 km", value: 250 },
+  { label: "Within 500 km", value: 500 },
+];
+
+const distanceValues = new Set<DistanceFilter>(distanceOptions.map((option) => option.value));
 
 const datePeriodValues = new Set<DatePeriod>(datePeriodOptions.map((option) => option.value));
 const featureFilterValues = new Set<FeatureFilter>(["any", "on", "off"]);
@@ -77,8 +93,11 @@ function splitCountryParam(value: string) {
 export function normalizeSearchFilters(searchParams: Record<string, string | string[] | undefined>): HackathonSearchFilters {
   const rawName = firstParam(searchParams.q);
   const datePeriodValue = firstParam(searchParams.datePeriod);
+  const rawDistance = firstParam(searchParams.distanceKm);
+  const distanceValue = rawDistance ? Number(rawDistance) : Number.NaN;
   const formatValue = firstParam(searchParams.format);
   const beginnerFriendlyValue = firstParam(searchParams.beginnerFriendly);
+  const highSchoolersOnlyValue = firstParam(searchParams.highSchoolersOnly);
   const travelReimbursementValue = firstParam(searchParams.travelReimbursement);
   const countries = normalizeCountrySelections(
     [...allParams(searchParams.countries), ...allParams(searchParams.country)].flatMap(splitCountryParam)
@@ -89,7 +108,10 @@ export function normalizeSearchFilters(searchParams: Record<string, string | str
       beginnerFriendlyValue && isFeatureFilter(beginnerFriendlyValue) ? beginnerFriendlyValue : "any",
     countries,
     datePeriod: datePeriodValue && isDatePeriod(datePeriodValue) ? datePeriodValue : "any",
+    distanceKm: distanceValues.has(distanceValue) ? distanceValue : "any",
     format: formatValue && isHackathonFormatFilter(formatValue) ? formatValue : "any",
+    highSchoolersOnly:
+      highSchoolersOnlyValue && isFeatureFilter(highSchoolersOnlyValue) ? highSchoolersOnlyValue : "any",
     name: rawName?.trim() ?? "",
     travelReimbursement:
       travelReimbursementValue && isFeatureFilter(travelReimbursementValue) ? travelReimbursementValue : "any",

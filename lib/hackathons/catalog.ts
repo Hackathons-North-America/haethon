@@ -40,6 +40,7 @@ type CatalogQuery = {
   format: "online" | "in_person" | null;
   beginnerFriendly: boolean | null;
   travelReimbursement: boolean | null;
+  highSchoolersOnly: boolean | null;
   /* ISO strings (not Dates) so the serialized cache key is stable. */
   startsAfter: string | null;
   startsBefore: string | null;
@@ -61,6 +62,11 @@ type PublicHackathonCard = {
   highSchoolersOnly: boolean;
   id: string;
   image: string | null;
+  /* City-centroid coordinates (from the GeoNames-backed cities table); null
+     for online events and unresolved cities. Shipped with the snapshot so the
+     "within N km" filter runs entirely in the browser. */
+  latitude: number | null;
+  longitude: number | null;
   location: string;
   name: string;
   slug: string;
@@ -126,6 +132,8 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       city: hackathonLocations.city,
       region: hackathonLocations.region,
       country: hackathonLocations.country,
+      latitude: hackathonLocations.latitude,
+      longitude: hackathonLocations.longitude,
       startsAt: hackathonDates.startsAt,
       endsAt: hackathonDates.endsAt,
     })
@@ -149,6 +157,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         query.format ? eq(hackathons.format, query.format) : undefined,
         query.beginnerFriendly === null ? undefined : eq(hackathons.beginnerFriendly, query.beginnerFriendly),
         query.travelReimbursement === null ? undefined : eq(hackathons.travelReimbursement, query.travelReimbursement),
+        query.highSchoolersOnly === null ? undefined : eq(hackathons.highSchoolersOnly, query.highSchoolersOnly),
         startsAfter ? gte(hackathonDates.startsAt, startsAfter) : undefined,
         startsBefore ? lte(hackathonDates.startsAt, startsBefore) : undefined
       )
@@ -223,6 +232,8 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         id: row.id,
         image: row.imageUrl,
         isPast: isPastCatalogRow(row, now),
+        latitude: row.latitude === null ? null : Number(row.latitude),
+        longitude: row.longitude === null ? null : Number(row.longitude),
         location: location.locality ?? "Location TBA",
         name: row.name,
         slug: row.slug,
@@ -258,6 +269,7 @@ export function getPublicHackathonCatalog(input: {
   format?: "online" | "in_person" | null;
   beginnerFriendly?: boolean | null;
   travelReimbursement?: boolean | null;
+  highSchoolersOnly?: boolean | null;
   startsAfter?: Date | string | null;
   startsBefore?: Date | string | null;
   limit?: number;
@@ -269,6 +281,7 @@ export function getPublicHackathonCatalog(input: {
     format: input.format ?? null,
     beginnerFriendly: input.beginnerFriendly ?? null,
     travelReimbursement: input.travelReimbursement ?? null,
+    highSchoolersOnly: input.highSchoolersOnly ?? null,
     startsAfter: roundDownToHourIso(input.startsAfter),
     startsBefore: roundDownToHourIso(input.startsBefore),
     limit: Math.min(Math.max(input.limit ?? CATALOG_PAGE_SIZE, 1), 50),
@@ -288,6 +301,7 @@ export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
     format: null,
     beginnerFriendly: null,
     travelReimbursement: null,
+    highSchoolersOnly: null,
     startsAfter: null,
     startsBefore: null,
     limit: null,

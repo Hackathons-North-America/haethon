@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 
+import { CityCombobox } from "@/components/forms/city-combobox";
 import { COMMUNITY_FORM_SOURCE_URL } from "@/lib/hackathons/source-provenance";
 
 type SubmitterType = "organizer" | "community";
@@ -54,6 +55,11 @@ export function HackathonSubmissionForm() {
   const [submitterType, setSubmitterType] = useState<SubmitterType>("community");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  // Controlled so picking a city from the autocomplete fills them in one step.
+  const [region, setRegion] = useState("");
+  const [country, setCountry] = useState("Canada");
+  // Remount key: form.reset() can't clear the combobox's internal state.
+  const [formVersion, setFormVersion] = useState(0);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,6 +79,9 @@ export function HackathonSubmissionForm() {
             country: fieldValue(formData, "country"),
             city: fieldValue(formData, "city"),
             region: fieldValue(formData, "region"),
+            countryCode: fieldValue(formData, "countryCode"),
+            latitude: fieldValue(formData, "latitude"),
+            longitude: fieldValue(formData, "longitude"),
             shortDescription: fieldValue(formData, "shortDescription"),
             organizationName: fieldValue(formData, "organizationName"),
             websiteUrl: urlValue(formData, "websiteUrl"),
@@ -112,6 +121,9 @@ export function HackathonSubmissionForm() {
         body.data?.publishedDirectly ? "Published directly for your verified organization." : "Submitted for review."
       );
       form.reset();
+      setRegion("");
+      setCountry("Canada");
+      setFormVersion((version) => version + 1);
     } catch {
       setStatus("error");
       setMessage("Something went wrong sending your submission. Please try again.");
@@ -233,7 +245,14 @@ export function HackathonSubmissionForm() {
                 <label className={labelClassName} htmlFor="country">
                   Country
                 </label>
-                <input id="country" name="country" required defaultValue="Canada" className={inputClassName} />
+                <input
+                  id="country"
+                  name="country"
+                  required
+                  className={inputClassName}
+                  onChange={(event) => setCountry(event.target.value)}
+                  value={country}
+                />
               </div>
             </div>
 
@@ -242,13 +261,27 @@ export function HackathonSubmissionForm() {
                 <label className={labelClassName} htmlFor="city">
                   City
                 </label>
-                <input id="city" name="city" className={inputClassName} />
+                <CityCombobox
+                  id="city"
+                  inputClassName={inputClassName}
+                  key={formVersion}
+                  onCitySelect={(city) => {
+                    setRegion(city.region ?? "");
+                    setCountry(city.country);
+                  }}
+                />
               </div>
               <div>
                 <label className={labelClassName} htmlFor="region">
                   Province / state
                 </label>
-                <input id="region" name="region" className={inputClassName} />
+                <input
+                  id="region"
+                  name="region"
+                  className={inputClassName}
+                  onChange={(event) => setRegion(event.target.value)}
+                  value={region}
+                />
               </div>
               <div>
                 <label className={labelClassName} htmlFor="venue">

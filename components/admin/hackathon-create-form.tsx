@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 
 import type { AdminHackathonListItem } from "@/components/admin/hackathon-admin-item";
 import { previewPayloadToCard } from "@/components/admin/hackathon-card-preview";
+import { CityCombobox } from "@/components/forms/city-combobox";
 import { HackathonCard } from "@/components/hackathon-card";
 
 const inputClassName =
@@ -56,6 +57,11 @@ export function HackathonCreateForm() {
   const [previewPayload, setPreviewPayload] = useState<Record<string, unknown>>(emptyPreviewPayload);
   const [discordChannelId, setDiscordChannelId] = useState("");
   const [createDiscordChannel, setCreateDiscordChannel] = useState(false);
+  // Controlled so picking a city from the autocomplete fills them in one step.
+  const [region, setRegion] = useState("");
+  const [country, setCountry] = useState("");
+  // Remount key: form.reset() can't clear the combobox's internal state.
+  const [formVersion, setFormVersion] = useState(0);
   const saving = status === "saving";
 
   function updatePreview(key: string, nextValue: unknown) {
@@ -85,6 +91,9 @@ export function HackathonCreateForm() {
       city: formData.get("city")?.toString() ?? "",
       region: formData.get("region")?.toString() ?? "",
       country: formData.get("country")?.toString() ?? "",
+      countryCode: formData.get("countryCode")?.toString() ?? "",
+      latitude: formData.get("latitude")?.toString() ?? "",
+      longitude: formData.get("longitude")?.toString() ?? "",
       startDate: formData.get("startDate")?.toString() ?? "",
       endDate: formData.get("endDate")?.toString() ?? "",
       applicationOpensAt: formData.get("applicationOpensAt")?.toString() ?? "",
@@ -119,6 +128,9 @@ export function HackathonCreateForm() {
     setPreviewPayload(emptyPreviewPayload());
     setDiscordChannelId("");
     setCreateDiscordChannel(false);
+    setRegion("");
+    setCountry("");
+    setFormVersion((version) => version + 1);
   }
 
   return (
@@ -198,19 +210,48 @@ export function HackathonCreateForm() {
             <label className={labelClassName} htmlFor="new-city">
               City
             </label>
-            <input id="new-city" name="city" className={inputClassName} />
+            <CityCombobox
+              id="new-city"
+              inputClassName={inputClassName}
+              key={formVersion}
+              onCitySelect={(city) => {
+                setRegion(city.region ?? "");
+                setCountry(city.country);
+                // Programmatic fills don't bubble a change event to the grid's
+                // preview handler, so the preview is updated directly.
+                setPreviewPayload((current) => ({
+                  ...current,
+                  city: city.name,
+                  region: city.region ?? "",
+                  country: city.country,
+                }));
+              }}
+            />
           </div>
           <div>
             <label className={labelClassName} htmlFor="new-region">
               Region
             </label>
-            <input id="new-region" name="region" className={inputClassName} />
+            <input
+              id="new-region"
+              name="region"
+              className={inputClassName}
+              onChange={(event) => setRegion(event.target.value)}
+              value={region}
+            />
           </div>
           <div>
             <label className={labelClassName} htmlFor="new-country">
               Country
             </label>
-            <input id="new-country" name="country" required className={inputClassName} />
+            <input
+              id="new-country"
+              name="country"
+              required
+              className={inputClassName}
+              onChange={(event) => setCountry(event.target.value)}
+              value={country}
+            />
           </div>
           <div>
             <label className={labelClassName} htmlFor="new-venue">

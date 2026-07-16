@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     format: searchParams.get("format") ?? undefined,
     beginnerFriendly: searchParams.get("beginnerFriendly") ?? undefined,
     travelReimbursement: searchParams.get("travelReimbursement") ?? undefined,
+    highSchoolersOnly: searchParams.get("highSchoolersOnly") ?? undefined,
     startsAfter: searchParams.get("startsAfter") ?? undefined,
     startsBefore: searchParams.get("startsBefore") ?? undefined,
     limit: searchParams.get("limit") ?? undefined,
@@ -23,8 +24,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { q, countries, format, beginnerFriendly, travelReimbursement, startsAfter, startsBefore, limit, offset } =
-    parsed.data;
+  const {
+    q,
+    countries,
+    format,
+    beginnerFriendly,
+    travelReimbursement,
+    highSchoolersOnly,
+    startsAfter,
+    startsBefore,
+    limit,
+    offset,
+  } = parsed.data;
 
   // The heavy catalog query is served from the shared cross-request cache;
   // only the tiny saved/vote overlay depends on who is asking.
@@ -35,6 +46,7 @@ export async function GET(request: Request) {
       format: format ?? null,
       beginnerFriendly: beginnerFriendly ?? null,
       travelReimbursement: travelReimbursement ?? null,
+      highSchoolersOnly: highSchoolersOnly ?? null,
       startsAfter: startsAfter ?? null,
       startsBefore: startsBefore ?? null,
       limit,

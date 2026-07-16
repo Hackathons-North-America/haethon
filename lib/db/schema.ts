@@ -223,6 +223,32 @@ export const hackathonLocations = pgTable(
   ]
 );
 
+/* World cities seeded from the free GeoNames cities5000 dump (population >
+   5000). City autocomplete and coordinate lookups run against this table so
+   no external geocoding API is ever called. Refreshed by scripts/db/seed-cities.mjs. */
+export const cities = pgTable(
+  "cities",
+  {
+    /* GeoNames' stable numeric id, so re-seeding upserts instead of duplicating. */
+    id: integer("id").primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    /* Accent-stripped name so "Montreal" still matches "Montréal". */
+    asciiName: varchar("ascii_name", { length: 200 }).notNull(),
+    region: varchar("region", { length: 120 }),
+    country: varchar("country", { length: 120 }).notNull(),
+    countryCode: varchar("country_code", { length: 2 }).notNull(),
+    latitude: numeric("latitude", { precision: 9, scale: 6 }).notNull(),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }).notNull(),
+    /* Ranks autocomplete results — "San" should surface San Francisco first. */
+    population: integer("population").notNull().default(0),
+  },
+  (table) => [
+    index("cities_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
+    index("cities_ascii_name_trgm_idx").using("gin", sql`${table.asciiName} gin_trgm_ops`),
+    index("cities_country_code_idx").on(table.countryCode),
+  ]
+);
+
 export const hackathonDates = pgTable(
   "hackathon_dates",
   {

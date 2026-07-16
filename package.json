@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:setup": "node scripts/db/setup.mjs",
+    "db:seed-cities": "node scripts/db/seed-cities.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db/migrate.mjs",
     "db:push": "drizzle-kit push",
@@ -19,6 +20,7 @@
     "backfill:import-submission-origin": "tsx scripts/backfill-import-submission-origin.ts",
     "backfill:source-types": "tsx scripts/backfill-source-types.ts",
     "backfill:passive-verification": "tsx scripts/backfill-passive-verification.ts",
+    "backfill:location-coordinates": "tsx scripts/backfill-location-coordinates.ts",
     "repair:checkin-codes": "node scripts/db/repair-checkin-codes.mjs"
   },
   "dependencies": {

@@ -15,6 +15,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import type { SelectUser } from "@/lib/db/schema";
+import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
 import { normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
 import {
   calculateDuplicateScore,
@@ -240,9 +241,7 @@ export async function createPublishedHackathon(
 
   await db.insert(hackathonLocations).values({
     hackathonId: created.id,
-    city: payload.city,
-    region: payload.region,
-    country: payload.country,
+    ...(await hackathonLocationValues(payload)),
   });
 
   await db.insert(sources).values({
@@ -329,20 +328,22 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
     .limit(1);
 
   if (existingLocation) {
-    await db
-      .update(hackathonLocations)
-      .set({
-        city: existingLocation.city ?? payload.city,
-        region: existingLocation.region ?? payload.region,
-        country: existingLocation.country ?? payload.country,
-      })
-      .where(eq(hackathonLocations.id, existingLocation.id));
+    // Existing fields win as usual; coordinates are recomputed from the
+    // merged location only when the target doesn't have any yet.
+    const merged = await hackathonLocationValues({
+      city: existingLocation.city ?? payload.city,
+      region: existingLocation.region ?? payload.region,
+      country: existingLocation.country ?? payload.country,
+      countryCode: existingLocation.countryCode ?? payload.countryCode,
+      latitude: existingLocation.latitude === null ? payload.latitude : Number(existingLocation.latitude),
+      longitude: existingLocation.longitude === null ? payload.longitude : Number(existingLocation.longitude),
+    });
+
+    await db.update(hackathonLocations).set(merged).where(eq(hackathonLocations.id, existingLocation.id));
   } else {
     await db.insert(hackathonLocations).values({
       hackathonId: targetHackathonId,
-      city: payload.city,
-      region: payload.region,
-      country: payload.country,
+      ...(await hackathonLocationValues(payload)),
     });
   }
 

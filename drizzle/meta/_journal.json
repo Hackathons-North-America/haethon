@@ -113,6 +113,13 @@
       "when": 1784076021987,
       "tag": "0015_dashing_drax",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784167920274,
+      "tag": "0016_damp_golden_guardian",
+      "breakpoints": true
     }
   ]
 }

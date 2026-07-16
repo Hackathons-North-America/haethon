@@ -160,7 +160,21 @@ export function SubmissionReviewCard({
     setStatus("submitting");
     setMessage(null);
 
+    // Coordinates picked via the city autocomplete at submission time survive
+    // review as long as the reviewer keeps that city; an edited city falls
+    // back to server-side resolution against the cities table at publish.
+    const reviewedCity = formData.get("city")?.toString() ?? "";
+    const submittedCoordinates =
+      reviewedCity && reviewedCity === value(submission.payload, "city")
+        ? {
+            latitude: value(submission.payload, "latitude"),
+            longitude: value(submission.payload, "longitude"),
+            countryCode: value(submission.payload, "countryCode"),
+          }
+        : {};
+
     const normalizedPayload = {
+      ...submittedCoordinates,
       name: formData.get("name")?.toString() ?? submission.normalizedName,
       organizationName: formData.get("organizationName")?.toString() ?? "",
       websiteUrl: formData.get("websiteUrl")?.toString() ?? submission.websiteUrl,

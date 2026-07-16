@@ -154,6 +154,7 @@ export const hackathonSearchSchema = z
     format: z.enum(["online", "in_person"]).optional(),
     beginnerFriendly: optionalBooleanQueryParam,
     travelReimbursement: optionalBooleanQueryParam,
+    highSchoolersOnly: optionalBooleanQueryParam,
     startsAfter: z.coerce.date().optional(),
     startsBefore: z.coerce.date().optional(),
     limit: z.coerce.number().int().min(1).max(50).default(12),
@@ -178,6 +179,20 @@ const normalizedHackathonPayloadBaseSchema = z.object({
     city: optionalString(120),
     region: optionalString(120),
     country: z.string().trim().min(2).max(120),
+    /* Set when the city was picked from the local cities autocomplete. Write
+       paths without them (imports, review queue) resolve coordinates
+       server-side from the cities table instead. */
+    countryCode: z.preprocess(
+      emptyToUndefined,
+      z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z]{2}$/)
+        .transform((value) => value.toUpperCase())
+        .optional()
+    ),
+    latitude: z.preprocess(emptyToUndefined, z.coerce.number().min(-90).max(90).optional()),
+    longitude: z.preprocess(emptyToUndefined, z.coerce.number().min(-180).max(180).optional()),
     venue: optionalString(160),
     startDate: requiredDate,
     endDate: requiredDate,

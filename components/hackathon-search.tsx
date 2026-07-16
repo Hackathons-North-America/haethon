@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { CalendarDays, Check, Globe2, MapPin, PlusSquare, Search, Settings2, X } from "lucide-react";
+import { CalendarDays, Check, Globe2, LocateFixed, MapPin, Navigation, PlusSquare, Search, Settings2, X } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
+import type { GeoPoint } from "@/lib/geo";
 import { countryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
-import { datePeriodOptions } from "@/lib/hackathons/search-filters";
+import { datePeriodOptions, distanceOptions } from "@/lib/hackathons/search-filters";
 import type {
   DatePeriod,
+  DistanceFilter,
   FeatureFilter,
   HackathonFormatFilter,
   HackathonSearchFilters,
@@ -24,8 +26,14 @@ const countryPopoverId = "hackathon-country-popover";
 const datePopoverId = "hackathon-date-popover";
 const formatPopoverId = "hackathon-format-popover";
 const featurePopoverId = "hackathon-feature-popover";
+const distancePopoverId = "hackathon-distance-popover";
 
-type OpenPopover = "countries" | "date" | "format" | "features" | null;
+type OpenPopover = "countries" | "date" | "format" | "features" | "distance" | null;
+
+/* The user's position for the distance filter. IP-based (free Vercel geo
+   headers, no permission prompt) by default; "precise" comes from the browser
+   geolocation API when the user asks for it. */
+type UserOrigin = GeoPoint & { label: string | null; precise: boolean };
 
 const formatOptions: { label: string; value: HackathonFormatFilter; detail: string }[] = [
   { label: "Any format", value: "any", detail: "Show online and in person events" },
@@ -37,7 +45,9 @@ function hasActiveFilters({
   beginnerFriendly,
   countries,
   datePeriod,
+  distanceKm,
   format,
+  highSchoolersOnly,
   name,
   travelReimbursement,
 }: HackathonSearchFilters) {
@@ -45,14 +55,25 @@ function hasActiveFilters({
     name.trim() ||
       countries.length ||
       datePeriod !== "any" ||
+      distanceKm !== "any" ||
       format !== "any" ||
       beginnerFriendly !== "any" ||
+      highSchoolersOnly !== "any" ||
       travelReimbursement !== "any"
   );
 }
 
 function replaceSearchUrl(
-  { beginnerFriendly, countries, datePeriod, format, name, travelReimbursement }: HackathonSearchFilters,
+  {
+    beginnerFriendly,
+    countries,
+    datePeriod,
+    distanceKm,
+    format,
+    highSchoolersOnly,
+    name,
+    travelReimbursement,
+  }: HackathonSearchFilters,
   basePath: string
 ) {
   const params = new URLSearchParams();
@@ -67,6 +88,10 @@ function replaceSearchUrl(
     params.set("datePeriod", datePeriod);
   }
 
+  if (distanceKm !== "any") {
+    params.set("distanceKm", String(distanceKm));
+  }
+
   if (format !== "any") {
     params.set("format", format);
   }
@@ -77,6 +102,10 @@ function replaceSearchUrl(
 
   if (travelReimbursement !== "any") {
     params.set("travelReimbursement", travelReimbursement);
+  }
+
+  if (highSchoolersOnly !== "any") {
+    params.set("highSchoolersOnly", highSchoolersOnly);
   }
 
   const query = params.toString();
@@ -109,9 +138,13 @@ export function HackathonSearch({
   const [countries, setCountries] = useState(initialFilters.countries);
   const [countryQuery, setCountryQuery] = useState("");
   const [datePeriod, setDatePeriod] = useState<DatePeriod>(initialFilters.datePeriod);
+  const [distanceKm, setDistanceKm] = useState<DistanceFilter>(initialFilters.distanceKm);
+  const [origin, setOrigin] = useState<UserOrigin | null>(null);
+  const [locationState, setLocationState] = useState<"idle" | "locating" | "ready" | "error">("idle");
   const [format, setFormat] = useState<HackathonFormatFilter>(initialFilters.format);
   const [beginnerFriendly, setBeginnerFriendly] = useState<FeatureFilter>(initialFilters.beginnerFriendly);
   const [travelReimbursement, setTravelReimbursement] = useState<FeatureFilter>(initialFilters.travelReimbursement);
+  const [highSchoolersOnly, setHighSchoolersOnly] = useState<FeatureFilter>(initialFilters.highSchoolersOnly);
   const [catalog, setCatalog] = useState(initialHackathons);
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
   const filterFormRef = useRef<HTMLFormElement>(null);
@@ -147,6 +180,67 @@ export function HackathonSearch({
     }
   }, [openPopover]);
 
+  /* Browser geolocation — accurate but shows a permission prompt, so it is
+     only used on explicit request or when the free IP lookup has nothing. */
+  function locateWithBrowser() {
+    if (!("geolocation" in navigator)) {
+      setLocationState("error");
+      return;
+    }
+
+    setLocationState("locating");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setOrigin({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          label: null,
+          precise: true,
+        });
+        setLocationState("ready");
+      },
+      () => setLocationState("error"),
+      { maximumAge: 5 * 60 * 1000, timeout: 10_000 }
+    );
+  }
+
+  /* Prompt-free default: Vercel's IP geo headers via /api/geo (city-level,
+     free). Falls back to browser geolocation when they are unavailable
+     (e.g. local dev). */
+  async function locate() {
+    setLocationState("locating");
+
+    try {
+      const response = await fetch("/api/geo");
+      const body = (await response.json()) as {
+        data: { latitude: number; longitude: number; city: string | null } | null;
+      };
+
+      if (body.data) {
+        setOrigin({ ...body.data, label: body.data.city, precise: false });
+        setLocationState("ready");
+        return;
+      }
+    } catch {
+      // Fall through to the browser API.
+    }
+
+    locateWithBrowser();
+  }
+
+  /* Distance picks trigger locate() from their click handler; this only
+     covers landing on a URL that already carries a distance filter. */
+  useEffect(() => {
+    if (initialFilters.distanceKm === "any") {
+      return;
+    }
+
+    const timeout = setTimeout(() => void locate(), 0);
+
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const row = countryRowRef.current;
 
@@ -177,16 +271,17 @@ export function HackathonSearch({
       value: travelReimbursement,
       setValue: setTravelReimbursement,
     },
+    { key: "highSchoolersOnly", label: "High school only", value: highSchoolersOnly, setValue: setHighSchoolersOnly },
   ];
 
   const currentFilters = useMemo(
-    () => ({ beginnerFriendly, countries, datePeriod, format, name, travelReimbursement }),
-    [beginnerFriendly, countries, datePeriod, format, name, travelReimbursement]
+    () => ({ beginnerFriendly, countries, datePeriod, distanceKm, format, highSchoolersOnly, name, travelReimbursement }),
+    [beginnerFriendly, countries, datePeriod, distanceKm, format, highSchoolersOnly, name, travelReimbursement]
   );
   const activeFilters = useMemo(() => hasActiveFilters(currentFilters), [currentFilters]);
   const filteredHackathons = useMemo(
-    () => filterLocalHackathonCatalog(catalog, currentFilters),
-    [catalog, currentFilters]
+    () => filterLocalHackathonCatalog(catalog, currentFilters, origin),
+    [catalog, currentFilters, origin]
   );
   const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
   const filteredCountries = useMemo(() => {
@@ -210,6 +305,12 @@ export function HackathonSearch({
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
   const selectedFormatLabel = formatOptions.find((option) => option.value === format)?.label ?? "Any format";
+  const selectedDistanceLabel =
+    distanceKm === "any"
+      ? "Any distance"
+      : locationState === "error"
+        ? "Location unavailable"
+        : `Within ${distanceKm} km`;
   const selectedFeatureLabels = featureTags.filter((tag) => tag.value === "on").map((tag) => tag.label);
 
   function selectCountry(country: string) {
@@ -265,9 +366,11 @@ export function HackathonSearch({
     setCountries([]);
     setCountryQuery("");
     setDatePeriod("any");
+    setDistanceKm("any");
     setFormat("any");
     setBeginnerFriendly("any");
     setTravelReimbursement("any");
+    setHighSchoolersOnly("any");
   }
 
   return (
@@ -581,6 +684,94 @@ export function HackathonSearch({
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="relative min-h-[4.2rem] min-w-0 flex-1">
+              {distanceKm !== "any" ? <input name="distanceKm" type="hidden" value={distanceKm} /> : null}
+              <button
+                aria-controls={distancePopoverId}
+                aria-expanded={openPopover === "distance"}
+                aria-label="Distance"
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-[2rem] px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 ${
+                  openPopover === "distance" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
+                }`}
+                onClick={() => setOpenPopover((current) => (current === "distance" ? null : "distance"))}
+                type="button"
+              >
+                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
+                  <Navigation aria-hidden="true" className="size-3.5" />
+                  Near me
+                </span>
+                <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">
+                  {distanceKm !== "any" && locationState === "locating" ? "Finding you..." : selectedDistanceLabel}
+                </span>
+              </button>
+              {openPopover === "distance" ? (
+                <div
+                  className="absolute left-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[19rem] rounded-[1.75rem] border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
+                  id={distancePopoverId}
+                >
+                  <div className="grid gap-2">
+                    {distanceOptions.map((option) => {
+                      const selected = distanceKm === option.value;
+
+                      return (
+                        <button
+                          aria-pressed={selected}
+                          className={`flex min-h-[3.5rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 ${
+                            selected
+                              ? "border-cabernet/35 dark:border-[#e4a3ab]/40 bg-cabernet/5 dark:bg-[#e4a3ab]/10"
+                              : "border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] hover:border-navy/20 hover:bg-ivory dark:hover:bg-white/10"
+                          }`}
+                          key={option.value}
+                          onClick={() => {
+                            setDistanceKm(option.value);
+                            setOpenPopover(null);
+
+                            if (option.value !== "any" && !origin && locationState === "idle") {
+                              void locate();
+                            }
+                          }}
+                          type="button"
+                        >
+                          <span className="text-sm font-semibold text-navy dark:text-wheat">{option.label}</span>
+                          <span
+                            className={`grid size-6 shrink-0 place-items-center rounded-full border ${
+                              selected ? "border-cabernet dark:border-[#e4a3ab]/50 bg-cabernet text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white" : "border-navy/15 dark:border-white/15 text-transparent"
+                            }`}
+                          >
+                            <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 border-t border-navy/10 dark:border-white/10 pt-3">
+                    {locationState === "error" ? (
+                      <p className="mb-2 text-xs leading-5 text-cabernet dark:text-[#e4a3ab]">
+                        We couldn&apos;t find your location. Allow location access in your browser and try again.
+                      </p>
+                    ) : origin ? (
+                      <p className="mb-2 text-xs leading-5 text-navy/55 dark:text-wheat/55">
+                        {origin.precise
+                          ? "Using your precise location."
+                          : `Using your approximate location${origin.label ? ` near ${origin.label}` : ""}.`}
+                      </p>
+                    ) : null}
+                    {!origin?.precise ? (
+                      <button
+                        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-navy/15 dark:border-white/15 px-4 text-xs font-semibold text-navy dark:text-wheat transition-colors hover:border-navy dark:hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40 disabled:opacity-50"
+                        disabled={locationState === "locating"}
+                        onClick={locateWithBrowser}
+                        type="button"
+                      >
+                        <LocateFixed aria-hidden="true" className="size-3.5" />
+                        {locationState === "locating" ? "Locating..." : "Use precise location"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

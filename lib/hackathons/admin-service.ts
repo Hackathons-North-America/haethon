@@ -13,6 +13,7 @@ import {
   hackathonSeries,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
 import { orderAdminHackathonRows } from "@/lib/hackathons/admin-ordering";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
@@ -165,11 +166,7 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
     await db.insert(hackathonDates).values({ hackathonId, ...dateValues });
   }
 
-  const locationValues = {
-    city: payload.city ?? null,
-    region: payload.region ?? null,
-    country: payload.country,
-  };
+  const locationValues = await hackathonLocationValues(payload);
   const [existingLocation] = await db
     .select({ id: hackathonLocations.id })
     .from(hackathonLocations)

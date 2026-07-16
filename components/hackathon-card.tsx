@@ -28,6 +28,9 @@ export type HackathonCardData = {
       until the next edition is published. */
   isPast?: boolean;
   isSaved: boolean;
+  /** City-centroid coordinates used by the browser-side distance filter. */
+  latitude?: number | null;
+  longitude?: number | null;
   location: string;
   name: string;
   slug?: string | null;
