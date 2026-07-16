@@ -243,7 +243,6 @@ export default async function AccountPage() {
     isWinner: wonHackathonIds.has(hackathon.id),
   }));
 
-  const displayName = [context.user.firstName, context.user.lastName].filter(Boolean).join(" ") || context.user.email;
   const pinnedItems = [
     ...wins.map((win) => ({
       id: `win-${win.id}`,
@@ -276,7 +275,11 @@ export default async function AccountPage() {
       <div className="mx-auto w-full max-w-[840px]">
         <div className="space-y-10">
           <section id="profile" className="pt-2">
-            <AccountProfileForm displayName={displayName} profile={profile ?? null} />
+            <AccountProfileForm
+              firstName={context.user.firstName}
+              lastName={context.user.lastName}
+              profile={profile ?? null}
+            />
           </section>
 
           <section id="email-preferences">

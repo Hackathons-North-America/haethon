@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { previewHackathonDiscordChannel, syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
+import { sendInstantCountryAlertsSafely } from "@/lib/notifications/country-alerts";
 import {
   hackathonDates,
   hackathonLocations,
@@ -256,6 +257,8 @@ export async function createPublishedHackathon(
   if (options?.syncDiscord !== false) {
     await syncHackathonDiscordChannelSafely(created.id);
   }
+
+  await sendInstantCountryAlertsSafely(created.id);
 
   revalidateHackathonCaches();
 

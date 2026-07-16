@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, asc, eq, ne, or } from "drizzle-orm";
 
+import { CountryAlertSection } from "@/components/country-alert-section";
 import type { HackathonCardData, HackathonCardReminder } from "@/components/hackathon-card";
 import { MyPipelineBoard } from "@/components/my-pipeline-board";
 import type { PipelineColumn } from "@/components/my-pipeline-board";
@@ -10,6 +11,7 @@ import { PastHackathonCard } from "@/components/past-hackathon-card";
 import { getCurrentUserRecord } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  countryAlertSubscriptions,
   hackathonDates,
   hackathonLocations,
   hackathons,
@@ -149,7 +151,7 @@ export default async function MyHackathonsPage() {
   pastRows.sort((a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0));
 
   const activeCount = stageOrder.reduce((total, stage) => total + (byStage.get(stage)?.length ?? 0), 0);
-  const [discordHackathonIds, sourceByHackathon, preferenceRows] = await Promise.all([
+  const [discordHackathonIds, sourceByHackathon, preferenceRows, countryAlertRows] = await Promise.all([
     getHackathonIdsWithDiscord(rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))),
     getPrimarySourceByHackathon(rows.map((row) => row.hackathonId)),
     db
@@ -165,7 +167,17 @@ export default async function MyHackathonsPage() {
           eq(userHackathonNotificationPreferences.channel, "email")
         )
       ),
+    db
+      .select({
+        country: countryAlertSubscriptions.country,
+        frequency: countryAlertSubscriptions.frequency,
+      })
+      .from(countryAlertSubscriptions)
+      .where(eq(countryAlertSubscriptions.userId, user.id))
+      .limit(1),
   ]);
+
+  const countryAlert = countryAlertRows[0] ?? null;
 
   // Reminder toggles default to disabled (opt-in), matching the reminder sync;
   // a stored row overrides that. Keyed by hackathon + reminder type.
@@ -213,6 +225,8 @@ export default async function MyHackathonsPage() {
   return (
     <main className="min-h-screen px-5 pb-20 pt-14 text-navy dark:text-wheat sm:px-8 sm:pt-16 lg:px-12">
       <div className="mx-auto w-full max-w-[1400px]">
+        <CountryAlertSection subscription={countryAlert} />
+
         {activeCount === 0 ? (
           <div className="mx-auto mt-10 w-full max-w-[980px] rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-8 text-center">
             <p className="text-base font-semibold text-navy dark:text-wheat">Nothing in your pipeline yet.</p>

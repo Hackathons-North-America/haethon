@@ -383,6 +383,8 @@ export const adminHackathonRecurringSchema = z.object({
 // All profile fields are clearable: an empty string wipes the stored value
 // (the previous optional-only fields made saved links impossible to delete).
 export const profileUpdateSchema = z.object({
+  firstName: cleanClearableString(80),
+  lastName: cleanClearableString(80),
   headline: cleanClearableString(160),
   bio: cleanClearableString(2000),
   locationCity: clearableString(120),

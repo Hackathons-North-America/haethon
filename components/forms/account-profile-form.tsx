@@ -18,6 +18,8 @@ import {
 type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" }>;
 
 type ProfileValues = {
+  firstName?: string | null;
+  lastName?: string | null;
   headline?: string | null;
   bio?: string | null;
   locationCity?: string | null;
@@ -33,7 +35,8 @@ type ProfileValues = {
 };
 
 type ProfileFormProps = {
-  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
   profile: ProfileValues | null;
 };
 
@@ -44,7 +47,7 @@ type ProfileLink = {
 };
 
 const inputClassName =
-  "w-full rounded-xl border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2.5 text-sm text-navy dark:text-wheat outline-none transition placeholder:text-navy/55 dark:placeholder:text-wheat/40 focus:border-cabernet focus:bg-white focus:ring-2 focus:ring-cabernet/15";
+  "w-full rounded-xl border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2.5 text-sm text-navy dark:text-wheat outline-none transition placeholder:text-navy/55 dark:placeholder:text-wheat/40 focus:border-cabernet focus:bg-white dark:focus:bg-white/[0.08] focus:ring-2 focus:ring-cabernet/15";
 const prefixGroupClassName =
   "flex w-full items-stretch overflow-hidden rounded-xl border bg-white dark:bg-white/[0.06] transition focus-within:border-cabernet focus-within:ring-2 focus-within:ring-cabernet/15";
 const prefixLabelClassName =
@@ -107,10 +110,12 @@ function compactHandle(url: string, fallback: string) {
   }
 }
 
-export function AccountProfileForm({ displayName, profile }: ProfileFormProps) {
+export function AccountProfileForm({ firstName, lastName, profile }: ProfileFormProps) {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState<ProfileValues>({
+    firstName: firstName ?? "",
+    lastName: lastName ?? "",
     headline: profile?.headline ?? "",
     bio: profile?.bio ?? "",
     locationCity: profile?.locationCity ?? "",
@@ -184,6 +189,8 @@ export function AccountProfileForm({ displayName, profile }: ProfileFormProps) {
     const errors: Record<string, string> = {};
 
     const textPayload = {
+      firstName: formValue(formData, "firstName"),
+      lastName: formValue(formData, "lastName"),
       headline: formValue(formData, "headline"),
       bio: formValue(formData, "bio"),
       locationCity: formValue(formData, "locationCity"),
@@ -191,7 +198,7 @@ export function AccountProfileForm({ displayName, profile }: ProfileFormProps) {
       school: formValue(formData, "school"),
     };
 
-    for (const name of ["headline", "bio", "school"] as const) {
+    for (const name of ["firstName", "lastName", "headline", "bio", "school"] as const) {
       if (containsProfanity(textPayload[name])) {
         errors[name] = PROFANITY_MESSAGE;
       }
@@ -278,6 +285,7 @@ export function AccountProfileForm({ displayName, profile }: ProfileFormProps) {
   }
 
   const skills = values.skills ?? [];
+  const displayName = [values.firstName, values.lastName].filter(Boolean).join(" ").trim();
   const rawLinks: { label: string; href: string | null | undefined; icon: IconComponent }[] = [
     { label: values.githubUrl ? compactHandle(values.githubUrl, "GitHub") : "GitHub", href: values.githubUrl, icon: SiGithub },
     { label: values.linkedinUrl ? compactHandle(values.linkedinUrl, "LinkedIn") : "LinkedIn", href: values.linkedinUrl, icon: FaLinkedin },
@@ -295,11 +303,13 @@ export function AccountProfileForm({ displayName, profile }: ProfileFormProps) {
         <div className="items-center gap-8 sm:gap-12">
           <div className="min-w-0">
             <h1 className="font-serif text-[clamp(3rem,8vw,4.75rem)] font-semibold leading-[0.92] tracking-[-0.055em] text-navy dark:text-wheat">
-              Hi, I&apos;m {displayName}
+              {displayName ? <>Hi, I&apos;m {displayName}</> : "Hi there"}
             </h1>
-            <p className="mt-5 text-xl font-medium leading-snug text-navy dark:text-wheat sm:text-2xl">
-              {values.school || "Computer & Software Engineer"}
-            </p>
+            {values.school ? (
+              <p className="mt-5 text-xl font-medium leading-snug text-navy dark:text-wheat sm:text-2xl">
+                {values.school}
+              </p>
+            ) : null}
             {values.bio ? (
               <p className="mt-8 max-w-xl text-base leading-7 text-navy/55 dark:text-wheat/60 sm:text-lg">
                 {values.bio}
@@ -402,6 +412,34 @@ export function AccountProfileForm({ displayName, profile }: ProfileFormProps) {
             </div>
 
           <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClassName} htmlFor="firstName">
+                First name
+              </label>
+              <input
+                id="firstName"
+                name="firstName"
+                maxLength={80}
+                defaultValue={values.firstName ?? ""}
+                onChange={() => clearFieldError("firstName")}
+                className={inputClassName}
+              />
+              {fieldErrors.firstName ? <p className={fieldErrorClassName}>{fieldErrors.firstName}</p> : null}
+            </div>
+            <div>
+              <label className={labelClassName} htmlFor="lastName">
+                Last name
+              </label>
+              <input
+                id="lastName"
+                name="lastName"
+                maxLength={80}
+                defaultValue={values.lastName ?? ""}
+                onChange={() => clearFieldError("lastName")}
+                className={inputClassName}
+              />
+              {fieldErrors.lastName ? <p className={fieldErrorClassName}>{fieldErrors.lastName}</p> : null}
+            </div>
             <div className="sm:col-span-2">
               <label className={labelClassName} htmlFor="headline">
                 Headline
