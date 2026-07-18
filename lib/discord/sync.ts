@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
 import type { REST } from "@discordjs/rest";
 import * as Sentry from "@sentry/nextjs";
 import { ChannelType, Routes } from "discord-api-types/v10";
@@ -9,6 +9,7 @@ import {
   channelNameForHackathon,
   channelReuseKey,
   type DiscordCategoryKey,
+  insertionIndexByDate,
   isArchiveCategoryName,
   pastCategoryDiscordName,
 } from "@/lib/discord/channel-rules";
@@ -19,6 +20,7 @@ import {
   hackathonDates,
   hackathonLocations,
   hackathons,
+  hackathonSeries,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { assignHackathonSeries } from "@/lib/hackathons/series";
@@ -33,6 +35,7 @@ type DiscordChannel = {
   id: string;
   name: string;
   parent_id?: string | null;
+  position?: number;
   topic?: string | null;
   type: number;
 };
@@ -50,6 +53,7 @@ type SyncTarget = {
   hackathonId: string;
   name: string;
   seriesId: string;
+  slug: string;
   startsAt: Date | null;
   status: string;
   websiteUrl: string | null;
@@ -67,6 +71,12 @@ type SyncContext = {
 };
 
 const SYNC_CONCURRENCY = 4;
+
+export const PAST_DISCORD_CHANNEL_RETENTION_DAYS = 30;
+
+function discordChannelRetentionCutoff(now: Date) {
+  return new Date(now.getTime() - PAST_DISCORD_CHANNEL_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+}
 
 const INELIGIBLE_REASON = "Only Canadian and US hackathons are synced to Discord.";
 
@@ -133,6 +143,41 @@ function channelTopic(input: {
 function reportHackathonSyncFailure(hackathonId: string, error: unknown) {
   console.error("Unable to sync Discord channel for hackathon.", { error, hackathonId });
   Sentry.captureException(error, { extra: { hackathonId } });
+}
+
+/**
+ * Posts the hackathon's links as the first message in a freshly created channel
+ * and pins it. Best-effort: the channel already exists and is tracked, so a
+ * send/pin failure (e.g. missing Send Messages / Manage Messages permission)
+ * must never fail the sync — it is reported and the sync moves on.
+ */
+async function postAndPinChannelLinks(
+  rest: REST,
+  channelSnowflake: string,
+  target: Pick<SyncTarget, "hackathonId" | "slug" | "websiteUrl">
+) {
+  const lines = [];
+
+  if (target.websiteUrl) {
+    lines.push(target.websiteUrl);
+  }
+
+  lines.push(`${env.NEXT_PUBLIC_APP_URL}/hackathons/${target.slug}`);
+
+  try {
+    const message = (await rest.post(Routes.channelMessages(channelSnowflake), {
+      body: { content: lines.join("\n") },
+    })) as { id: string };
+
+    await rest.put(Routes.channelMessagesPin(channelSnowflake, message.id));
+  } catch (error) {
+    console.error("Unable to post the pinned links message in a new Discord channel.", {
+      channelSnowflake,
+      error,
+      hackathonId: target.hackathonId,
+    });
+    Sentry.captureException(error, { extra: { channelSnowflake, hackathonId: target.hackathonId } });
+  }
 }
 
 async function listGuildChannels(rest: REST, guildSnowflake: string) {
@@ -356,7 +401,73 @@ function createGuildChannelDirectory(rest: REST, guildSnowflake: string) {
     return resolution;
   };
 
-  return { getChannel, listChannels, resolveCategoryId };
+  // Placements are serialized per category: two lanes repositioning the same
+  // category concurrently would each renumber from a different view and clobber
+  // the other's ordering.
+  const placementQueues = new Map<string, Promise<void>>();
+
+  const placeChannelByDate = (parentId: string, channelSnowflake: string, startsAt: Date | null) => {
+    const run = async () => {
+      // A fresh listing, not the shared snapshot: concurrent lanes may have
+      // created siblings (and this channel itself) since the snapshot was taken.
+      const channels = await listGuildChannels(rest, guildSnowflake);
+      const siblings = channels
+        .filter(
+          (channel) =>
+            channel.type === ChannelType.GuildText &&
+            (channel.parent_id ?? null) === parentId &&
+            channel.id !== channelSnowflake
+        )
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || a.id.localeCompare(b.id));
+
+      const dates = new Map<string, Date>();
+
+      if (siblings.length > 0) {
+        const dateRows = await db
+          .select({
+            channelSnowflake: discordChannels.channelSnowflake,
+            startsAt: hackathonDates.startsAt,
+          })
+          .from(discordChannels)
+          .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, discordChannels.hackathonId))
+          .where(
+            inArray(
+              discordChannels.channelSnowflake,
+              siblings.map((sibling) => sibling.id)
+            )
+          );
+
+        for (const row of dateRows) {
+          if (row.startsAt && !dates.has(row.channelSnowflake)) {
+            dates.set(row.channelSnowflake, row.startsAt);
+          }
+        }
+      }
+
+      const index = insertionIndexByDate(
+        siblings.map((sibling) => dates.get(sibling.id) ?? null),
+        startsAt
+      );
+      const ordered = [
+        ...siblings.slice(0, index),
+        { id: channelSnowflake },
+        ...siblings.slice(index),
+      ];
+
+      // Renumbering the whole category preserves the siblings' current relative
+      // order — only the placed channel moves. One bulk call, so per-channel
+      // edit rate limits don't apply.
+      await rest.patch(Routes.guildChannels(guildSnowflake), {
+        body: ordered.map((channel, position) => ({ id: channel.id, position })),
+      });
+    };
+
+    const queued = (placementQueues.get(parentId) ?? Promise.resolve()).then(run, run);
+    placementQueues.set(parentId, queued);
+    return queued;
+  };
+
+  return { getChannel, listChannels, placeChannelByDate, resolveCategoryId };
 }
 
 async function removeIneligibleChannel(
@@ -543,6 +654,9 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
   // "recycled" = we reused the series' existing channel and just moved/renamed it;
   // "created" = no usable channel existed, so a brand new one was made.
   let action: "created" | "recycled" = "created";
+  // Date ordering is applied only when a channel is created or refiled into a
+  // different category; manual rearranging is otherwise left alone.
+  let needsDatePlacement = false;
 
   if (channelSnowflake) {
     const existing = await ctx.directory.getChannel(channelSnowflake);
@@ -556,6 +670,8 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
       (existing.parent_id ?? null) !== parentId ||
       (existing.topic ?? "") !== topic
     ) {
+      const parentChanged = (existing.parent_id ?? null) !== parentId;
+
       try {
         await ctx.rest.patch(Routes.channel(channelSnowflake), {
           body: {
@@ -565,6 +681,7 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
           },
         });
         action = "recycled";
+        needsDatePlacement = parentChanged;
       } catch (error) {
         if (!isUnknownChannelError(error)) {
           throw error;
@@ -590,6 +707,10 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
     })) as DiscordChannel;
     channelSnowflake = created.id;
     action = "created";
+    // An undated new channel needs no placement — Discord already appends it to
+    // the bottom of the category, which is where undated channels belong.
+    needsDatePlacement = target.startsAt !== null;
+    await postAndPinChannelLinks(ctx.rest, channelSnowflake, target);
   }
 
   if (mapped) {
@@ -620,6 +741,22 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
 
   ctx.touchedSnowflakes.add(channelSnowflake);
 
+  // After the DB write, so concurrent lanes placing siblings can already see
+  // this channel's date. Best-effort: the channel is created and tracked, so a
+  // failed reorder must not fail the sync.
+  if (needsDatePlacement) {
+    try {
+      await ctx.directory.placeChannelByDate(parentId, channelSnowflake, target.startsAt);
+    } catch (error) {
+      console.error("Unable to place a Discord channel in date order.", {
+        channelSnowflake,
+        error,
+        hackathonId: target.hackathonId,
+      });
+      Sentry.captureException(error, { extra: { channelSnowflake, hackathonId: target.hackathonId } });
+    }
+  }
+
   return {
     action,
     category,
@@ -645,6 +782,7 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
       hackathonId: hackathons.id,
       name: hackathons.name,
       seriesId: hackathons.seriesId,
+      slug: hackathons.slug,
       startsAt: hackathonDates.startsAt,
       status: hackathons.status,
       websiteUrl: hackathons.websiteUrl,
@@ -988,6 +1126,7 @@ async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T
 
 export async function syncPublishedHackathonDiscordChannels() {
   const rest = discordRest();
+  const retentionCutoff = discordChannelRetentionCutoff(new Date());
 
   // One query loads every published hackathon with its location and dates. The
   // left joins can fan out when a hackathon has multiple location or date rows,
@@ -1001,6 +1140,7 @@ export async function syncPublishedHackathonDiscordChannels() {
       hackathonId: hackathons.id,
       name: hackathons.name,
       seriesId: hackathons.seriesId,
+      slug: hackathons.slug,
       startsAt: hackathonDates.startsAt,
       status: hackathons.status,
       websiteUrl: hackathons.websiteUrl,
@@ -1008,7 +1148,18 @@ export async function syncPublishedHackathonDiscordChannels() {
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
-    .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, ["upcoming", "live", "completed", "archived"])));
+    .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
+    .where(
+      and(
+        isNotNull(hackathons.publishedAt),
+        inArray(hackathons.status, ["upcoming", "live", "completed", "archived"]),
+        or(
+          eq(hackathonSeries.isRecurring, true),
+          isNull(hackathonDates.endsAt),
+          gte(hackathonDates.endsAt, retentionCutoff)
+        )
+      )
+    );
 
   const targets: (typeof rows)[number][] = [];
   const seen = new Set<string>();
@@ -1159,4 +1310,64 @@ export async function syncPublishedHackathonDiscordChannels() {
     synced,
     total: targets.length,
   };
+}
+
+/**
+ * Deletes Discord channels for non-recurring hackathons more than 30 days
+ * after their end date. Only the Discord channel and its mapping are removed;
+ * the hackathon and all related database records are retained.
+ */
+export async function deleteExpiredHackathonDiscordChannels(now = new Date()) {
+  const cutoff = discordChannelRetentionCutoff(now);
+  const expired = await db
+    .select({
+      channelId: discordChannels.id,
+      channelSnowflake: discordChannels.channelSnowflake,
+      hackathonId: hackathons.id,
+      name: hackathons.name,
+    })
+    .from(discordChannels)
+    .innerJoin(hackathons, eq(hackathons.id, discordChannels.hackathonId))
+    .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
+    .where(
+      and(
+        lt(hackathonDates.endsAt, cutoff),
+        or(isNull(hackathons.seriesId), eq(hackathonSeries.isRecurring, false))
+      )
+    );
+
+  if (expired.length === 0) {
+    return { expired: 0, deleted: [] as string[], failed: [] as string[] };
+  }
+
+  const rest = discordRest();
+  const deleted: string[] = [];
+  const failed: string[] = [];
+
+  for (const row of expired) {
+    try {
+      if (!rest) {
+        throw new Error("Discord bot credentials are not configured.");
+      }
+
+      try {
+        await rest.delete(Routes.channel(row.channelSnowflake));
+      } catch (error) {
+        if (!isUnknownChannelError(error)) {
+          throw error;
+        }
+      }
+
+      await db.delete(discordChannels).where(eq(discordChannels.id, row.channelId));
+      deleted.push(row.name);
+    } catch (error) {
+      failed.push(row.name);
+      Sentry.captureException(error, {
+        extra: { hackathonId: row.hackathonId, hackathonName: row.name },
+      });
+    }
+  }
+
+  return { expired: expired.length, deleted, failed };
 }

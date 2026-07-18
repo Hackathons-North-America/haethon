@@ -2,6 +2,7 @@
 
 import { HackathonCard, type HackathonCardData } from "@/components/hackathon-card";
 import { formatDateRange } from "@/lib/hackathons/card-format";
+import { HACKATHON_SOURCES, sourceBadge } from "@/lib/hackathons/source-provenance";
 
 export type PreviewPayload = Record<string, unknown>;
 
@@ -60,8 +61,10 @@ function locationText(payload: PreviewPayload) {
 
 export function previewPayloadToCard(payload: PreviewPayload, id = "admin-preview"): HackathonCardData {
   const name = text(payload.name, "Untitled hackathon");
+  const source = HACKATHON_SOURCES.find((type) => type === payload.source);
 
   return {
+    source: source ? sourceBadge(source) : null,
     beginnerFriendly: payload.beginnerFriendly === true,
     date: formatDateRange(parseDate(payload.startDate), parseDate(payload.endDate)),
     highSchoolersOnly: payload.highSchoolersOnly === true,

@@ -181,6 +181,11 @@ export const hackathons = pgTable(
     travelReimbursement: boolean("travel_reimbursement").notNull().default(false),
     highSchoolersOnly: boolean("high_schoolers_only").notNull().default(false),
     prizeAmountUsd: integer("prize_amount_usd"),
+    /* Where the listing came from, compiled once when the hackathon is
+       created (derived from the import's source URL) and admin-editable
+       afterwards. Later sightings of the same event never overwrite it.
+       Null renders no source badge. */
+    source: sourceTypeEnum("source"),
     voteScore: integer("vote_score").notNull().default(0),
     // Beta-only presentation value. Keep it separate from the real vote score
     // so voting, ranking, and reporting always use the genuine total.
@@ -462,19 +467,6 @@ export const notifications = pgTable(
   (table) => [index("notifications_user_idx").on(table.userId)]
 );
 
-export const sources = pgTable(
-  "sources",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    hackathonId: uuid("hackathon_id").references(() => hackathons.id, { onDelete: "cascade" }),
-    sourceType: sourceTypeEnum("source_type").notNull(),
-    sourceUrl: text("source_url").notNull(),
-    reliabilityScore: numeric("reliability_score", { precision: 5, scale: 2 }).default("0"),
-    importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index("sources_hackathon_idx").on(table.hackathonId)]
-);
-
 export const importBatches = pgTable("import_batches", {
   id: uuid("id").defaultRandom().primaryKey(),
   sourceName: varchar("source_name", { length: 120 }).notNull(),
@@ -694,7 +686,6 @@ export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
     fields: [hackathons.id],
     references: [hackathonDates.hackathonId],
   }),
-  sources: many(sources),
   tags: many(hackathonTags),
   attendanceDays: many(userHackathonAttendanceDays),
   notificationPreferences: many(userHackathonNotificationPreferences),

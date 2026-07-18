@@ -50,8 +50,8 @@ import {
 } from "@/lib/hackathons/reminder-plan";
 import { formatReminderDate, reminderTypeLabels } from "@/lib/hackathons/reminder-labels";
 
-/* "archived" is viewable here (unlike the catalog) so archive-page cards for
-   pre-half-year rows never link to a 404. */
+/* "archived" is viewable here (unlike the catalog) so old links to
+   pre-half-year rows never land on a 404. */
 const publicStatuses = ["upcoming", "live", "completed", "archived"] as const;
 
 type PageProps = {

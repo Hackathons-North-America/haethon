@@ -1,5 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
-import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
@@ -14,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
+import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
 import { orderAdminHackathonRows } from "@/lib/hackathons/admin-ordering";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
@@ -43,6 +43,7 @@ const adminHackathonSelection = {
   travelReimbursement: hackathons.travelReimbursement,
   highSchoolersOnly: hackathons.highSchoolersOnly,
   prizeAmountUsd: hackathons.prizeAmountUsd,
+  source: hackathons.source,
   voteScore: hackathons.voteScore,
   voteDisplayOffset: hackathons.voteDisplayOffset,
   city: hackathonLocations.city,
@@ -113,6 +114,11 @@ export async function getAdminHackathon(hackathonId: string) {
   }
 
   return (await withDiscordChannelIds([row]))[0];
+}
+
+/** Sets or clears (null = no badge) the hackathon's stored source. */
+export async function setHackathonSource(hackathonId: string, source: HackathonSource | null) {
+  await db.update(hackathons).set({ source, updatedAt: new Date() }).where(eq(hackathons.id, hackathonId));
 }
 
 export async function updatePublishedHackathon(hackathonId: string, payload: AdminHackathonUpdatePayload) {
@@ -236,50 +242,6 @@ export async function setHackathonSeriesRecurring(hackathonId: string, isRecurri
   revalidateHackathonCaches();
 
   return updated;
-}
-
-/* Grace window before an unpublished, past, non-repeating hackathon is deleted
-   outright. Published hackathons are never auto-deleted — they stay on record
-   for the public half-year archive. Repeating (recurring-series) events are
-   likewise never deleted by the cleanup cron. */
-export const PAST_HACKATHON_RETENTION_DAYS = 30;
-
-/**
- * Deletes never-published hackathons whose dates ended more than
- * PAST_HACKATHON_RETENTION_DAYS ago, unless their series is marked recurring.
- * Run daily by the cleanup-hackathons cron. A per-row failure (e.g. Discord
- * channel retirement) skips that row and is retried on the next run.
- */
-export async function deleteExpiredHackathons(now = new Date()) {
-  const cutoff = new Date(now.getTime() - PAST_HACKATHON_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-
-  const expired = await db
-    .select({ id: hackathons.id, name: hackathons.name })
-    .from(hackathons)
-    .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
-    .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
-    .where(
-      and(
-        isNull(hackathons.publishedAt),
-        lt(hackathonDates.endsAt, cutoff),
-        or(isNull(hackathons.seriesId), eq(hackathonSeries.isRecurring, false))
-      )
-    );
-
-  const deleted: string[] = [];
-  const failed: string[] = [];
-
-  for (const row of expired) {
-    try {
-      await deleteHackathon(row.id);
-      deleted.push(row.name);
-    } catch (error) {
-      failed.push(row.name);
-      Sentry.captureException(error, { extra: { hackathonId: row.id, hackathonName: row.name } });
-    }
-  }
-
-  return { expired: expired.length, deleted, failed };
 }
 
 export async function deleteHackathon(hackathonId: string) {

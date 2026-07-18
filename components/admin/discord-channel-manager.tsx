@@ -3,26 +3,11 @@
 import { useState } from "react";
 import { Check, Pencil, Pin, PinOff, Trash2, X } from "lucide-react";
 
-import type { AdminDiscordChannel } from "@/lib/discord/channel-admin";
-
-const categoryLabels: Record<string, string> = {
-  canada: "Canadian Hackathons",
-  us: "US Hackathons",
-  past: "Past Hackathons",
-  deleted: "Deleted (parked)",
-};
-
-function categoryBadgeClasses(category: string | null) {
-  if (category === "deleted") {
-    return "border-[#B42318]/30 bg-[#B42318]/10 text-[#B42318]";
-  }
-
-  if (category === "past") {
-    return "border-navy/15 bg-ivory text-navy/60 dark:border-white/15 dark:bg-white/5 dark:text-wheat/60";
-  }
-
-  return "border-navy/15 bg-ivory text-navy dark:border-white/15 dark:bg-white/5 dark:text-wheat";
-}
+import type {
+  AdminDiscordChannel,
+  AdminDiscordGuildChannel,
+  AdminDiscordOverview,
+} from "@/lib/discord/channel-admin";
 
 async function patchChannel(channelId: string, name: string | null) {
   const response = await fetch(`/api/admin/discord/channels/${channelId}`, {
@@ -39,28 +24,33 @@ async function patchChannel(channelId: string, name: string | null) {
   return result.data;
 }
 
-function DiscordChannelRow({
-  channel,
+function DiscordChannelCard({
+  entry,
   onDelete,
   onUpdate,
 }: {
-  channel: AdminDiscordChannel;
+  entry: AdminDiscordGuildChannel;
   onDelete: (channelId: string) => void;
   onUpdate: (channel: AdminDiscordChannel) => void;
 }) {
+  const tracked = entry.tracked;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(channel.name);
+  const [draft, setDraft] = useState(entry.name);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const busy = saving || deleting;
 
   async function submit(name: string | null) {
+    if (!tracked) {
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
 
     try {
-      const updated = await patchChannel(channel.id, name);
+      const updated = await patchChannel(tracked.id, name);
       setEditing(false);
       onUpdate(updated);
     } catch (error) {
@@ -71,18 +61,22 @@ function DiscordChannelRow({
   }
 
   async function deleteChannel() {
+    if (!tracked) {
+      return;
+    }
+
     setDeleting(true);
     setMessage(null);
 
     try {
-      const response = await fetch(`/api/admin/discord/channels/${channel.id}`, { method: "DELETE" });
+      const response = await fetch(`/api/admin/discord/channels/${tracked.id}`, { method: "DELETE" });
 
       if (!response.ok) {
         const result = (await response.json().catch(() => ({}))) as { error?: unknown };
         throw new Error(typeof result.error === "string" ? result.error : "Could not delete the Discord channel.");
       }
 
-      onDelete(channel.id);
+      onDelete(tracked.id);
     } catch (error) {
       setDeleting(false);
       setMessage(error instanceof Error ? error.message : "Could not delete the Discord channel.");
@@ -121,7 +115,7 @@ function DiscordChannelRow({
               disabled={saving}
               onClick={() => {
                 setEditing(false);
-                setDraft(channel.name);
+                setDraft(entry.name);
                 setMessage(null);
               }}
               type="button"
@@ -132,37 +126,43 @@ function DiscordChannelRow({
           </form>
         ) : (
           <>
-            <span className="font-mono text-sm font-semibold text-navy dark:text-wheat">#{channel.name}</span>
-            {channel.nameOverride ? (
+            <span className="font-mono text-sm font-semibold text-navy dark:text-wheat">#{entry.name}</span>
+            {tracked?.nameOverride ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-cabernet/30 bg-cabernet/10 px-3 py-1 text-xs font-semibold text-cabernet dark:border-wheat/30 dark:bg-wheat/10 dark:text-wheat">
                 <Pin aria-hidden="true" className="size-3" />
                 Pinned name
               </span>
             ) : null}
-            <span
-              className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${categoryBadgeClasses(channel.category)}`}
-            >
-              {channel.category ? categoryLabels[channel.category] ?? channel.category : "No category"}
-            </span>
+            {tracked ? null : (
+              <span className="inline-flex items-center rounded-full border border-navy/15 bg-ivory px-3 py-1 text-xs font-semibold text-navy/60 dark:border-white/15 dark:bg-white/5 dark:text-wheat/60">
+                Untracked
+              </span>
+            )}
           </>
         )}
       </div>
 
-      <p className="mt-2 text-sm text-navy/55 dark:text-wheat/55">
-        {channel.seriesName ? <>Series: {channel.seriesName}</> : <>Not linked to a series</>}
-        {" · "}
-        {channel.hackathonName ? <>Hackathon: {channel.hackathonName}</> : <>No hackathon attached</>}
-        {" · "}
-        {channel.guildName}
-      </p>
+      {tracked ? (
+        <p className="mt-2 text-sm text-navy/55 dark:text-wheat/55">
+          {tracked.seriesName ? <>Series: {tracked.seriesName}</> : <>Not linked to a series</>}
+          {" · "}
+          {tracked.hackathonName ? <>Hackathon: {tracked.hackathonName}</> : <>No hackathon attached</>}
+          {" · "}
+          {tracked.guildName}
+        </p>
+      ) : (
+        <p className="mt-2 text-sm text-navy/55 dark:text-wheat/55">
+          {entry.topic ? entry.topic : "Not managed by the sync — created outside Haethon."}
+        </p>
+      )}
 
-      {editing ? null : (
+      {editing || !tracked ? null : (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/20 px-4 text-sm font-semibold text-navy/70 hover:bg-ivory hover:text-navy dark:border-white/20 dark:text-wheat/70 dark:hover:bg-white/10 dark:hover:text-wheat disabled:opacity-50"
             disabled={saving}
             onClick={() => {
-              setDraft(channel.name);
+              setDraft(entry.name);
               setEditing(true);
               setMessage(null);
             }}
@@ -171,7 +171,7 @@ function DiscordChannelRow({
             <Pencil aria-hidden="true" className="size-4" />
             Rename
           </button>
-          {channel.nameOverride ? (
+          {tracked.nameOverride ? (
             <button
               className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/20 px-4 text-sm font-semibold text-navy/70 hover:bg-ivory hover:text-navy dark:border-white/20 dark:text-wheat/70 dark:hover:bg-white/10 dark:hover:text-wheat disabled:opacity-50"
               disabled={busy}
@@ -187,7 +187,7 @@ function DiscordChannelRow({
             disabled={busy}
             onClick={() => void deleteChannel()}
             title={
-              channel.hackathonId
+              tracked.hackathonId
                 ? "This hackathon is still listed, so the next sync will create a fresh channel for it."
                 : undefined
             }
@@ -204,10 +204,30 @@ function DiscordChannelRow({
   );
 }
 
-export function DiscordChannelManager({ channels }: { channels: AdminDiscordChannel[] }) {
-  const [items, setItems] = useState(channels);
+export function DiscordChannelManager({ overview }: { overview: AdminDiscordOverview }) {
+  const [groups, setGroups] = useState(overview.groups);
 
-  if (!items.length) {
+  function handleUpdate(updated: AdminDiscordChannel) {
+    setGroups((current) =>
+      current.map((group) => ({
+        ...group,
+        channels: group.channels.map((entry) =>
+          entry.tracked?.id === updated.id ? { ...entry, name: updated.name, tracked: updated } : entry
+        ),
+      }))
+    );
+  }
+
+  function handleDelete(recordId: string) {
+    setGroups((current) =>
+      current.map((group) => ({
+        ...group,
+        channels: group.channels.filter((entry) => entry.tracked?.id !== recordId),
+      }))
+    );
+  }
+
+  if (!groups.length) {
     return (
       <p className="rounded-xl border border-navy/10 bg-white p-6 text-sm text-navy/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-wheat/55">
         No Discord channels have been created yet. Channels appear here once a hackathon is approved for Discord.
@@ -216,15 +236,44 @@ export function DiscordChannelManager({ channels }: { channels: AdminDiscordChan
   }
 
   return (
-    <ul className="space-y-4">
-      {items.map((channel) => (
-        <DiscordChannelRow
-          channel={channel}
-          key={channel.id}
-          onDelete={(channelId) => setItems((current) => current.filter((item) => item.id !== channelId))}
-          onUpdate={(updated) => setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)))}
-        />
+    <div className="space-y-6">
+      {!overview.live ? (
+        <p className="rounded-xl border border-navy/10 bg-white p-4 text-sm text-navy/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-wheat/55">
+          Discord could not be reached, so only tracked channels are shown, grouped by the category the sync last
+          filed them into.
+        </p>
+      ) : null}
+
+      {groups.map((group) => (
+        <section
+          className="rounded-xl border border-navy/10 bg-ivory/60 p-5 dark:border-white/10 dark:bg-white/[0.03]"
+          key={group.categorySnowflake ?? group.name}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-navy/70 dark:text-wheat/70">
+              {group.name}
+            </h2>
+            <span className="text-xs font-semibold text-navy/45 dark:text-wheat/45">
+              {group.channels.length} {group.channels.length === 1 ? "channel" : "channels"}
+            </span>
+          </div>
+
+          {group.channels.length ? (
+            <ul className="mt-4 grid gap-4 lg:grid-cols-2">
+              {group.channels.map((entry) => (
+                <DiscordChannelCard
+                  entry={entry}
+                  key={entry.channelSnowflake}
+                  onDelete={handleDelete}
+                  onUpdate={handleUpdate}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-navy/45 dark:text-wheat/45">No text channels in this category.</p>
+          )}
+        </section>
       ))}
-    </ul>
+    </div>
   );
 }

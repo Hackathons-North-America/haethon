@@ -11,7 +11,6 @@ import {
   hackathonSubmissions,
   organizationMemberships,
   organizations,
-  sources,
   users,
 } from "@/lib/db/schema";
 import type { SelectUser } from "@/lib/db/schema";
@@ -27,6 +26,7 @@ import {
 import type { CommunitySubmissionInput, HackathonSubmissionInput, NormalizedHackathonPayload } from "@/lib/hackathons/utils";
 import { ensureHackathonSeries } from "@/lib/hackathons/series";
 import { deriveSourceType } from "@/lib/hackathons/source-badges";
+import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 import { deleteHackathon } from "@/lib/hackathons/admin-service";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import {
@@ -198,7 +198,7 @@ async function findBestDuplicate(payload: { name: string; websiteUrl?: string | 
 
 export async function createPublishedHackathon(
   payload: NormalizedHackathonPayload,
-  options?: { syncDiscord?: boolean }
+  options?: { source?: HackathonSource; syncDiscord?: boolean }
 ) {
   payload = normalizeLocationPayload(payload);
   const organizationId = await ensureOrganization(payload);
@@ -224,6 +224,9 @@ export async function createPublishedHackathon(
       travelReimbursement: payload.travelReimbursement,
       highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd,
+      // Compiled once here. An explicit feed identity wins because the event
+      // URL may point somewhere else (for example MLH linking to Devpost).
+      source: options?.source ?? deriveSourceType(payload.sourceUrl, payload.websiteUrl),
       lastVerifiedAt: now,
       dataConfidenceScore: "0.85",
       publishedAt: now,
@@ -242,13 +245,6 @@ export async function createPublishedHackathon(
   await db.insert(hackathonLocations).values({
     hackathonId: created.id,
     ...(await hackathonLocationValues(payload)),
-  });
-
-  await db.insert(sources).values({
-    hackathonId: created.id,
-    sourceType: deriveSourceType(payload.sourceUrl, payload.websiteUrl),
-    sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
-    reliabilityScore: "0.85",
   });
 
   // The bulk import flow passes syncDiscord: false so the channel is created only
@@ -294,6 +290,9 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
       travelReimbursement: existing.travelReimbursement || payload.travelReimbursement,
       highSchoolersOnly: existing.highSchoolersOnly || payload.highSchoolersOnly,
       prizeAmountUsd: existing.prizeAmountUsd ?? payload.prizeAmountUsd,
+      // First source wins: a later sighting only fills the gap when the
+      // hackathon was created before sources were compiled.
+      source: existing.source ?? deriveSourceType(payload.sourceUrl, payload.websiteUrl),
       lastVerifiedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -346,13 +345,6 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
       ...(await hackathonLocationValues(payload)),
     });
   }
-
-  await db.insert(sources).values({
-    hackathonId: targetHackathonId,
-    sourceType: deriveSourceType(payload.sourceUrl, payload.websiteUrl),
-    sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
-    reliabilityScore: "0.7",
-  });
 
   await syncHackathonDiscordChannelSafely(targetHackathonId);
   revalidateHackathonCaches();
@@ -633,7 +625,10 @@ export async function importAdminHackathons(input: {
     }
 
     // Do not create the Discord channel yet — the admin approves that separately.
-    const hackathonId = await createPublishedHackathon(payload, { syncDiscord: false });
+    const hackathonId = await createPublishedHackathon(payload, {
+      source: rawPayload.source,
+      syncDiscord: false,
+    });
     duplicateCandidates.unshift({ id: hackathonId, name: payload.name, websiteUrl: payload.websiteUrl, startsAt: payload.startDate });
     const discord = await previewHackathonDiscordChannel(hackathonId);
     const [submission] = await db

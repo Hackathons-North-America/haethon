@@ -1,3 +1,5 @@
+import type { HackathonSource } from "@/lib/hackathons/source-provenance";
+
 /* Serialized shape of a single hackathon as returned to admin/organizer client
    components. Dates are ISO strings (not Date objects) so this stays safe to
    pass across the server → client boundary. Shared by the admin hackathons
@@ -9,6 +11,8 @@ export type AdminHackathonListItem = {
   isRecurring: boolean;
   /** Existing channel managed for this hackathon's series in the configured guild. */
   discordChannelId?: string | null;
+  /** Stored source badge, compiled at import time and admin-editable; null shows no badge. */
+  source?: HackathonSource | null;
   name: string;
   shortDescription: string | null;
   websiteUrl: string | null;

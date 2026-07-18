@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { serializeAdminHackathon } from "@/components/admin/hackathon-admin-item";
 import { requireAdminUser } from "@/lib/auth";
 import { assignExistingDiscordChannel } from "@/lib/discord/sync";
-import { deleteHackathon, getAdminHackathon, updatePublishedHackathon } from "@/lib/hackathons/admin-service";
+import {
+  deleteHackathon,
+  getAdminHackathon,
+  setHackathonSource,
+  updatePublishedHackathon,
+} from "@/lib/hackathons/admin-service";
 import { adminHackathonEditSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -43,10 +48,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const { discordChannelId, ...payload } = parsed.data;
+    const { discordChannelId, source, ...payload } = parsed.data;
 
     if (discordChannelId) {
       await assignExistingDiscordChannel(id, discordChannelId);
+    }
+
+    if (source !== undefined) {
+      await setHackathonSource(id, source);
     }
 
     const data = await updatePublishedHackathon(id, payload);

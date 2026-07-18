@@ -35,7 +35,7 @@ export type HackathonCardData = {
   name: string;
   slug?: string | null;
   /* Where this hackathon's data came from — surfaced as a small provenance
-     badge under the card text. Absent when we have no source on file. */
+     badge under the card image. Absent when we have no source on file. */
   source?: HackathonSourceBadge | null;
   startsAt?: string | null;
   travelReimbursement?: boolean;
@@ -550,8 +550,13 @@ export function HackathonCard({
     : null;
   return (
     <article
-      className={`group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-navy/10 bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.1),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.1)),radial-gradient(circle_130px_at_10%_8%,rgb(178_142_100_/_0.05),transparent_72%),radial-gradient(circle_150px_at_65%_130%,rgb(178_142_100_/_0.05),transparent_72%),linear-gradient(160deg,#ffffff_0%,#f7f3ea_100%)] shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-transform duration-200 ease-out hover:z-10 hover:scale-105 after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.08),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.08))] after:opacity-0 after:transition-opacity after:duration-[450ms] after:ease-out after:content-[''] group-hover:after:opacity-100 group-focus-within:after:opacity-100 dark:border-white/10 dark:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.14),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.14)),radial-gradient(circle_130px_at_10%_8%,rgb(178_142_100_/_0.07),transparent_72%),radial-gradient(circle_150px_at_65%_130%,rgb(178_142_100_/_0.07),transparent_72%),linear-gradient(160deg,#181a19_0%,#0f1110_100%)] dark:shadow-[0_18px_45px_rgb(0_0_0/0.5)] dark:after:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.1),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.1))] ${
+      className={`group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-navy/10 bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.1),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.1)),radial-gradient(circle_130px_at_10%_8%,rgb(178_142_100_/_0.05),transparent_72%),radial-gradient(circle_150px_at_65%_130%,rgb(178_142_100_/_0.05),transparent_72%),linear-gradient(160deg,#ffffff_0%,#f7f3ea_100%)] shadow-[0_18px_45px_rgb(0_0_0/0.06)] transition-[transform,opacity,filter] duration-200 ease-out hover:z-10 hover:scale-105 after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.08),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.08))] after:opacity-0 after:transition-opacity after:duration-[450ms] after:ease-out after:content-[''] group-hover:after:opacity-100 group-focus-within:after:opacity-100 dark:border-white/10 dark:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.14),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.14)),radial-gradient(circle_130px_at_10%_8%,rgb(178_142_100_/_0.07),transparent_72%),radial-gradient(circle_150px_at_65%_130%,rgb(178_142_100_/_0.07),transparent_72%),linear-gradient(160deg,#181a19_0%,#0f1110_100%)] dark:shadow-[0_18px_45px_rgb(0_0_0/0.5)] dark:after:bg-[linear-gradient(to_bottom_left,rgb(var(--hackathon-accent-rgb)_/_0.1),transparent_45%,transparent_55%,rgb(var(--hackathon-accent-rgb)_/_0.1))] ${
         compact ? "p-4" : "p-5 sm:p-6"
+      } ${
+        /* Past editions read as faded — dimmed and desaturated just enough to
+           signal "already happened" without hurting text legibility. Hover
+           restores full strength so the card is still easy to inspect. */
+        hackathon.isPast ? "opacity-80 saturate-[0.55] hover:opacity-100 hover:saturate-100 focus-within:opacity-100 focus-within:saturate-100" : ""
       }`}
       style={accentStyle}
     >
@@ -571,8 +576,17 @@ export function HackathonCard({
       <CardAccentEdges />
 
       <div className={`flex items-start ${compact ? "gap-3" : "gap-4"}`}>
-        <div className="flex shrink-0 flex-col items-start gap-2">
+        {/* The column is pinned to the logo's width so the provenance badge
+            below can never grow wider than the image — long labels truncate. */}
+        <div className={`flex shrink-0 flex-col items-center gap-2 ${compact ? "w-14" : "w-[4.5rem]"}`}>
           <HackathonLogoMark compact={compact} hackathon={hackathon} logoSrc={logoSrc} />
+          {/* Provenance label — names where this hackathon's data came from.
+              Absent when we have no source on file. */}
+          {hackathon.source ? (
+            <span className="relative z-10 max-w-full truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-navy/55 dark:text-wheat/55">
+              {hackathon.source.label}
+            </span>
+          ) : null}
         </div>
         <div className="min-w-0 pt-1">
           <h2
@@ -614,7 +628,6 @@ export function HackathonCard({
           {hackathon.beginnerFriendly ||
           hackathon.travelReimbursement ||
           hackathon.highSchoolersOnly ||
-          hackathon.source ||
           hackathon.hasDiscord ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {hackathon.beginnerFriendly ? (
@@ -630,14 +643,6 @@ export function HackathonCard({
               {hackathon.highSchoolersOnly ? (
                 <span className="relative z-10 inline-flex items-center rounded-full border border-cabernet/20 bg-cabernet/[0.05] px-2.5 py-1 text-[11px] font-semibold text-cabernet dark:border-[#e4a3ab]/30 dark:bg-[#e4a3ab]/10 dark:text-[#e4a3ab]">
                   High school only
-                </span>
-              ) : null}
-              {/* Provenance badge — names where this hackathon's data came from.
-                  Sits under the location, to the left of the Discord badge when both
-                  are present. Absent when we have no source on file. */}
-              {hackathon.source ? (
-                <span className="relative z-10 inline-flex items-center rounded-full border border-navy/15 bg-navy/[0.03] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-navy/55 dark:border-white/15 dark:bg-white/[0.04] dark:text-wheat/55">
-                  {hackathon.source.label}
                 </span>
               ) : null}
               {hackathon.hasDiscord ? (

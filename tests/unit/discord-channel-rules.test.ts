@@ -4,6 +4,7 @@ import {
   categoryForHackathon,
   channelNameForHackathon,
   channelReuseKey,
+  insertionIndexByDate,
   isArchiveCategoryName,
   normalizeChannelName,
   pastCategoryDiscordName,
@@ -108,6 +109,34 @@ describe("Discord channel reuse key", () => {
 
   it("returns an empty key when nothing but a date or year remains", () => {
     expect(channelReuseKey("sep-13-2026")).toBe("");
+  });
+});
+
+describe("Discord channel date placement", () => {
+  const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
+
+  it("slots a channel between its dated neighbours", () => {
+    expect(insertionIndexByDate([date("2026-01-10"), date("2026-03-05")], date("2026-02-01"))).toBe(1);
+  });
+
+  it("puts the earliest start date at the top", () => {
+    expect(insertionIndexByDate([date("2026-03-05"), date("2026-06-20")], date("2026-01-10"))).toBe(0);
+  });
+
+  it("orders across a year boundary", () => {
+    expect(insertionIndexByDate([date("2026-12-05")], date("2027-01-15"))).toBe(1);
+  });
+
+  it("keeps undated siblings below the dated ones", () => {
+    expect(insertionIndexByDate([date("2026-01-10"), null, null], date("2026-05-01"))).toBe(1);
+  });
+
+  it("sends an undated channel to the bottom", () => {
+    expect(insertionIndexByDate([date("2026-01-10"), date("2026-03-05")], null)).toBe(2);
+  });
+
+  it("places after an equal start date", () => {
+    expect(insertionIndexByDate([date("2026-01-10")], date("2026-01-10"))).toBe(1);
   });
 });
 

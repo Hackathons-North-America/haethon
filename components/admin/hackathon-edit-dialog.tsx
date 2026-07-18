@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import type { AdminHackathonListItem } from "@/components/admin/hackathon-admin-item";
 import { previewPayloadToCard } from "@/components/admin/hackathon-card-preview";
 import { HackathonCard } from "@/components/hackathon-card";
+import { HACKATHON_SOURCES, sourceBadge } from "@/lib/hackathons/source-provenance";
 import { dateToInputValue } from "@/lib/hackathons/utils";
 
 const inputClassName =
@@ -30,6 +31,7 @@ function itemToPreviewPayload(item: AdminHackathonListItem): Record<string, unkn
     travelReimbursement: item.travelReimbursement,
     highSchoolersOnly: item.highSchoolersOnly,
     prizeAmountUsd: item.prizeAmountUsd ?? "",
+    source: item.source ?? "",
   };
 }
 
@@ -106,6 +108,7 @@ export function HackathonEditDialog({
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
       voteDisplayOffset: formData.get("voteDisplayOffset")?.toString() ?? "0",
       discordChannelId: formData.get("discordChannelId")?.toString() ?? "",
+      source: formData.get("source")?.toString() ?? "",
     };
 
     const response = await fetch(`/api/admin/hackathons/${item.id}`, {
@@ -190,6 +193,24 @@ export function HackathonEditDialog({
                 <select id={`${item.id}-format`} name="format" defaultValue={item.format} className={inputClassName}>
                   <option value="in_person">In person</option>
                   <option value="online">Online</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClassName} htmlFor={`${item.id}-source`}>
+                  Source
+                </label>
+                <select
+                  id={`${item.id}-source`}
+                  name="source"
+                  defaultValue={item.source ?? ""}
+                  className={inputClassName}
+                >
+                  <option value="">None (no badge)</option>
+                  {HACKATHON_SOURCES.map((source) => (
+                    <option key={source} value={source}>
+                      {sourceBadge(source).label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

@@ -92,7 +92,7 @@ pnpm db:push
 1. Create an application in the Discord Developer Portal.
 2. Open its **Bot** page and generate a bot token. Store it in `DISCORD_BOT_TOKEN`; never commit or share it.
 3. Copy the Application ID into `DISCORD_CLIENT_ID`.
-4. On the app's **Installation** page, enable the `bot` scope with **View Channels** and **Manage Channels**, then install it in the Discord server.
+4. On the app's **Installation** page, enable the `bot` scope with **View Channels**, **Manage Channels**, **Send Messages**, and **Manage Messages**, then install it in the Discord server. (Send Messages and Manage Messages let the bot post and pin the links message in each new channel; if the bot is already installed without them, re-run the install link or grant them on the bot's role.)
 5. Enable Developer Mode in Discord. Right-click the server and copy its ID into `DISCORD_GUILD_ID`.
 6. Right-click each existing category, choose **Copy Channel ID**, and configure:
 
@@ -103,6 +103,10 @@ DISCORD_DELETED_CATEGORY_ID=
 ```
 
 Category IDs are optional. When one is omitted, the sync finds a category by its configured name and creates it if it does not exist. Past hackathons are filed into half-year archive categories named `past-hackathons-h1-YYYY` (January–June) and `past-hackathons-h2-YYYY` (July–December); these are always resolved by name and created on demand, so they have no env var. `DISCORD_DELETED_CATEGORY_ID` is the holding category a hackathon's channel is moved into when the hackathon is deleted; the channel is parked there (not removed) for you to clean up on Discord later.
+
+When the sync creates a brand-new channel, the bot posts a first message containing the hackathon's website link and its Haethon page link, then pins it. Existing channels are not backfilled.
+
+When a channel is created or refiled into a different category, it is slotted among its siblings so the category reads earliest start date first, top to bottom. Channels the bot cannot date (untracked, or no start date) stay at the bottom in their existing order. The sync does not otherwise reorder channels, so manual rearranging survives until a channel is next created or moved.
 
 The website performs Discord REST API calls itself, so no separate always-on bot process is required. The deployed Next.js app and the scheduled `/api/cron/sync-discord` request perform the synchronization.
 

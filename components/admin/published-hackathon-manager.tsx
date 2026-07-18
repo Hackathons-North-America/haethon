@@ -28,6 +28,7 @@ function itemToPreviewPayload(item: AdminHackathonListItem): Record<string, unkn
     travelReimbursement: item.travelReimbursement,
     highSchoolersOnly: item.highSchoolersOnly,
     prizeAmountUsd: item.prizeAmountUsd ?? "",
+    source: item.source ?? "",
   };
 }
 

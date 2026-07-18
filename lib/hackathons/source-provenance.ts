@@ -1,5 +1,8 @@
-/* Pure source-provenance helpers. This module is safe to use from client
-   components; database access stays in source-badges.ts. */
+/* Pure source helpers, safe to use from client components.
+
+   A hackathon's source is compiled once — derived from the import's source
+   URL when the hackathon is created — and stored on hackathons.source. It is
+   never re-derived on reads; admins change it from the edit dialog. */
 export type HackathonSource = "devpost" | "mlh" | "luma" | "cerebral_valley" | "organizer_site" | "manual" | "other";
 
 export type HackathonSourceBadge = {
@@ -7,19 +10,12 @@ export type HackathonSourceBadge = {
   type: HackathonSource;
 };
 
-// A source row is only labelled Community when it originated in the public
+// A hackathon is only labelled Community when it originated in the public
 // submission form and a reviewer approved it. Imported URLs never use this.
 export const COMMUNITY_FORM_SOURCE_URL = "https://haethon.local/submissions/community-form";
 
-const SOURCE_PRIORITY: Record<HackathonSource, number> = {
-  mlh: 7,
-  luma: 6,
-  cerebral_valley: 5,
-  devpost: 4,
-  organizer_site: 3,
-  other: 2,
-  manual: 1,
-};
+/* Dropdown order for the admin edit dialog. */
+export const HACKATHON_SOURCES = ["mlh", "luma", "cerebral_valley", "devpost", "organizer_site", "manual", "other"] as const;
 
 const SOURCE_HOST_HINTS: Array<{ hint: string; source: HackathonSource }> = [
   { hint: "mlh.com", source: "mlh" },
@@ -31,14 +27,19 @@ const SOURCE_HOST_HINTS: Array<{ hint: string; source: HackathonSource }> = [
   { hint: "devpost.com", source: "devpost" },
 ];
 
-const SOURCE_LABELS: Record<Exclude<HackathonSource, "other">, string> = {
+const SOURCE_LABELS: Record<HackathonSource, string> = {
   mlh: "MLH",
   luma: "Luma",
   cerebral_valley: "Cerebral Valley",
   devpost: "Devpost",
   organizer_site: "Organizer",
   manual: "Community",
+  other: "Website",
 };
+
+export function sourceBadge(type: HackathonSource): HackathonSourceBadge {
+  return { type, label: SOURCE_LABELS[type] };
+}
 
 function sourceHost(url: string) {
   try {
@@ -48,37 +49,11 @@ function sourceHost(url: string) {
   }
 }
 
-function sourceLabel(type: HackathonSource, url: string) {
-  return type === "other" ? (sourceHost(url) ?? "Website") : SOURCE_LABELS[type];
-}
-
-export function pickPrimarySourceBadge(rows: Array<{ sourceType: HackathonSource; sourceUrl: string }>): HackathonSourceBadge | null {
-  if (!rows.length) {
-    return null;
-  }
-
-  const byType = new Map<HackathonSource, { count: number; urls: Map<string, number> }>();
-
-  for (const row of rows) {
-    const current = byType.get(row.sourceType) ?? { count: 0, urls: new Map<string, number>() };
-    current.count += 1;
-    current.urls.set(row.sourceUrl, (current.urls.get(row.sourceUrl) ?? 0) + 1);
-    byType.set(row.sourceType, current);
-  }
-
-  const [sourceType, value] = Array.from(byType).sort(([leftType, left], [rightType, right]) =>
-    right.count !== left.count ? right.count - left.count : SOURCE_PRIORITY[rightType] - SOURCE_PRIORITY[leftType]
-  )[0];
-  const sourceUrl = Array.from(value.urls).sort(([leftUrl, leftCount], [rightUrl, rightCount]) =>
-    rightCount !== leftCount ? rightCount - leftCount : leftUrl.localeCompare(rightUrl)
-  )[0][0];
-
-  return { type: sourceType, label: sourceLabel(sourceType, sourceUrl) };
-}
-
 /**
  * MLH, Luma, Cerebral Valley, and Devpost are recognized by host. Only the
- * community-form URL resolves to `manual`; other sites retain their hostname.
+ * community-form URL resolves to `manual`; other sites become `other`. Runs
+ * once when a hackathon is created from an import or approved submission —
+ * never on reads.
  */
 export function deriveSourceType(...urls: Array<string | null | undefined>): HackathonSource {
   for (const url of urls) {

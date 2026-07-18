@@ -108,6 +108,30 @@ export function channelReuseKey(channelName: string) {
 }
 
 /**
+ * Where a channel belongs among its category siblings so the category reads
+ * earliest-start-date first, top to bottom. `siblingStartDates` is the
+ * siblings' start dates in their current display order (null for channels the
+ * bot cannot date — untracked or missing a start date). The channel is slotted
+ * after the last sibling that starts on or before it, so undated siblings keep
+ * their place and an undated channel itself goes to the bottom.
+ */
+export function insertionIndexByDate(siblingStartDates: (Date | null)[], startsAt: Date | null) {
+  if (!startsAt) {
+    return siblingStartDates.length;
+  }
+
+  let index = 0;
+
+  siblingStartDates.forEach((date, position) => {
+    if (date && date.getTime() <= startsAt.getTime()) {
+      index = position + 1;
+    }
+  });
+
+  return index;
+}
+
+/**
  * Shapes an admin-typed channel name the way Discord shapes text channel
  * names (lowercase, no spaces) without stripping unicode, so names like
  * "hack-the-north-🍁" survive. Returns null when nothing usable remains.

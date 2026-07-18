@@ -3,6 +3,7 @@ import { z } from "zod";
 import { normalizeCountrySelections } from "@/lib/hackathons/countries";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { normalizeCountry, normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
+import { HACKATHON_SOURCES } from "@/lib/hackathons/source-provenance";
 import { containsProfanity } from "@/lib/validations/profanity";
 import { parsePortfolioUrl, parseSocialInput, type SocialPlatformKey } from "@/lib/validations/social";
 
@@ -220,6 +221,9 @@ export const adminHackathonImportPayloadSchema = normalizedHackathonPayloadBaseS
   .extend({
     externalId: optionalString(200),
     shortDescription: truncatedOptionalString(500),
+    // Provenance comes from the scraper/feed, not necessarily the event URL
+    // (an MLH calendar entry may link to Devpost, for example).
+    source: z.enum(HACKATHON_SOURCES).optional(),
   })
   .strip()
   .superRefine(dateRangeRefinement)
@@ -247,10 +251,17 @@ export const adminHackathonUpdateSchema = adminHackathonUpdatePayloadSchema
   .superRefine(dateRangeRefinement)
   .transform((payload) => normalizeLocationPayload(payload));
 
+// Admin-picked source badge: "" (the None option) clears the stored source, a
+// named source sets it, and an absent field leaves the current value untouched.
+const optionalSource = z
+  .union([z.literal(""), z.enum(HACKATHON_SOURCES)])
+  .optional()
+  .transform((value) => (value === "" ? null : value));
+
 /* Admin-only edit payload. Organizers continue to use the schema above and
    cannot change which Discord channel the automation manages. */
 export const adminHackathonEditSchema = adminHackathonUpdatePayloadSchema
-  .extend({ discordChannelId: optionalDiscordChannelId })
+  .extend({ discordChannelId: optionalDiscordChannelId, source: optionalSource })
   .strip()
   .superRefine(dateRangeRefinement)
   .transform((payload) => normalizeLocationPayload(payload));

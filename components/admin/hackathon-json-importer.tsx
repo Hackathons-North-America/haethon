@@ -58,6 +58,7 @@ const sampleJson = `[
     "websiteUrl": "https://example.com",
     "imageUrl": "https://images.unsplash.com/photo-1517048676732-d65bc937f952",
     "sourceUrl": "https://example.com/event",
+    "source": "mlh",
     "country": "Canada",
     "startDate": "2026-09-12",
     "endDate": "2026-09-14",

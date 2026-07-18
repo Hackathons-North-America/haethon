@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   COMMUNITY_FORM_SOURCE_URL,
   deriveSourceType,
-  pickPrimarySourceBadge,
+  HACKATHON_SOURCES,
+  sourceBadge,
 } from "@/lib/hackathons/source-provenance";
 
 describe("hackathon source badges", () => {
@@ -21,28 +22,26 @@ describe("hackathon source badges", () => {
     expect(deriveSourceType(COMMUNITY_FORM_SOURCE_URL)).toBe("manual");
   });
 
-  it("uses the most frequent source, then the specified source order for ties", () => {
-    expect(
-      pickPrimarySourceBadge([
-        { sourceType: "devpost", sourceUrl: "https://devpost.com/hackathons/example" },
-        { sourceType: "luma", sourceUrl: "https://lu.ma/example" },
-        { sourceType: "luma", sourceUrl: "https://lu.ma/example" },
-      ])
-    ).toEqual({ type: "luma", label: "Luma" });
-
-    expect(
-      pickPrimarySourceBadge([
-        { sourceType: "devpost", sourceUrl: "https://devpost.com/hackathons/example" },
-        { sourceType: "cerebral_valley", sourceUrl: "https://cerebralvalley.ai/events/example" },
-        { sourceType: "luma", sourceUrl: "https://lu.ma/example" },
-        { sourceType: "mlh", sourceUrl: "https://mlh.io/events/example" },
-      ])
-    ).toEqual({ type: "mlh", label: "MLH" });
+  it("falls back through URLs until one derives a source", () => {
+    expect(deriveSourceType(null, "https://devpost.com/hackathons/example")).toBe("devpost");
+    expect(deriveSourceType(undefined, undefined)).toBe("other");
   });
 
-  it("shows an unrecognized source's website instead of Community", () => {
-    expect(
-      pickPrimarySourceBadge([{ sourceType: "other", sourceUrl: "https://events.example.edu/hackathons/example" }])
-    ).toEqual({ type: "other", label: "events.example.edu" });
+  it("keeps URL derivation separate from importer-provided provenance", () => {
+    // The import service can persist `source: \"mlh\"` for an MLH feed item
+    // even when the event itself links to Devpost.
+    expect(deriveSourceType("https://devpost.com/hackathons/example")).toBe("devpost");
+  });
+
+  it("labels every storable source without needing a URL", () => {
+    expect(HACKATHON_SOURCES.map(sourceBadge)).toEqual([
+      { type: "mlh", label: "MLH" },
+      { type: "luma", label: "Luma" },
+      { type: "cerebral_valley", label: "Cerebral Valley" },
+      { type: "devpost", label: "Devpost" },
+      { type: "organizer_site", label: "Organizer" },
+      { type: "manual", label: "Community" },
+      { type: "other", label: "Website" },
+    ]);
   });
 });

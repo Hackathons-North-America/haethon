@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { CalendarDays, Check, Globe2, LocateFixed, MapPin, Navigation, PlusSquare, Search, Settings2, X } from "lucide-react";
+import { Archive, CalendarDays, Check, Globe2, LocateFixed, MapPin, Navigation, PlusSquare, Search, Settings2, X } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
@@ -282,6 +282,17 @@ export function HackathonSearch({
   const filteredHackathons = useMemo(
     () => filterLocalHackathonCatalog(catalog, currentFilters, origin),
     [catalog, currentFilters, origin]
+  );
+  /* The catalog arrives with past (recurring) editions already ordered after
+     everything upcoming; splitting on isPast keeps that order while letting the
+     grid draw an explicit archive divider between the two groups. */
+  const upcomingHackathons = useMemo(
+    () => filteredHackathons.filter((hackathon) => !hackathon.isPast),
+    [filteredHackathons]
+  );
+  const pastHackathons = useMemo(
+    () => filteredHackathons.filter((hackathon) => hackathon.isPast),
+    [filteredHackathons]
   );
   const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
   const filteredCountries = useMemo(() => {
@@ -871,11 +882,37 @@ export function HackathonSearch({
 
           {filteredHackathons.length ? (
             <>
-              <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredHackathons.map((hackathon) => (
-                  <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
-                ))}
-              </div>
+              {upcomingHackathons.length ? (
+                <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                  {upcomingHackathons.map((hackathon) => (
+                    <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Past recurring editions sit below a labeled rule so the cutoff
+                  between live events and the archive is unmistakable. */}
+              {pastHackathons.length ? (
+                <>
+                  <div
+                    aria-label="Archived hackathons"
+                    className={`flex items-center gap-4 ${upcomingHackathons.length ? "mt-14" : "mt-2"}`}
+                    role="separator"
+                  >
+                    <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
+                    <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-navy/55 dark:text-wheat/55">
+                      <Archive aria-hidden="true" className="size-3.5" />
+                      Archived · awaiting next edition
+                    </span>
+                    <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
+                  </div>
+                  <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                    {pastHackathons.map((hackathon) => (
+                      <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </>
           ) : (
             <div className="rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-8 text-center">
