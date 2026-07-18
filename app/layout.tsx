@@ -27,17 +27,6 @@ export const metadata: Metadata = {
   description: "Discover, track, and organize hackathons across North America.",
 };
 
-// The app is dark-only. Lock the theme in before hydration so there's no flash.
-const themeInitScript = `
-(() => {
-  try {
-    document.documentElement.classList.add("dark");
-    document.documentElement.classList.remove("light");
-    document.documentElement.style.colorScheme = "dark";
-  } catch {}
-})();
-`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -47,11 +36,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`dark ${spaceGrotesk.variable} ${plexMono.variable} ${newsreader.variable} h-full bg-[#141414]`}
+      style={{ colorScheme: "dark" }}
       suppressHydrationWarning
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
       <body className="min-h-full bg-white font-sans text-navy antialiased selection:bg-cabernet/30 selection:text-white dark:bg-[#141414] dark:text-wheat motion-safe:[&_*]:transition-[color,border-color,background-color,opacity] motion-safe:[&_*]:duration-[160ms] motion-safe:[&_*]:ease-out">
         <AppProviders>{children}</AppProviders>
       </body>

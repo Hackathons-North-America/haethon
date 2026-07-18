@@ -1,4 +1,17 @@
-ALTER TABLE "hackathons" ADD COLUMN "source" "source_type";--> statement-breakpoint
+-- Idempotent because an earlier version of migration 0019 may already have
+-- added this column before this additive rollout migration replaced it.
+ALTER TABLE "hackathons" ADD COLUMN IF NOT EXISTS "source" "source_type";--> statement-breakpoint
+-- The earlier 0019 also dropped this table. Recreate it when necessary so the
+-- schema stays compatible with old Vercel instances during this release.
+CREATE TABLE IF NOT EXISTS "sources" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "hackathon_id" uuid REFERENCES "hackathons"("id") ON DELETE cascade,
+  "source_type" "source_type" NOT NULL,
+  "source_url" text NOT NULL,
+  "reliability_score" numeric(5, 2) DEFAULT '0',
+  "imported_at" timestamp with time zone DEFAULT now() NOT NULL
+);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "sources_hackathon_idx" ON "sources" USING btree ("hackathon_id");--> statement-breakpoint
 -- Compile the currently displayed badge once. Admin overrides win; remaining
 -- rows replay the legacy read-time vote so this release has no visual churn.
 UPDATE "hackathons" h
