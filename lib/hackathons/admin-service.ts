@@ -238,16 +238,17 @@ export async function setHackathonSeriesRecurring(hackathonId: string, isRecurri
   return updated;
 }
 
-/* Grace window before a past, non-repeating hackathon is deleted outright.
-   Repeating (recurring-series) events are never deleted by the cleanup cron —
-   they stay listed until their next edition is published. */
+/* Grace window before an unpublished, past, non-repeating hackathon is deleted
+   outright. Published hackathons are never auto-deleted — they stay on record
+   for the public half-year archive. Repeating (recurring-series) events are
+   likewise never deleted by the cleanup cron. */
 export const PAST_HACKATHON_RETENTION_DAYS = 30;
 
 /**
- * Deletes hackathons whose dates ended more than PAST_HACKATHON_RETENTION_DAYS
- * ago, unless their series is marked recurring. Run daily by the
- * cleanup-hackathons cron. A per-row failure (e.g. Discord channel retirement)
- * skips that row and is retried on the next run.
+ * Deletes never-published hackathons whose dates ended more than
+ * PAST_HACKATHON_RETENTION_DAYS ago, unless their series is marked recurring.
+ * Run daily by the cleanup-hackathons cron. A per-row failure (e.g. Discord
+ * channel retirement) skips that row and is retried on the next run.
  */
 export async function deleteExpiredHackathons(now = new Date()) {
   const cutoff = new Date(now.getTime() - PAST_HACKATHON_RETENTION_DAYS * 24 * 60 * 60 * 1000);
@@ -259,6 +260,7 @@ export async function deleteExpiredHackathons(now = new Date()) {
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
     .where(
       and(
+        isNull(hackathons.publishedAt),
         lt(hackathonDates.endsAt, cutoff),
         or(isNull(hackathons.seriesId), eq(hackathonSeries.isRecurring, false))
       )

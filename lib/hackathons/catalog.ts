@@ -25,7 +25,7 @@ export const CATALOG_PAGE_SIZE = 30;
    query fan-out on nearly every page view. */
 const CATALOG_REVALIDATE_SECONDS = 600;
 
-const CATALOG_CACHE_TAG = "hackathon-catalog";
+export const CATALOG_CACHE_TAG = "hackathon-catalog";
 const DETAIL_CACHE_TAG = "hackathon-detail";
 
 /* Status is derived once at approval and never re-derived, so it cannot gate

@@ -9,6 +9,8 @@ import {
   channelNameForHackathon,
   channelReuseKey,
   type DiscordCategoryKey,
+  isArchiveCategoryName,
+  pastCategoryDiscordName,
 } from "@/lib/discord/channel-rules";
 import { discordRest, isUnknownChannelError } from "@/lib/discord/rest";
 import {
@@ -72,20 +74,31 @@ const INELIGIBLE_REASON = "Only Canadian and US hackathons are synced to Discord
 // target — it just parks the channel so an admin can remove it on Discord later.
 const DELETED_CATEGORY_NAME = "deleted";
 
-const categoryNames: Record<DiscordCategoryKey, string> = {
-  canada: "Canadian Hackathons",
-  us: "US Hackathons",
-  past: "Past Hackathons",
-};
+function categoryDisplayName(category: DiscordCategoryKey) {
+  if (category === "canada") {
+    return "Canadian Hackathons";
+  }
 
+  if (category === "us") {
+    return "US Hackathons";
+  }
+
+  return pastCategoryDiscordName(category);
+}
+
+// Past buckets ("past-hackathons-h1-2026", …) roll over every half-year, so
+// they are always resolved by name (and created on demand) rather than pinned
+// to an env-configured category id like the two active categories.
 function configuredCategoryId(category: DiscordCategoryKey) {
-  const ids: Record<DiscordCategoryKey, string | undefined> = {
-    canada: env.DISCORD_CANADA_CATEGORY_ID,
-    us: env.DISCORD_US_CATEGORY_ID,
-    past: env.DISCORD_PAST_CATEGORY_ID,
-  };
+  if (category === "canada") {
+    return env.DISCORD_CANADA_CATEGORY_ID;
+  }
 
-  return ids[category];
+  if (category === "us") {
+    return env.DISCORD_US_CATEGORY_ID;
+  }
+
+  return undefined;
 }
 
 function formatDate(value: Date | null) {
@@ -305,7 +318,7 @@ function createGuildChannelDirectory(rest: REST, guildSnowflake: string) {
     const resolution = (async () => {
       const channels = await listChannels();
       const configuredId = configuredCategoryId(category);
-      const name = categoryNames[category];
+      const name = categoryDisplayName(category);
 
       if (configuredId) {
         const configured = channels.find((channel) => channel.id === configuredId);
@@ -319,7 +332,11 @@ function createGuildChannelDirectory(rest: REST, guildSnowflake: string) {
         return configured.id;
       }
 
-      const existing = channels.find((channel) => channel.type === ChannelType.GuildCategory && channel.name === name);
+      // Case-insensitive so hand-created categories (e.g. "Past-Hackathons-H1-2026")
+      // are reused instead of duplicated.
+      const existing = channels.find(
+        (channel) => channel.type === ChannelType.GuildCategory && channel.name.toLowerCase() === name.toLowerCase()
+      );
 
       if (existing) {
         return existing.id;
@@ -365,15 +382,21 @@ async function removeIneligibleChannel(
 }
 
 /**
- * Looks for a channel that was parked in the "deleted" holding category (its
- * hackathon was removed, so it lost its hackathon link — and, before series
- * links were preserved on retirement, its series link too) and matches the
- * target event by year-insensitive name. Claiming it re-attaches the channel
- * to the target's series so the normal recycle path renames and re-files it,
- * instead of creating a duplicate channel for the returning event.
+ * Looks for an existing channel the returning event can reuse instead of
+ * getting a duplicate, matching by year-insensitive name in two places:
  *
- * The claim is a guarded update (`series_id IS NULL`) so two concurrent lanes
- * can never adopt the same channel for different series.
+ * 1. Tracked rows parked in the "deleted" holding category (their hackathon was
+ *    removed, so they lost their hackathon link — and, before series links were
+ *    preserved on retirement, their series link too). The claim is a guarded
+ *    update (`series_id IS NULL`) so two concurrent lanes can never adopt the
+ *    same channel for different series.
+ * 2. Untracked channels sitting in any past-hackathons half-year category on
+ *    the guild itself — hand-made channels from earlier years that predate the
+ *    bot. Claiming one inserts its row; the unique snowflake index makes that
+ *    claim atomic.
+ *
+ * Either way the channel is re-attached to the target's series so the normal
+ * recycle path renames and re-files it.
  */
 async function adoptRetiredChannel(ctx: SyncContext, target: SyncTarget) {
   const key = channelReuseKey(channelNameForHackathon({ name: target.name, startsAt: null }));
@@ -394,34 +417,103 @@ async function adoptRetiredChannel(ctx: SyncContext, target: SyncTarget) {
 
   const match = orphans.find((orphan) => channelReuseKey(orphan.name) === key);
 
-  if (!match) {
+  if (match) {
+    const [claimed] = await db
+      .update(discordChannels)
+      .set({ seriesId: target.seriesId })
+      .where(and(eq(discordChannels.id, match.recordId), isNull(discordChannels.seriesId)))
+      .returning({ id: discordChannels.id });
+
+    if (claimed) {
+      const mapped: MappedChannel = {
+        channelSnowflake: match.channelSnowflake,
+        nameOverride: match.nameOverride,
+        recordId: match.recordId,
+      };
+      ctx.channelsBySeries.set(target.seriesId, mapped);
+
+      return mapped;
+    }
+  }
+
+  const candidate = await findAdoptableArchivedChannel(ctx.directory, key);
+
+  if (!candidate) {
     return undefined;
   }
 
-  const [claimed] = await db
-    .update(discordChannels)
-    .set({ seriesId: target.seriesId })
-    .where(and(eq(discordChannels.id, match.recordId), isNull(discordChannels.seriesId)))
+  const [inserted] = await db
+    .insert(discordChannels)
+    .values({
+      channelSnowflake: candidate.id,
+      guildId: ctx.guildId,
+      name: candidate.name,
+      seriesId: target.seriesId,
+    })
+    .onConflictDoNothing()
     .returning({ id: discordChannels.id });
 
-  if (!claimed) {
+  if (!inserted) {
     return undefined;
   }
 
   const mapped: MappedChannel = {
-    channelSnowflake: match.channelSnowflake,
-    nameOverride: match.nameOverride,
-    recordId: match.recordId,
+    channelSnowflake: candidate.id,
+    nameOverride: null,
+    recordId: inserted.id,
   };
   ctx.channelsBySeries.set(target.seriesId, mapped);
 
   return mapped;
 }
 
+/**
+ * Scans every archive category in the guild (all past-hackathons-hX-YYYY
+ * buckets plus the legacy "Past Hackathons") for a text channel matching the
+ * reuse key that no DB row claims yet. Returns the live Discord channel, or
+ * undefined when every match is already tracked.
+ */
+async function findAdoptableArchivedChannel(
+  directory: Pick<GuildChannelDirectory, "listChannels">,
+  key: string
+) {
+  const channels = await directory.listChannels();
+  const archiveCategoryIds = new Set(
+    channels
+      .filter((channel) => channel.type === ChannelType.GuildCategory && isArchiveCategoryName(channel.name))
+      .map((channel) => channel.id)
+  );
+  const candidates = channels.filter(
+    (channel) =>
+      channel.type === ChannelType.GuildText &&
+      channel.parent_id &&
+      archiveCategoryIds.has(channel.parent_id) &&
+      channelReuseKey(channel.name) === key
+  );
+
+  if (!candidates.length) {
+    return undefined;
+  }
+
+  const trackedRows = await db
+    .select({ channelSnowflake: discordChannels.channelSnowflake })
+    .from(discordChannels)
+    .where(
+      inArray(
+        discordChannels.channelSnowflake,
+        candidates.map((candidate) => candidate.id)
+      )
+    );
+  const tracked = new Set(trackedRows.map((row) => row.channelSnowflake));
+
+  return candidates.find((candidate) => !tracked.has(candidate.id));
+}
+
 async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
   const category = categoryForHackathon({
     country: target.country,
     endsAt: target.endsAt,
+    startsAt: target.startsAt,
     status: target.status,
   });
 
@@ -531,7 +623,7 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
   return {
     action,
     category,
-    categoryName: categoryNames[category],
+    categoryName: categoryDisplayName(category),
     channelSnowflake,
     name,
     status: "synced" as const,
@@ -594,6 +686,7 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
   const category = categoryForHackathon({
     country: row.country,
     endsAt: row.endsAt,
+    startsAt: row.startsAt,
     status: row.status,
   });
 
@@ -743,10 +836,12 @@ export async function retireHackathonDiscordChannel(hackathonId: string) {
 }
 
 /**
- * Works out what syncing this hackathon *would* do, using only the database and
- * the channel rules — it makes no Discord API calls. Used to show an admin, before
- * they confirm, whether approving will create a new channel or recycle the series'
- * existing one, and which category it lands in.
+ * Works out what syncing this hackathon *would* do. Used to show an admin,
+ * before they confirm, whether approving will create a new channel or recycle
+ * the series' existing one, and which category it lands in. Database checks
+ * come first; a best-effort guild listing then covers untracked channels
+ * parked in the archive categories, so the preview matches what the sync's
+ * adoption would actually do.
  */
 export async function previewHackathonDiscordChannel(hackathonId: string) {
   const [row] = await db
@@ -771,6 +866,7 @@ export async function previewHackathonDiscordChannel(hackathonId: string) {
   const category = categoryForHackathon({
     country: row.country,
     endsAt: row.endsAt,
+    startsAt: row.startsAt,
     status: row.status,
   });
 
@@ -828,12 +924,34 @@ export async function previewHackathonDiscordChannel(hackathonId: string) {
         name = match.nameOverride ?? name;
       }
     }
+
+    // Also mirror adoption of untracked channels from the archive categories.
+    // Listing the guild can fail (bot offline, missing permissions) — the
+    // preview then just says "create" and the sync sorts it out.
+    if (action === "create") {
+      const rest = discordRest();
+      const key = channelReuseKey(channelNameForHackathon({ name: row.name, startsAt: null }));
+
+      if (rest && key) {
+        try {
+          const directory = createGuildChannelDirectory(rest, env.DISCORD_GUILD_ID);
+          const candidate = await findAdoptableArchivedChannel(directory, key);
+
+          if (candidate) {
+            action = "recycle";
+            existingChannelName = candidate.name;
+          }
+        } catch (error) {
+          console.error("Unable to scan Discord archive categories for the channel preview.", { error, hackathonId });
+        }
+      }
+    }
   }
 
   return {
     action,
     category,
-    categoryName: categoryNames[category],
+    categoryName: categoryDisplayName(category),
     eligible: true as const,
     existingChannelName,
     name,

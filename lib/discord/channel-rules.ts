@@ -1,7 +1,39 @@
+import { type HalfYear, halfYearOf } from "@/lib/hackathons/half-year";
 import { normalizeCountry } from "@/lib/hackathons/location-normalization";
 import { slugify } from "@/lib/hackathons/utils";
 
-export type DiscordCategoryKey = "canada" | "past" | "us";
+/* Past hackathons are filed per half-year ("past-h1-2026" = ended Jan–Jun 2026)
+   instead of one shared archive, mirroring the guild's category layout. */
+export type PastDiscordCategoryKey = `past-h${1 | 2}-${number}`;
+export type DiscordCategoryKey = "canada" | "us" | PastDiscordCategoryKey;
+
+export function pastCategoryKey({ half, year }: HalfYear): PastDiscordCategoryKey {
+  return `past-h${half}-${year}`;
+}
+
+export function isPastCategoryKey(key: DiscordCategoryKey): key is PastDiscordCategoryKey {
+  return key !== "canada" && key !== "us";
+}
+
+/* Discord category name for a past bucket, e.g. "past-hackathons-h1-2026". */
+export function pastCategoryDiscordName(key: PastDiscordCategoryKey) {
+  return `past-hackathons-${key.slice("past-".length)}`;
+}
+
+const pastCategoryNamePattern = /^past-hackathons-h[12]-\d{4}$/i;
+
+// The pre-half-year guild had one "Past Hackathons" archive category; channels
+// still parked there stay adoptable while the layout migrates.
+const legacyPastCategoryName = "past hackathons";
+
+/**
+ * True for guild categories that hold archived hackathon channels — every
+ * half-year bucket plus the legacy single archive. Channel adoption scans all
+ * of them so a returning event reuses its old channel from any year.
+ */
+export function isArchiveCategoryName(name: string) {
+  return pastCategoryNamePattern.test(name) || name.trim().toLowerCase() === legacyPastCategoryName;
+}
 
 const monthAbbreviations = [
   "jan",
@@ -21,6 +53,7 @@ const monthAbbreviations = [
 export function categoryForHackathon(input: {
   country: string | null;
   endsAt: Date | null;
+  startsAt?: Date | null;
   status: string;
   now?: Date;
 }): DiscordCategoryKey | null {
@@ -33,7 +66,9 @@ export function categoryForHackathon(input: {
   const now = input.now ?? new Date();
 
   if (input.status === "completed" || input.status === "archived" || (input.endsAt && input.endsAt < now)) {
-    return "past";
+    // Bucketed by when the event happened; "now" only backstops rows whose
+    // status says past but whose dates were never recorded.
+    return pastCategoryKey(halfYearOf(input.endsAt ?? input.startsAt ?? now));
   }
 
   return country === "Canada" ? "canada" : "us";

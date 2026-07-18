@@ -50,7 +50,9 @@ import {
 } from "@/lib/hackathons/reminder-plan";
 import { formatReminderDate, reminderTypeLabels } from "@/lib/hackathons/reminder-labels";
 
-const publicStatuses = ["upcoming", "live", "completed"] as const;
+/* "archived" is viewable here (unlike the catalog) so archive-page cards for
+   pre-half-year rows never link to a 404. */
+const publicStatuses = ["upcoming", "live", "completed", "archived"] as const;
 
 type PageProps = {
   params: Promise<{ slug: string }>;

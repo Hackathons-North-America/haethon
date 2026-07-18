@@ -4,7 +4,9 @@ import {
   categoryForHackathon,
   channelNameForHackathon,
   channelReuseKey,
+  isArchiveCategoryName,
   normalizeChannelName,
+  pastCategoryDiscordName,
 } from "@/lib/discord/channel-rules";
 
 describe("Discord channel rules", () => {
@@ -37,7 +39,7 @@ describe("Discord channel rules", () => {
     expect(categoryForHackathon({ ...event, country: "USA" })).toBe("us");
   });
 
-  it("places eligible completed hackathons in the past category", () => {
+  it("places eligible completed hackathons in the half-year past category of their end date", () => {
     expect(
       categoryForHackathon({
         country: "United States",
@@ -45,7 +47,26 @@ describe("Discord channel rules", () => {
         now: new Date("2026-10-01T00:00:00.000Z"),
         status: "upcoming",
       })
-    ).toBe("past");
+    ).toBe("past-h2-2026");
+  });
+
+  it("splits the year at the June/July boundary", () => {
+    const event = { country: "Canada", now: new Date("2027-01-01T00:00:00.000Z"), status: "completed" };
+
+    expect(categoryForHackathon({ ...event, endsAt: new Date("2026-06-30T00:00:00.000Z") })).toBe("past-h1-2026");
+    expect(categoryForHackathon({ ...event, endsAt: new Date("2026-07-01T00:00:00.000Z") })).toBe("past-h2-2026");
+  });
+
+  it("falls back to the start date when a past-status event has no end date", () => {
+    expect(
+      categoryForHackathon({
+        country: "Canada",
+        endsAt: null,
+        now: new Date("2026-07-18T00:00:00.000Z"),
+        startsAt: new Date("2025-03-08T00:00:00.000Z"),
+        status: "archived",
+      })
+    ).toBe("past-h1-2025");
   });
 
   it("does not assign a Discord category to other countries", () => {
@@ -57,6 +78,20 @@ describe("Discord channel rules", () => {
         status: "completed",
       })
     ).toBeNull();
+  });
+});
+
+describe("Discord past category names", () => {
+  it("maps a past category key onto the guild's category naming", () => {
+    expect(pastCategoryDiscordName("past-h1-2026")).toBe("past-hackathons-h1-2026");
+  });
+
+  it("recognizes half-year archive categories and the legacy archive", () => {
+    expect(isArchiveCategoryName("past-hackathons-h2-2025")).toBe(true);
+    expect(isArchiveCategoryName("Past-Hackathons-H1-2023")).toBe(true);
+    expect(isArchiveCategoryName("Past Hackathons")).toBe(true);
+    expect(isArchiveCategoryName("Canadian Hackathons")).toBe(false);
+    expect(isArchiveCategoryName("past-hackathons")).toBe(false);
   });
 });
 

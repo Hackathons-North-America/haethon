@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "motion/react";
 
 import { DiscordIcon } from "@/components/discord-icon";
 import {
+  Archive,
   Building2,
   CalendarDays,
   CircleUser,
@@ -16,6 +17,7 @@ import {
 
 const items = [
   { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
+  { href: "/archive", icon: Archive, label: "Archive" },
   { href: "/my", icon: CalendarDays, label: "My Hackathons" },
   { href: "/account", icon: CircleUser, label: "Hacker Profile" },
   { href: "/account/settings", icon: Settings, label: "Account Settings" },

@@ -45,7 +45,6 @@ Recommended to fully wire the stack:
 - `DISCORD_GUILD_ID`
 - `DISCORD_CANADA_CATEGORY_ID`
 - `DISCORD_US_CATEGORY_ID`
-- `DISCORD_PAST_CATEGORY_ID`
 - `DISCORD_DELETED_CATEGORY_ID`
 - `CRON_SECRET`
 
@@ -100,11 +99,10 @@ pnpm db:push
 ```dotenv
 DISCORD_CANADA_CATEGORY_ID=
 DISCORD_US_CATEGORY_ID=
-DISCORD_PAST_CATEGORY_ID=
 DISCORD_DELETED_CATEGORY_ID=
 ```
 
-Category IDs are optional. When one is omitted, the sync finds a category by its configured name and creates it if it does not exist. `DISCORD_DELETED_CATEGORY_ID` is the holding category a hackathon's channel is moved into when the hackathon is deleted; the channel is parked there (not removed) for you to clean up on Discord later.
+Category IDs are optional. When one is omitted, the sync finds a category by its configured name and creates it if it does not exist. Past hackathons are filed into half-year archive categories named `past-hackathons-h1-YYYY` (January–June) and `past-hackathons-h2-YYYY` (July–December); these are always resolved by name and created on demand, so they have no env var. `DISCORD_DELETED_CATEGORY_ID` is the holding category a hackathon's channel is moved into when the hackathon is deleted; the channel is parked there (not removed) for you to clean up on Discord later.
 
 The website performs Discord REST API calls itself, so no separate always-on bot process is required. The deployed Next.js app and the scheduled `/api/cron/sync-discord` request perform the synchronization.
 

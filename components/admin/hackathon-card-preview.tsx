@@ -1,6 +1,7 @@
 "use client";
 
 import { HackathonCard, type HackathonCardData } from "@/components/hackathon-card";
+import { formatDateRange } from "@/lib/hackathons/card-format";
 
 export type PreviewPayload = Record<string, unknown>;
 
@@ -29,6 +30,18 @@ function dateText(value: unknown) {
   }).format(date);
 }
 
+function parseDate(value: unknown) {
+  const raw = text(value);
+
+  if (!raw) {
+    return null;
+  }
+
+  const date = new Date(raw);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function locationText(payload: PreviewPayload) {
   const format = text(payload.format, "in_person");
 
@@ -47,11 +60,10 @@ function locationText(payload: PreviewPayload) {
 
 export function previewPayloadToCard(payload: PreviewPayload, id = "admin-preview"): HackathonCardData {
   const name = text(payload.name, "Untitled hackathon");
-  const startDate = dateText(payload.startDate);
 
   return {
     beginnerFriendly: payload.beginnerFriendly === true,
-    date: startDate || "Date to be announced",
+    date: formatDateRange(parseDate(payload.startDate), parseDate(payload.endDate)),
     highSchoolersOnly: payload.highSchoolersOnly === true,
     id,
     image: text(payload.imageUrl) || null,
