@@ -12,11 +12,10 @@ type RouteContext = {
 const MAX_LOGO_BYTES = 4 * 1024 * 1024;
 export const runtime = "nodejs";
 
-/* Same-origin proxy for hackathon logos. Most logo hosts (e.g. the Devpost
-   CDN) don't send CORS headers, which taints the canvas the card uses to
-   sample the logo's dominant color. Serving the bytes from our own origin
-   keeps the canvas readable, and the long cache header means each logo is
-   fetched upstream at most once per client per day. */
+/* Same-origin fallback proxy for hackathon logos. Logos on allowlisted hosts
+   (lib/hackathons/logo-hosts.ts) skip this route entirely and are served to
+   the image optimizer directly; only legacy rows on unknown hosts still load
+   through here, with the SSRF-guarded fetch happening per cache miss. */
 export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
   const [hackathon] = await db

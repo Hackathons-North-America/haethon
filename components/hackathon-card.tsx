@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowBigDown, ArrowBigUp, BellPlus, Bookmark, Check, ChevronDown } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
+import { hackathonLogoSrc, isDirectImageUrl } from "@/lib/hackathons/logo-hosts";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
@@ -294,10 +295,11 @@ function HackathonLogoMark({
           priority={false}
           sizes="72px"
           src={logoSrc}
-          /* Non-preview logos route through our same-origin /logo proxy, so
-             next/image can optimize them (WebP + srcset) without remotePatterns.
-             Preview cards carry raw remote URLs and must skip optimization. */
-          unoptimized={!logoSrc.startsWith("/")}
+          /* Same-origin (proxy fallback) and allowlisted remote hosts both go
+             through next/image optimization (WebP + srcset). Only preview cards
+             carrying a raw URL on an unknown host must skip it — the optimizer
+             rejects hosts outside remotePatterns. */
+          unoptimized={!logoSrc.startsWith("/") && !isDirectImageUrl(logoSrc)}
         />
       ) : (
         <div className="grid size-full place-items-center bg-[rgb(var(--hackathon-accent-rgb)/0.92)] px-2 text-center text-lg font-semibold text-white">
@@ -546,7 +548,7 @@ export function HackathonCard({
   const logoSrc = hackathon.image
     ? preview
       ? hackathon.image
-      : `/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`
+      : hackathonLogoSrc(hackathon.id, hackathon.image)
     : null;
   return (
     <article

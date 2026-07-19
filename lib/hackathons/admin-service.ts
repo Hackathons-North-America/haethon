@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
+import { assertReachableImageUrl } from "@/lib/hackathons/image-ingest";
 import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
 import { orderAdminHackathonRows } from "@/lib/hackathons/admin-ordering";
@@ -122,10 +123,22 @@ export async function setHackathonSource(hackathonId: string, source: HackathonS
 }
 
 export async function updatePublishedHackathon(hackathonId: string, payload: AdminHackathonUpdatePayload) {
-  const [existing] = await db.select({ id: hackathons.id }).from(hackathons).where(eq(hackathons.id, hackathonId)).limit(1);
+  const [existing] = await db
+    .select({ id: hackathons.id, imageUrl: hackathons.imageUrl })
+    .from(hackathons)
+    .where(eq(hackathons.id, hackathonId))
+    .limit(1);
 
   if (!existing) {
     throw new Error("Hackathon not found.");
+  }
+
+  // Image URLs are vetted once, on change, instead of on every read — cards
+  // hand allowlisted hosts straight to the image optimizer.
+  const imageUrl = payload.imageUrl ?? null;
+
+  if (imageUrl && imageUrl !== existing.imageUrl) {
+    await assertReachableImageUrl(imageUrl);
   }
 
   const now = new Date();
@@ -136,7 +149,7 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
       name: payload.name,
       shortDescription: payload.shortDescription ?? null,
       websiteUrl: payload.websiteUrl,
-      imageUrl: payload.imageUrl ?? null,
+      imageUrl,
       applicationUrl: payload.applicationUrl ?? null,
       venue: payload.venue ?? null,
       format: payload.format,

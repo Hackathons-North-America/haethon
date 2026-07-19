@@ -43,6 +43,7 @@ import {
   userHackathons,
 } from "@/lib/db/schema";
 import { formatDateRange, formatDuration, formatLocation } from "@/lib/hackathons/card-format";
+import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import {
   computeSelectableReminderOffers,
   getSelectableReminderTypesForStatus,
@@ -345,7 +346,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
                 className="object-contain p-2.5"
                 fill
                 sizes="80px"
-                src={`/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`}
+                src={hackathonLogoSrc(hackathon.id, hackathon.imageUrl)}
               />
             ) : (
               <span className="text-xl font-semibold text-cabernet dark:text-[#e4a3ab]">{getInitials(hackathon.name) || "HN"}</span>

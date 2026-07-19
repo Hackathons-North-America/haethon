@@ -15,6 +15,7 @@ import {
 } from "@/lib/db/schema";
 import type { SelectUser } from "@/lib/db/schema";
 import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
+import { verifiedImageUrl } from "@/lib/hackathons/image-ingest";
 import { normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
 import {
   calculateDuplicateScore,
@@ -201,6 +202,9 @@ export async function createPublishedHackathon(
   options?: { revalidateCaches?: boolean; source?: HackathonSource; syncDiscord?: boolean }
 ) {
   payload = normalizeLocationPayload(payload);
+  // Vetted once at ingest; a dead or non-image URL degrades to the initials
+  // tile rather than failing the import (see lib/hackathons/image-ingest.ts).
+  payload = { ...payload, imageUrl: await verifiedImageUrl(payload.imageUrl) };
   const organizationId = await ensureOrganization(payload);
   const seriesId = await ensureHackathonSeries(payload);
   const slug = await uniqueHackathonSlug(payload.name);
@@ -285,7 +289,7 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
       seriesId,
       shortDescription: existing.shortDescription ?? payload.shortDescription,
       websiteUrl: existing.websiteUrl ?? payload.websiteUrl,
-      imageUrl: existing.imageUrl ?? payload.imageUrl,
+      imageUrl: existing.imageUrl ?? (await verifiedImageUrl(payload.imageUrl)),
       applicationUrl: existing.applicationUrl ?? payload.applicationUrl,
       venue: existing.venue ?? payload.venue,
       beginnerFriendly: existing.beginnerFriendly || payload.beginnerFriendly,

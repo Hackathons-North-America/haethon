@@ -21,6 +21,7 @@ import {
 } from "@/lib/db/schema";
 import { deriveAttendanceTrustTier, type AttendanceSource, type AttendanceTrustTier } from "@/lib/hackathons/attendance-rules";
 import { formatDateRange } from "@/lib/hackathons/card-format";
+import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { dateToInputValue } from "@/lib/hackathons/utils";
 
 function getInitials(name: string) {
@@ -311,7 +312,7 @@ export default async function AccountPage() {
                             className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                             fill
                             sizes="(min-width: 768px) 400px, 100vw"
-                            src={`/api/hackathons/${encodeURIComponent(item.hackathonId)}/logo`}
+                            src={hackathonLogoSrc(item.hackathonId, item.imageUrl)}
                           />
                         ) : (
                           // No cover image: fall back to a hackathon-specific branded tile
