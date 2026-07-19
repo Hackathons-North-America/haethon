@@ -96,10 +96,10 @@ function assertSafeUrl(rawUrl: string) {
 function createSafeAgent() {
   return new Agent({
     connect: {
-      // Validate and pin the exact address used by the socket. Doing a separate
-      // DNS preflight would still permit a DNS-rebinding race between lookup
-      // and connection.
-      lookup(hostname, _options, callback) {
+      // Validate and pin the exact addresses used by the socket. Doing a
+      // separate DNS preflight would still permit a DNS-rebinding race between
+      // lookup and connection.
+      lookup(hostname, options, callback) {
         lookup(hostname, { all: true, verbatim: true }, (error, addresses) => {
           if (error) {
             callback(error, "", 4);
@@ -111,8 +111,27 @@ function createSafeAgent() {
             return;
           }
 
-          const selected = addresses[0];
-          callback(null, selected.address, selected.family);
+          const candidates = options.family
+            ? addresses.filter(({ family }) => family === options.family)
+            : addresses;
+
+          if (candidates.length === 0) {
+            callback(new Error("Unsafe image address."), "", 4);
+            return;
+          }
+
+          // Node's Happy Eyeballs path (autoSelectFamily, the default since
+          // Node 20) calls lookup with `all: true` and requires the address
+          // array back — answering with a single address string here makes
+          // every connect throw ERR_INVALID_IP_ADDRESS. Handing back the full
+          // validated list also lets Node fall back across address families
+          // instead of hanging on an unreachable one.
+          if (options.all) {
+            callback(null, candidates);
+            return;
+          }
+
+          callback(null, candidates[0].address, candidates[0].family);
         });
       },
     },
