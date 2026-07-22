@@ -31,20 +31,7 @@ export function HeroHeadline() {
 
   return (
     <>
-      <motion.p
-        className="inline-flex items-center gap-2.5 rounded-full border border-navy/15 bg-white/60 px-4 py-1.5 font-mono text-[0.66rem] font-medium uppercase tracking-[0.16em] text-navy/60 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-wheat/60"
-        initial={still ? false : { opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05, duration: 0.7, ease: easeOut }}
-      >
-        <span aria-hidden="true" className="relative flex size-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#7cc7ab] opacity-60 [animation-duration:2.6s] motion-reduce:animate-none" />
-          <span className="relative inline-flex size-2 rounded-full bg-[#8ee3be] shadow-[0_0_10px_2px_rgb(134_227_190_/_0.45)]" />
-        </span>
-        5,000+ hackers strong
-      </motion.p>
-
-      <h1 className="relative mt-6 text-balance font-serif text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-navy dark:text-wheat">
+      <h1 className="relative text-balance font-serif text-[clamp(2.75rem,8vw,5.5rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-navy dark:text-wheat">
         <RevealWord index={0} still={still}>
           Where
         </RevealWord>{" "}
