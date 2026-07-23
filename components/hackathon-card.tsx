@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { BellPlus, Bookmark, Check, ChevronDown, Swords } from "lucide-react";
+import { BellPlus, Bookmark, Check, ChevronDown } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
-import { hackathonLogoSrc, isDirectImageUrl } from "@/lib/hackathons/logo-hosts";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
+import type { TierLabel } from "@/lib/hackathons/ranking";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
 export type HackathonCardData = {
@@ -19,6 +18,7 @@ export type HackathonCardData = {
   /** Two-letter ISO code — used for the "near me" local-country boost. */
   countryCode?: string | null;
   date: string;
+  description?: string | null;
   /** Face Off head-to-head rating. Undefined only for hand-built preview cards. */
   eloRating?: number;
   faceoffLosses?: number;
@@ -38,8 +38,8 @@ export type HackathonCardData = {
   location: string;
   name: string;
   slug?: string | null;
-  /* Where this hackathon's data came from — surfaced as a small provenance
-     badge under the card image. Absent when we have no source on file. */
+  /* Catalog metadata retained for card-data compatibility; cards do not
+     surface source provenance in their UI. */
   source?: HackathonSourceBadge | null;
   startsAt?: string | null;
   travelReimbursement?: boolean;
@@ -49,46 +49,36 @@ function handleUnauthenticated() {
   window.location.href = "/sign-in";
 }
 
-/* Keep country names readable while preserving the US/Canada color accents. */
-function getCountryDisplay(country: string): { label: string; underlineClass: string } {
+function getCountryDisplay(country: string) {
   const key = country.trim().toLowerCase();
 
   if (key === "united states" || key === "united states of america" || key === "usa") {
-    return { label: "United States", underlineClass: "underline decoration-[#5A6CFF] underline-offset-2" };
+    return "United States";
   }
 
   if (key === "canada") {
-    return { label: "Canada", underlineClass: "underline decoration-[#D9043D] underline-offset-2" };
+    return "Canada";
   }
 
-  return { label: country.trim(), underlineClass: "" };
+  return country.trim();
 }
 
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("");
-}
+function getLocationColor(country?: string | null) {
+  const normalizedCountry = country?.trim().toLowerCase();
 
-function getAccentStyle(name: string) {
-  const palette = [
-    [102, 0, 0],
-    [217, 4, 61],
-    [31, 93, 135],
-    [24, 120, 92],
-    [138, 83, 18],
-    [86, 64, 148],
-    [160, 62, 43],
-  ] as const;
-  const hash = Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0);
-  const [r, g, b] = palette[hash % palette.length] ?? palette[0];
+  if (normalizedCountry === "canada") {
+    return "text-[#d80621]";
+  }
 
-  return {
-    "--hackathon-accent-rgb": `${r} ${g} ${b}`,
-  } as CSSProperties & { "--hackathon-accent-rgb": string };
+  if (
+    normalizedCountry === "united states" ||
+    normalizedCountry === "united states of america" ||
+    normalizedCountry === "usa"
+  ) {
+    return "text-[#3c3b6e]";
+  }
+
+  return "text-ink/85";
 }
 
 function BookmarkButton({
@@ -149,7 +139,7 @@ function BookmarkButton({
       aria-disabled={preview || undefined}
       aria-pressed={saved}
       disabled={saving}
-      className={`relative z-10 grid size-10 shrink-0 place-items-center transition-colors hover:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
+      className={`relative z-10 inline-flex min-h-10 shrink-0 items-center px-1 transition-colors hover:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
         saved ? "text-pine" : "text-ink"
       } disabled:cursor-wait disabled:opacity-70`}
       onClick={toggleSaved}
@@ -157,49 +147,60 @@ function BookmarkButton({
     >
       <Bookmark
         aria-hidden="true"
-        className={`size-5 ${saved ? "fill-current" : "fill-transparent"}`}
+        className={`size-[1.15rem] ${saved ? "fill-current" : "fill-transparent"}`}
         strokeWidth={2.35}
       />
     </button>
   );
 }
 
-function HackathonLogoMark({
-  compact = false,
-  hackathon,
-  logoSrc,
-}: {
-  compact?: boolean;
-  hackathon: HackathonCardData;
-  logoSrc: string | null;
-}) {
-  return (
-    <div
-      className={`relative grid shrink-0 place-items-center overflow-hidden bg-ink/5 ${
-        compact ? "size-14" : "size-[4.5rem]"
-      }`}
-    >
-      {logoSrc ? (
-        <Image
-          alt={`${hackathon.name} logo`}
-          className="object-contain"
-          fill
-          priority={false}
-          sizes="72px"
-          src={logoSrc}
-          /* Same-origin (proxy fallback) and allowlisted remote hosts both go
-             through next/image optimization (WebP + srcset). Only preview cards
-             carrying a raw URL on an unknown host must skip it — the optimizer
-             rejects hosts outside remotePatterns. */
-          unoptimized={!logoSrc.startsWith("/") && !isDirectImageUrl(logoSrc)}
-        />
-      ) : (
-        <div className="grid size-full place-items-center bg-[rgb(var(--hackathon-accent-rgb)/0.92)] px-2 text-center text-lg font-semibold text-paper">
-          {getInitials(hackathon.name) || "HN"}
-        </div>
-      )}
-    </div>
-  );
+function splitDateRange(date: string) {
+  const normalized = date.replace(/\s+/g, " ").trim();
+  const match = normalized.match(/^([A-Za-z]{3})\s+(\d{1,2})(?:\s*-\s*(?:(?:[A-Za-z]{3})\s+)?(\d{1,2}))?/);
+
+  if (!match) {
+    return { label: "DATE", primary: normalized, secondary: null };
+  }
+
+  return {
+    label: match[1]?.toUpperCase() ?? "DATE",
+    primary: match[2] ?? normalized,
+    secondary: match[3] ?? null,
+  };
+}
+
+function cardDescription(hackathon: HackathonCardData) {
+  if (hackathon.description?.trim()) {
+    return hackathon.description.trim();
+  }
+
+  return `${hackathon.name} brings hackers together to build, learn, and connect.`;
+}
+
+function featureLabels(hackathon: HackathonCardData) {
+  const labels: string[] = [];
+
+  if (hackathon.hasDiscord) {
+    labels.push("Discord");
+  }
+
+  if (hackathon.travelReimbursement) {
+    labels.push("reimbursement available");
+  }
+
+  if (hackathon.beginnerFriendly) {
+    labels.push("beginner friendly");
+  }
+
+  if (hackathon.highSchoolersOnly) {
+    labels.push("high school only");
+  }
+
+  if (hackathon.format === "online") {
+    labels.push("online");
+  }
+
+  return labels.length ? labels : ["Applications and event details available"];
 }
 
 type ReminderOption = {
@@ -405,37 +406,37 @@ export function HackathonCard({
   cornerAction,
   hackathon,
   preview = false,
+  rank,
   reminder,
+  tier,
 }: {
-  /* Tightens padding, logo, and footer spacing so cards stack densely on the
-     My Hackathons board. */
+  /* Keeps pipeline-board cards shorter while preserving the shared layout. */
   compact?: boolean;
-  /* Optional control pinned to the card's top-right corner (e.g. the remove
-     trash button on the My Hackathons board). Sits above the full-card link. */
+  /* Optional footer control, such as the pipeline board's remove button. */
   cornerAction?: ReactNode;
   hackathon: HackathonCardData;
   preview?: boolean;
+  rank?: number;
   /* When set, the footer swaps the save control for an inline reminder
      picker that expands below the card — used on the My Hackathons board. */
   reminder?: HackathonCardReminder;
+  tier?: TierLabel;
 }) {
-  const accentStyle = useMemo(() => getAccentStyle(hackathon.name), [hackathon.name]);
-  const logoSrc = hackathon.image
-    ? preview
-      ? hackathon.image
-      : hackathonLogoSrc(hackathon.id, hackathon.image)
-    : null;
+  const date = splitDateRange(hackathon.date);
+  const features = featureLabels(hackathon);
+  const location = [hackathon.country ? getCountryDisplay(hackathon.country) : null, hackathon.location]
+    .filter(Boolean)
+    .join(", ");
+  const rankingLabel = `Tier ${tier ?? "—"}  Rank ${rank ?? "—"}`;
+
   return (
     <article
-      className={`group relative flex min-w-0 flex-col border border-ink/15 bg-paper transition-colors hover:border-ink/40 ${
-        compact ? "p-4" : "p-5 sm:p-6"
-      } ${
+      className={`group @container relative grid w-full max-w-[56rem] min-w-0 overflow-hidden border border-ink/20 bg-paper transition-colors hover:border-ink/50 ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
         hackathon.isPast ? "opacity-70 hover:opacity-100 focus-within:opacity-100" : ""
       }`}
-      style={accentStyle}
     >
       {hackathon.slug && !preview ? (
         <Link
@@ -446,117 +447,81 @@ export function HackathonCard({
         />
       ) : null}
 
-      <div className={`flex items-start ${compact ? "gap-3" : "gap-4"}`}>
-        {/* The column is pinned to the logo's width so the provenance badge
-            below can never grow wider than the image — long labels truncate. */}
-        <div className={`flex shrink-0 flex-col items-center gap-2 ${compact ? "w-14" : "w-[4.5rem]"}`}>
-          <HackathonLogoMark compact={compact} hackathon={hackathon} logoSrc={logoSrc} />
-          {/* Provenance label — names where this hackathon's data came from.
-              Absent when we have no source on file. */}
-          {hackathon.source ? (
-            <span className="relative z-10 max-w-full truncate font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink/55">
-              {hackathon.source.label}
+      <div className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] @[38rem]:grid-cols-[minmax(11.5rem,25%)_minmax(0,1fr)]">
+        <div
+          className={`flex flex-col border-r border-ink/35 px-4 py-6 @[38rem]:px-7 @[38rem]:py-9 ${
+            compact ? "min-h-52" : "min-h-64 @[38rem]:min-h-[36rem]"
+          }`}
+        >
+          <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#e84216] @[38rem]:text-sm">
+            {rankingLabel}
+          </span>
+          <div className="mt-5 font-sans font-semibold tracking-[-0.07em] text-ink">
+            <span className="line-clamp-2 text-[1.35rem] leading-[0.95] @[38rem]:text-[2.25rem]">
+              {date.label === "DATE" ? date.primary : `${date.label[0]}${date.label.slice(1).toLowerCase()} ${date.primary}`}
+            </span>
+            {date.secondary ? (
+              <span className="mt-1 block whitespace-nowrap text-[1.35rem] leading-[0.95] @[38rem]:text-[2.25rem]">
+                – {date.secondary}
+              </span>
+            ) : null}
+          </div>
+          {hackathon.isPast ? (
+            <span className="mt-auto font-mono text-[10px] uppercase tracking-[0.12em] text-ink/45">
+              Past edition
             </span>
           ) : null}
         </div>
-        <div className="min-w-0 pt-1">
-          <h2
-            className={`line-clamp-2 font-semibold tracking-tight text-ink ${
-              compact ? "text-lg leading-6" : "text-xl leading-6 sm:text-[1.35rem]"
-            }`}
-          >
+
+        <div className="flex min-w-0 flex-col px-5 py-6 @[38rem]:px-10 @[38rem]:py-9">
+          <h2 className="line-clamp-2 text-[1.8rem] font-medium leading-[1.02] tracking-[-0.045em] text-ink @[38rem]:text-[3rem]">
             {hackathon.name}
           </h2>
-          {hackathon.isPast ? (
-            <p className="mt-2 text-[15px] leading-5 text-ink/40">
-              Last held {hackathon.date} · next edition TBA
-            </p>
-          ) : (
-            <p className="mt-2 text-[15px] leading-5 text-ink/55">
-              {hackathon.date}
-            </p>
-          )}
           <p
-            className="mt-1 truncate text-[15px] leading-5 text-ink/55"
-            title={[hackathon.country ? getCountryDisplay(hackathon.country).label : null, hackathon.location]
-              .filter(Boolean)
-              .join(", ")}
+            className={`mt-4 truncate font-mono text-[13px] uppercase tracking-[0.08em] @[38rem]:mt-5 @[38rem]:text-[1.3rem] ${getLocationColor(
+              hackathon.country
+            )}`}
+            title={location}
           >
-            {hackathon.country
-              ? (() => {
-                  const { label, underlineClass } = getCountryDisplay(hackathon.country);
-
-                  return (
-                    <>
-                      <span className={underlineClass}>{label}</span>
-                      {", "}
-                    </>
-                  );
-                })()
-              : null}
-            {hackathon.location}
+            {location}
           </p>
-          {hackathon.beginnerFriendly ||
-          hackathon.travelReimbursement ||
-          hackathon.highSchoolersOnly ||
-          hackathon.hasDiscord ||
-          typeof hackathon.eloRating === "number" ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {typeof hackathon.eloRating === "number" ? (
-                <span
-                  className="relative z-10 inline-flex items-center gap-1 bg-ink/5 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink/55"
-                  title="Face Off Elo rating"
-                >
-                  <Swords aria-hidden="true" className="size-3" />
-                  {hackathon.eloRating}
-                </span>
-              ) : null}
-              {hackathon.beginnerFriendly ? (
-                <span className="relative z-10 inline-flex items-center bg-pine/10 px-2.5 py-1 text-[11px] font-medium text-pine">
-                  Beginner friendly
-                </span>
-              ) : null}
-              {hackathon.travelReimbursement ? (
-                <span className="relative z-10 inline-flex items-center bg-pine/10 px-2.5 py-1 text-[11px] font-medium text-pine">
-                  Travel support
-                </span>
-              ) : null}
-              {hackathon.highSchoolersOnly ? (
-                <span className="relative z-10 inline-flex items-center bg-pine/10 px-2.5 py-1 text-[11px] font-medium text-pine">
-                  High school only
-                </span>
-              ) : null}
-              {hackathon.hasDiscord ? (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#5865F2]">
-                  <DiscordGlyph className="size-3.5" />
-                  Discord
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
 
-      <div className={`mt-auto text-base leading-6 ${compact ? "pt-3" : "pt-5"}`}>
-        {reminder ? (
-          <div className="flex items-start justify-between gap-2">
-            <ReminderControl
-              hackathonId={reminder.hackathonId}
-              options={reminder.options}
-              statusLabel={reminder.statusLabel}
-            />
-            {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
+          <p className="mt-7 line-clamp-4 text-sm leading-6 text-ink/70 @[38rem]:mt-16 @[38rem]:max-w-[42rem] @[38rem]:text-xl @[38rem]:leading-[1.55]">
+            {cardDescription(hackathon)}
+          </p>
+
+          <div className="relative z-10 mt-auto border-t border-ink/25 pt-3 @[38rem]:pt-5">
+            {reminder ? (
+              <div className="flex items-start justify-between gap-2">
+                <ReminderControl
+                  hackathonId={reminder.hackathonId}
+                  options={reminder.options}
+                  statusLabel={reminder.statusLabel}
+                />
+                {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
+              </div>
+            ) : (
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink/60 @[38rem]:text-sm">
+                  <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ink" />
+                  {features.map((feature, index) => (
+                    <span className="inline-flex items-center gap-2" key={feature}>
+                      {index > 0 ? <span aria-hidden="true">|</span> : null}
+                      {feature === "Discord" ? <DiscordGlyph className="size-3.5 text-[#5865F2]" /> : null}
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+                <BookmarkButton
+                  hackathonId={hackathon.id}
+                  hackathonName={hackathon.name}
+                  initialSaved={hackathon.isSaved}
+                  preview={preview}
+                />
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex items-center justify-end gap-3">
-            <BookmarkButton
-              hackathonId={hackathon.id}
-              hackathonName={hackathon.name}
-              initialSaved={hackathon.isSaved}
-              preview={preview}
-            />
-          </div>
-        )}
+        </div>
       </div>
     </article>
   );

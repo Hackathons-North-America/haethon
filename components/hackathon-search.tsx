@@ -27,7 +27,7 @@ import { HackathonTierList } from "@/components/hackathon-tier-list";
 import type { GeoPoint } from "@/lib/geo";
 import { countryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
-import { sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
+import { assignTiers, sortByEloDescending, sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, distanceOptions, viewModeOptions } from "@/lib/hackathons/search-filters";
@@ -377,7 +377,28 @@ export function HackathonSearch({
     }),
     []
   );
-  const renderCardNode = renderCard ?? ((hackathon: HackathonCardData) => <HackathonCard hackathon={hackathon} />);
+  const faceoffRanks = useMemo(
+    () => new Map(sortByEloDescending(rankableHackathons).map((hackathon, index) => [hackathon.id, index + 1])),
+    [rankableHackathons]
+  );
+  const faceoffTiers = useMemo(
+    () =>
+      new Map(
+        assignTiers(rankableHackathons).flatMap((group) =>
+          group.hackathons.map((hackathon) => [hackathon.id, group.tier] as const)
+        )
+      ),
+    [rankableHackathons]
+  );
+  const renderCardNode =
+    renderCard ??
+    ((hackathon: HackathonCardData) => (
+      <HackathonCard
+        hackathon={hackathon}
+        rank={faceoffRanks.get(hackathon.id)}
+        tier={faceoffTiers.get(hackathon.id)}
+      />
+    ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
   const selectedFormatLabel = formatOptions.find((option) => option.value === format)?.label ?? "Any format";
@@ -989,7 +1010,7 @@ export function HackathonSearch({
             ) : (
               <>
                 {upcomingHackathons.length ? (
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
                     {upcomingHackathons.map((hackathon) => (
                       <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                     ))}
@@ -1012,7 +1033,7 @@ export function HackathonSearch({
                       </span>
                       <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
                     </div>
-                    <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-10 grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
                       {pastHackathons.map((hackathon) => (
                         <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                       ))}

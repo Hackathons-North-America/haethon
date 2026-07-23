@@ -67,6 +67,7 @@ export function previewPayloadToCard(payload: PreviewPayload, id = "admin-previe
     source: source ? sourceBadge(source) : null,
     beginnerFriendly: payload.beginnerFriendly === true,
     date: formatDateRange(parseDate(payload.startDate), parseDate(payload.endDate)),
+    description: text(payload.shortDescription) || null,
     highSchoolersOnly: payload.highSchoolersOnly === true,
     id,
     image: text(payload.imageUrl) || null,

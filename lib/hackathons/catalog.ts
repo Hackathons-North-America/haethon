@@ -59,6 +59,7 @@ type PublicHackathonCard = {
      reliable join key. */
   countryCode: string | null;
   date: string;
+  description: string | null;
   eloRating: number;
   faceoffLosses: number;
   faceoffWins: number;
@@ -138,6 +139,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       region: hackathonLocations.region,
       country: hackathonLocations.country,
       countryCode: hackathonLocations.countryCode,
+      description: hackathons.shortDescription,
       latitude: hackathonLocations.latitude,
       longitude: hackathonLocations.longitude,
       startsAt: hackathonDates.startsAt,
@@ -228,6 +230,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         country: location.country,
         countryCode: row.countryCode ?? null,
         date: formatDateRange(row.startsAt, row.endsAt),
+        description: row.description,
         eloRating: row.eloRating,
         faceoffWins: row.faceoffWins,
         faceoffLosses: row.faceoffLosses,

@@ -49,6 +49,7 @@ type PipelineRow = {
   city: string | null;
   region: string | null;
   country: string | null;
+  description: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
   applicationOpensAt: Date | null;
@@ -70,6 +71,7 @@ function toCardData(row: PipelineRow, hasDiscord: boolean, source: HackathonSour
   return {
     country: location.country,
     date: formatDateRange(row.startsAt, row.endsAt),
+    description: row.description,
     hasDiscord,
     id: row.hackathonId,
     image: row.imageUrl,
@@ -105,6 +107,7 @@ export default async function MyHackathonsPage() {
       city: hackathonLocations.city,
       region: hackathonLocations.region,
       country: hackathonLocations.country,
+      description: hackathons.shortDescription,
       startsAt: hackathonDates.startsAt,
       endsAt: hackathonDates.endsAt,
       applicationOpensAt: hackathonDates.applicationOpensAt,
