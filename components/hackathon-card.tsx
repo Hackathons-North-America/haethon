@@ -7,7 +7,7 @@ import Link from "next/link";
 import { BellPlus, Bookmark, Check, ChevronDown, Swords } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
-import { hackathonLogoSrc, isDirectImageUrl } from "@/lib/hackathons/logo-hosts";
+import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
 import type { TierLabel } from "@/lib/hackathons/ranking";
@@ -277,9 +277,22 @@ function CardDate({ parsed, weekday }: { parsed: ParsedDate; weekday: string | n
   );
 }
 
+function themeTagsFromDescription(description?: string | null) {
+  const match = description?.trim().match(/^Themes?\s*:\s*(.+)$/i);
+
+  return match?.[1]
+    ? match[1]
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    : [];
+}
+
 function cardDescription(hackathon: HackathonCardData) {
-  if (hackathon.description?.trim()) {
-    return hackathon.description.trim();
+  const description = hackathon.description?.trim();
+
+  if (description && themeTagsFromDescription(description).length === 0) {
+    return description;
   }
 
   return `${hackathon.name} brings hackers together to build, learn, and connect.`;
@@ -301,7 +314,7 @@ function BookmarkCardLogo({ hackathon, preview }: { hackathon: HackathonCardData
           fill
           sizes="56px"
           src={logoSrc}
-          unoptimized={!logoSrc.startsWith("/") && !isDirectImageUrl(logoSrc)}
+          unoptimized
         />
       ) : (
         <div className="grid size-full place-items-center bg-[rgb(var(--hackathon-accent-rgb)/0.92)] px-2 text-center text-lg font-semibold text-paper">
@@ -673,14 +686,17 @@ export function HackathonCard({
   const date = splitDateRange(hackathon.date);
   const weekday = getWeekday(hackathon.startsAt);
   const cardTags = Array.from(
-    new Set(
+    new Map(
       [
         hackathon.beginnerFriendly ? "Beginner friendly" : null,
         hackathon.travelReimbursement ? "Travel support" : null,
         hackathon.highSchoolersOnly ? "High school only" : null,
         ...(hackathon.tags ?? []),
-      ].filter((tag): tag is string => Boolean(tag))
-    )
+        ...themeTagsFromDescription(hackathon.description),
+      ]
+        .filter((tag): tag is string => Boolean(tag))
+        .map((tag) => [tag.toLowerCase(), tag] as const)
+    ).values()
   );
 
   return (
@@ -712,7 +728,8 @@ export function HackathonCard({
             className="object-cover"
             fill
             sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            src={`/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`}
+            src={hackathonLogoSrc(hackathon.id, hackathon.image)}
+            unoptimized
           />
         ) : (
           <span className="grid size-full place-items-center bg-ink/5 px-2 text-center font-mono text-xl font-semibold uppercase tracking-[0.18em] text-ink/35">
@@ -735,12 +752,29 @@ export function HackathonCard({
       </div>
 
       <div className="grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] @[38rem]:grid-cols-[8.5rem_minmax(0,1fr)]">
-        <div className="border-r border-ink/35 px-3 py-5 @[38rem]:px-4">
+        <div className="flex min-w-0 flex-col border-r border-ink/35 px-3 py-5 @[38rem]:px-4">
           <CardDate parsed={date} weekday={weekday} />
           {hackathon.isPast ? (
             <span className="mt-3 block font-mono text-[10px] uppercase tracking-[0.12em] text-ink/45">
               Past edition
             </span>
+          ) : null}
+          {cardTags.length ? (
+            <div
+              aria-label={`Tags: ${cardTags.join(", ")}`}
+              className="mt-auto flex min-w-0 flex-col items-start gap-1.5 pt-4"
+              title={cardTags.join(", ")}
+            >
+              {cardTags.map((tag) => (
+                <span
+                  className="max-w-full break-words bg-pine/10 px-2 py-1 text-[11px] font-medium leading-4 text-pine"
+                  key={tag}
+                  title={tag}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           ) : null}
         </div>
 
@@ -768,36 +802,19 @@ export function HackathonCard({
                 {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
               </div>
             ) : (
-              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-                <div
-                  aria-label={cardTags.length ? `Tags: ${cardTags.join(", ")}` : "No tags"}
-                  className="flex h-6 w-full max-w-60 min-w-0 flex-wrap items-start gap-x-1.5 gap-y-2 overflow-hidden"
-                  title={cardTags.join(", ")}
-                >
-                  {cardTags.map((tag) => (
-                    <span
-                      className="max-w-full shrink-0 truncate bg-pine/10 px-2 py-1 text-[11px] font-medium leading-4 text-pine"
-                      key={tag}
-                      title={tag}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  {hackathon.hasDiscord ? (
-                    <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-[#5865F2]">
-                      <DiscordGlyph className="size-4" />
-                      Discord
-                    </span>
-                  ) : null}
-                  <BookmarkButton
-                    hackathonId={hackathon.id}
-                    hackathonName={hackathon.name}
-                    initialSaved={hackathon.isSaved}
-                    preview={preview}
-                  />
-                </div>
+              <div className="flex items-center justify-end gap-3">
+                {hackathon.hasDiscord ? (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-[#5865F2]">
+                    <DiscordGlyph className="size-4" />
+                    Discord
+                  </span>
+                ) : null}
+                <BookmarkButton
+                  hackathonId={hackathon.id}
+                  hackathonName={hackathon.name}
+                  initialSaved={hackathon.isSaved}
+                  preview={preview}
+                />
               </div>
             )}
           </div>

@@ -74,7 +74,7 @@ export function isPrivateOrReservedAddress(address: string) {
 function assertSafeUrl(rawUrl: string) {
   const url = new URL(rawUrl);
 
-  if (!(["http:", "https:"] as string[]).includes(url.protocol) || url.username || url.password) {
+  if (url.protocol !== "https:" || url.username || url.password) {
     throw new Error("Unsafe image URL.");
   }
 

@@ -34,7 +34,7 @@ export function PrimaryNav() {
         <div className="flex shrink-0 items-center gap-2">
           <Link
             className="group relative inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[0.8rem] font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-5"
-            href="https://discord.gg/wcNfUUVgqe"
+            href="/discord"
             rel="noreferrer"
             target="_blank"
           >

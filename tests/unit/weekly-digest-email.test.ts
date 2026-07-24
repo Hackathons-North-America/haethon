@@ -36,6 +36,9 @@ describe("buildWeeklyDigestEmail", () => {
     expect(email.text).toContain("Starts Sep 12, 2026");
     expect(email.html).toContain("https://haethon.dev/hackathons/hacknight-2026");
     expect(email.html).toContain("Unsubscribe from all emails");
+    expect(email.html).toContain("#007354");
+    expect(email.html).toContain("#FBF7F0");
+    expect(email.html).not.toContain("#660000");
   });
 
   it("renders application reminders with application copy", async () => {

@@ -311,6 +311,7 @@ export default async function AccountPage() {
                             fill
                             sizes="(min-width: 768px) 400px, 100vw"
                             src={hackathonLogoSrc(item.hackathonId, item.imageUrl)}
+                            unoptimized
                           />
                         ) : (
                           // No cover image: fall back to a hackathon-specific branded tile

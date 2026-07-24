@@ -74,7 +74,7 @@ export type TierGroup<T> = {
 };
 
 /**
- * Groups by the global tier already persisted with each rating. This helper
+ * Groups by the global tier derived by the cached leaderboard. This helper
  * deliberately does not derive percentiles from `cards`: a country, date, or
  * search filter must never change a hackathon's rank.
  */

@@ -87,7 +87,7 @@ export function AddToCalendarButton(props: Props) {
       <button
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex rounded-full min-h-11 items-center justify-center gap-1.5 border border-pine dark:border-moss/50 px-6 text-sm font-semibold text-pine dark:text-moss transition-colors hover:bg-pine hover:text-wheat"
+        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >

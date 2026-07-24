@@ -28,9 +28,9 @@ data completeness do not affect the prior.
 
 ## Rank tiers
 
-Each eligible, published hackathon has one global tier stored on its Face Off
-rating row. Tiers use the confidence-adjusted score above, with the hackathon
-id as the deterministic tie-breaker:
+Each eligible, published hackathon has one global tier derived from the cached
+Face Off rating set. Tiers use the confidence-adjusted score above, with the
+hackathon id as the deterministic tie-breaker:
 
 - S: top 1%
 - A: next 10%
@@ -38,37 +38,31 @@ id as the deterministic tie-breaker:
 - C: next 30%
 - D: remaining 39%
 
-PostgreSQL backfills the tiers and recomputes them whenever an Elo rating
-changes. Publishing, unpublishing, or changing an eligible status also
-recomputes the population. UI filters only group the stored tiers; they do not
-recalculate them.
+The application derives rank and tier once per shared cache window. Votes only
+touch the winner and loser rating rows; they never rewrite the full population.
+UI filters group the global tiers returned by that cached calculation, so a
+search filter cannot change a hackathon's tier.
 
 ## Request flow
 
-1. `GET /api/faceoff/matchup` chooses under-exposed candidates and favors
-   close, informative comparisons while retaining some random exploration.
-2. The issued matchup records left/right placement, voter fingerprint, and
-   expiry. The vote API will not accept an arbitrary pair.
-3. `POST /api/faceoff/vote` supplies the matchup, winner, and a unique request
-   id.
-4. `record_hackathon_faceoff_vote` locks the voter and both rating rows,
-   validates eligibility and throttles, updates both ratings, writes the audit
-   row, and consumes the matchup in one PostgreSQL transaction.
-5. Open clients update optimistically from the response and reconcile against
-   `/api/faceoff/leaderboard` every 15 seconds.
+1. The browser chooses a close, informative pair from the cached Face Off pool
+   while avoiding recently shown hackathons.
+2. `POST /api/faceoff/vote` supplies only the winner and loser ids.
+3. `record_hackathon_faceoff_vote` validates eligibility, consumes one aggregate
+   daily rate-limit counter, locks the two rating rows, and updates them in one
+   PostgreSQL transaction.
+4. The open client updates those two ratings from the response. The shared
+   leaderboard endpoint is cached for one minute.
 
-Anonymous cookie identifiers are SHA-256 hashed before storage. Signed-in and
-anonymous voters are limited to one judgment of a pair per hour, at least 600
-ms between any two votes, and 50 votes in a rolling 24-hour period.
+Anonymous cookie identifiers are SHA-256 hashed before being used as aggregate
+rate-limit keys. Signed-in and anonymous voters are limited to 50 votes in a
+fixed 24-hour window. No individual matchup or vote record is retained.
 
 ## Data and operations
 
 - `hackathon_faceoff_ratings` is the narrow, high-churn current-state table.
-- `hackathon_faceoff_votes` is the immutable audit/reconciliation log.
-- `hackathon_faceoff_matchups` stores impressions, position, skips, and
-  consumption. Rows older than 90 days are removed by the daily cleanup cron.
-- Vote foreign keys use `RESTRICT` so deleting a rated hackathon cannot silently
-  invalidate the opponent's history.
-- Run `pnpm audit:faceoff` for a read-only consistency check.
-- Run `pnpm audit:faceoff -- --repair` only when the audit reports cached-state
-  mismatches; it rebuilds played ratings and counters from the latest log.
+- `rate_limit_buckets` retains one expiring aggregate row per active voter, not
+  their choices.
+- Rank and tier are calculated from the rating table and shared through the
+  one-minute application/CDN cache.
+- Run `pnpm audit:faceoff` for a read-only current-state consistency check.

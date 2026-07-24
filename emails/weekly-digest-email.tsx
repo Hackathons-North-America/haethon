@@ -12,6 +12,8 @@ import {
   Text,
 } from "@react-email/components";
 
+import { emailColors, emailStyles } from "@/emails/email-theme";
+
 export type WeeklyDigestReminderItem = {
   hackathonName: string;
   /* Date-based headline, e.g. "Applications open Jul 23, 2026" — digest items
@@ -37,123 +39,6 @@ export type WeeklyDigestEmailProps = {
   unsubscribeUrl: string;
 };
 
-const maroon = "#660000";
-const ink = "#1A1A1A";
-const muted = "#706F6B";
-const border = "#E5E1DC";
-
-const main = {
-  backgroundColor: "#EFEDEA",
-  fontFamily:
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji'",
-};
-
-const container = {
-  margin: "0 auto",
-  maxWidth: "520px",
-  padding: "32px 0 48px",
-};
-
-const card = {
-  backgroundColor: "#FFFFFF",
-  border: `1px solid ${border}`,
-  borderRadius: "12px",
-  padding: "32px",
-};
-
-const eyebrow = {
-  color: maroon,
-  fontSize: "12px",
-  fontWeight: 600,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase" as const,
-  margin: "0 0 8px",
-};
-
-const heading = {
-  color: ink,
-  fontSize: "22px",
-  fontWeight: 600,
-  lineHeight: "28px",
-  margin: "0 0 16px",
-};
-
-const paragraph = {
-  color: ink,
-  fontSize: "15px",
-  lineHeight: "24px",
-  margin: "0 0 16px",
-};
-
-const sectionTitle = {
-  color: maroon,
-  fontSize: "12px",
-  fontWeight: 600,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase" as const,
-  margin: "24px 0 12px",
-};
-
-const itemRow = {
-  border: `1px solid ${border}`,
-  borderRadius: "10px",
-  margin: "0 0 12px",
-  padding: "16px 18px",
-};
-
-const itemName = {
-  color: ink,
-  fontSize: "16px",
-  fontWeight: 600,
-  lineHeight: "22px",
-  margin: "0 0 4px",
-};
-
-const meta = {
-  color: muted,
-  fontSize: "13px",
-  lineHeight: "20px",
-  margin: "0",
-};
-
-const button = {
-  backgroundColor: maroon,
-  borderRadius: "8px",
-  color: "#FFFFFF",
-  display: "inline-block",
-  fontSize: "14px",
-  fontWeight: 600,
-  padding: "12px 20px",
-  textDecoration: "none",
-};
-
-const secondaryLink = {
-  color: maroon,
-  fontSize: "14px",
-  fontWeight: 600,
-  textDecoration: "none",
-};
-
-const footer = {
-  color: muted,
-  fontSize: "12px",
-  lineHeight: "18px",
-  margin: "24px 0 0",
-  textAlign: "center" as const,
-};
-
-const unsubscribeButton = {
-  border: `1px solid ${muted}`,
-  borderRadius: "8px",
-  color: muted,
-  display: "inline-block",
-  fontSize: "12px",
-  fontWeight: 600,
-  marginTop: "12px",
-  padding: "8px 14px",
-  textDecoration: "none",
-};
-
 export function WeeklyDigestEmail({
   greetingName,
   reminderItems,
@@ -173,25 +58,31 @@ export function WeeklyDigestEmail({
     <Html>
       <Head />
       <Preview>{intro}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          <Section style={card}>
-            <Text style={eyebrow}>Weekly digest</Text>
-            <Heading style={heading}>Your week ahead</Heading>
-            <Text style={paragraph}>Hey {greetingName},</Text>
-            <Text style={paragraph}>{intro}</Text>
+      <Body style={emailStyles.main}>
+        <Container style={emailStyles.container}>
+          <Text style={emailStyles.brand}>
+            HNA{" "}
+            <span style={emailStyles.brandDescriptor}>
+              / Hackathons North America
+            </span>
+          </Text>
+          <Section style={emailStyles.card}>
+            <Text style={emailStyles.eyebrow}>Weekly digest</Text>
+            <Heading style={emailStyles.heading}>Your week ahead</Heading>
+            <Text style={emailStyles.paragraph}>Hey {greetingName},</Text>
+            <Text style={emailStyles.paragraph}>{intro}</Text>
 
             {reminderItems.length ? (
               <>
-                <Text style={sectionTitle}>Coming up</Text>
+                <Text style={emailStyles.sectionTitle}>Coming up</Text>
                 {reminderItems.map((item) => (
-                  <Section key={`${item.detailUrl}:${item.headline}`} style={itemRow}>
-                    <Text style={itemName}>
-                      <Link href={item.detailUrl} style={{ color: ink, textDecoration: "none" }}>
+                  <Section key={`${item.detailUrl}:${item.headline}`} style={emailStyles.itemRow}>
+                    <Text style={emailStyles.itemName}>
+                      <Link href={item.detailUrl} style={{ color: emailColors.ink, textDecoration: "none" }}>
                         {item.hackathonName}
                       </Link>
                     </Text>
-                    <Text style={meta}>{item.headline}</Text>
+                    <Text style={emailStyles.meta}>{item.headline}</Text>
                   </Section>
                 ))}
               </>
@@ -199,15 +90,15 @@ export function WeeklyDigestEmail({
 
             {country && countryItems.length ? (
               <>
-                <Text style={sectionTitle}>New in {country}</Text>
+                <Text style={emailStyles.sectionTitle}>New in {country}</Text>
                 {countryItems.map((item) => (
-                  <Section key={item.detailUrl} style={itemRow}>
-                    <Text style={itemName}>
-                      <Link href={item.detailUrl} style={{ color: ink, textDecoration: "none" }}>
+                  <Section key={item.detailUrl} style={emailStyles.itemRow}>
+                    <Text style={emailStyles.itemName}>
+                      <Link href={item.detailUrl} style={{ color: emailColors.ink, textDecoration: "none" }}>
                         {item.name}
                       </Link>
                     </Text>
-                    <Text style={meta}>
+                    <Text style={emailStyles.meta}>
                       {item.location} · {item.dateRange}
                     </Text>
                   </Section>
@@ -216,27 +107,26 @@ export function WeeklyDigestEmail({
             ) : null}
 
             <Section style={{ margin: "24px 0" }}>
-              <Button href={reminderItems.length ? pipelineUrl : browseUrl} style={button}>
+              <Button href={reminderItems.length ? pipelineUrl : browseUrl} style={emailStyles.button}>
                 {reminderItems.length ? "Open your pipeline" : "Browse the Hackathons DB"}
               </Button>
             </Section>
-            <Hr style={{ borderColor: border, margin: "24px 0" }} />
-            <Text style={meta}>
+            <Hr style={emailStyles.divider} />
+            <Text style={emailStyles.meta}>
               Keeping your status current keeps these digests accurate.{" "}
-              <Link href={pipelineUrl} style={secondaryLink}>
+              <Link href={pipelineUrl} style={emailStyles.secondaryLink}>
                 Open your pipeline
               </Link>
               .
             </Text>
           </Section>
-          <Text style={footer}>
+          <Text style={emailStyles.footer}>
             You are receiving this weekly digest because of your saved hackathons and alerts on Haethon.
-          </Text>
-          <Section style={{ textAlign: "center" }}>
-            <Button href={unsubscribeUrl} style={unsubscribeButton}>
+            <br />
+            <Link href={unsubscribeUrl} style={emailStyles.unsubscribeLink}>
               Unsubscribe from all emails
-            </Button>
-          </Section>
+            </Link>
+          </Text>
         </Container>
       </Body>
     </Html>

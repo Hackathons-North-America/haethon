@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown, ChevronUp, RotateCcw, Swords, X } from "lucide-react";
 
 import { displayEloRating, isProvisional } from "@/lib/hackathons/elo";
-import { pushRecentIds } from "@/lib/hackathons/faceoff-pairing";
+import { pickChallenger, pickMatchup, pushRecentIds } from "@/lib/hackathons/faceoff-pairing";
+import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { isRankGuessCorrect, sortByEloDescending } from "@/lib/hackathons/ranking";
 
 export type FaceoffHackathon = {
@@ -25,7 +26,6 @@ export type FaceoffHackathon = {
 };
 
 type IssuedMatchup = {
-  id: string;
   leftId: string;
   rightId: string;
 };
@@ -63,11 +63,6 @@ function limitWords(name: string, max = 5) {
 function formatPrize(amount: number | null) {
   return amount ? `$${amount.toLocaleString("en-US")} prize pool` : "Prize pool TBA";
 }
-
-/* ---------------------------------------------------------------------------
- * Majority color — each side's backdrop is a gradient built from the dominant
- * color of the hackathon's logo, sampled client-side on a tiny canvas.
- * ------------------------------------------------------------------------- */
 
 type RGB = { r: number; g: number; b: number };
 
@@ -116,122 +111,10 @@ function isLightColor(color: RGB) {
   return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255 > 0.64;
 }
 
-function extractDominantColor(image: HTMLImageElement): RGB | null {
-  const size = 32;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-
-  if (!context) {
-    return null;
-  }
-
-  let data: Uint8ClampedArray;
-
-  try {
-    context.drawImage(image, 0, 0, size, size);
-    data = context.getImageData(0, 0, size, size).data;
-  } catch {
-    return null;
-  }
-
-  const buckets = new Map<number, { count: number; r: number; g: number; b: number }>();
-
-  for (let index = 0; index < data.length; index += 4) {
-    const r = data[index];
-    const g = data[index + 1];
-    const b = data[index + 2];
-    const alpha = data[index + 3];
-
-    if (alpha < 128) {
-      continue;
-    }
-
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-
-    // Near-white pixels are almost always logo padding, not brand color.
-    if (max > 240 && max - min < 20) {
-      continue;
-    }
-
-    const key = ((r >> 5) << 6) | ((g >> 5) << 3) | (b >> 5);
-    const bucket = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };
-    bucket.count += 1;
-    bucket.r += r;
-    bucket.g += g;
-    bucket.b += b;
-    buckets.set(key, bucket);
-  }
-
-  let best: { score: number; color: RGB } | null = null;
-
-  for (const bucket of buckets.values()) {
-    const color = {
-      r: Math.round(bucket.r / bucket.count),
-      g: Math.round(bucket.g / bucket.count),
-      b: Math.round(bucket.b / bucket.count),
-    };
-    const max = Math.max(color.r, color.g, color.b);
-    const min = Math.min(color.r, color.g, color.b);
-    const saturation = max === 0 ? 0 : (max - min) / max;
-    // Saturation-weighted so a colorful mark beats a larger neutral backdrop.
-    const score = bucket.count * (0.35 + saturation);
-
-    if (!best || score > best.score) {
-      best = { score, color };
-    }
-  }
-
-  return best?.color ?? null;
-}
-
-/* Cache of extracted colors keyed by logo URL; null marks "tried, no usable
-   color" so failed extractions aren't retried on every chained matchup. */
-const dominantColorCache = new Map<string, RGB | null>();
-
-function useDominantColor(hackathonId: string, hasImage: boolean): RGB {
-  const fallback = useMemo(() => fallbackColorFor(hackathonId), [hackathonId]);
-  const src = hasImage ? `/api/hackathons/${encodeURIComponent(hackathonId)}/logo` : null;
-  const [extracted, setExtracted] = useState<RGB | null>(() => (src ? (dominantColorCache.get(src) ?? null) : null));
-
-  useEffect(() => {
-    if (!src) {
-      return;
-    }
-
-    if (dominantColorCache.has(src)) {
-      setExtracted(dominantColorCache.get(src) ?? null);
-      return;
-    }
-
-    let cancelled = false;
-    const image = new window.Image();
-    image.crossOrigin = "anonymous";
-    image.onload = () => {
-      const color = extractDominantColor(image);
-      dominantColorCache.set(src, color);
-
-      if (!cancelled) {
-        setExtracted(color);
-      }
-    };
-    image.onerror = () => {
-      dominantColorCache.set(src, null);
-
-      if (!cancelled) {
-        setExtracted(null);
-      }
-    };
-    image.src = src;
-
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
-
-  return extracted ?? fallback;
+/* A deterministic palette color gives each hackathon a stable arena treatment
+   without downloading and scanning the logo a second time in the browser. */
+function useArenaColor(hackathonId: string): RGB {
+  return useMemo(() => fallbackColorFor(hackathonId), [hackathonId]);
 }
 
 /* Deterministic per-index jitter (no Math.random) so the burst layout stays
@@ -321,7 +204,7 @@ function ArenaSide({
   reveal: Reveal | null;
   side: "left" | "right";
 }) {
-  const color = useDominantColor(hackathon.id, Boolean(hackathon.image));
+  const color = useArenaColor(hackathon.id);
   const lightBg = isLightColor(color);
   const heading = lightBg ? "text-navy" : "text-white";
   const soft = lightBg ? "text-navy/70" : "text-white/80";
@@ -344,7 +227,8 @@ function ArenaSide({
             className="object-cover"
             fill
             sizes="112px"
-            src={`/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`}
+            src={hackathonLogoSrc(hackathon.id, hackathon.image)}
+            unoptimized
           />
         ) : (
           getInitials(hackathon.name) || "HN"
@@ -456,6 +340,7 @@ function ArenaSide({
 export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
   const reduceMotion = Boolean(useReducedMotion());
   const [livePool, setLivePool] = useState(pool);
+  const livePoolRef = useRef(livePool);
   const [issuedMatchup, setIssuedMatchup] = useState<IssuedMatchup | null>(null);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -464,7 +349,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
   const [highScore, setHighScore] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [burstId, setBurstId] = useState(0);
-  const [isLoadingMatchup, setIsLoadingMatchup] = useState(true);
+  const isLoadingMatchup = !issuedMatchup && !notice;
 
   const matchup = useMemo<[FaceoffHackathon, FaceoffHackathon] | null>(() => {
     if (!issuedMatchup) {
@@ -482,42 +367,39 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
   );
 
   useEffect(() => {
-    try {
-      const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
+    livePoolRef.current = livePool;
+  }, [livePool]);
 
-      if (Number.isFinite(stored) && stored > 0) {
-        setHighScore(Math.floor(stored));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
+
+        if (Number.isFinite(stored) && stored > 0) {
+          setHighScore(Math.floor(stored));
+        }
+      } catch {
+        // Private mode without storage access — the high score just stays session-local.
       }
-    } catch {
-      // Private mode without storage access — the high score just stays session-local.
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
-  const requestMatchup = useCallback(async (excludeIds: string[], anchorId?: string) => {
-    setIsLoadingMatchup(true);
+  const requestMatchup = useCallback((excludeIds: string[], anchorId?: string) => {
+    const candidates = livePoolRef.current;
+    const anchoredPair = anchorId ? pickChallenger(candidates, anchorId, excludeIds) : null;
+    const pair = anchoredPair ?? pickMatchup(candidates, excludeIds);
 
-    try {
-      const params = new URLSearchParams();
-      excludeIds.slice(0, 8).forEach((id) => params.append("exclude", id));
-
-      if (anchorId) {
-        params.set("anchor", anchorId);
-      }
-
-      const response = await fetch(`/api/faceoff/matchup?${params.toString()}`, { cache: "no-store" });
-
-      if (!response.ok) {
-        throw new Error("Matchup request failed");
-      }
-
-      const body = (await response.json()) as { data: IssuedMatchup };
-      setIssuedMatchup(body.data);
-    } catch {
+    if (!pair) {
       setIssuedMatchup(null);
-      setNotice("Couldn't load a matchup — try again shortly.");
-    } finally {
-      setIsLoadingMatchup(false);
+      setNotice("No matchup is currently available.");
+      return;
     }
+
+    const [left, right] = anchoredPair ? pair : Math.random() < 0.5 ? pair : [pair[1], pair[0]];
+    setIssuedMatchup({ leftId: left.id, rightId: right.id });
+    setNotice(null);
   }, []);
 
   const advanceMatchup = useCallback(
@@ -528,7 +410,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
       setIssuedMatchup(null);
       setReveal(null);
       setPhase("idle");
-      void requestMatchup(nextRecent, anchorId);
+      requestMatchup(nextRecent, anchorId);
     },
     [recentIds, requestMatchup]
   );
@@ -536,13 +418,12 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
   /* The vote rides along in the background: the streak verdict is already
      decided client-side, so a rate limit or dropped connection never stalls
      the game — it only pauses the ranking side effect. */
-  const recordVote = useCallback(async (matchupId: string, winnerId: string) => {
+  const recordVote = useCallback(async (winnerId: string, loserId: string) => {
     try {
       const response = await fetch("/api/faceoff/vote", {
         body: JSON.stringify({
-          matchupId,
           winnerId,
-          requestId: crypto.randomUUID(),
+          loserId,
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -610,6 +491,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
          visible evidence after the verdict has been decided. */
       const correct = isRankGuessCorrect(leftRank, rightRank, direction);
       const winnerId = direction === "higher" ? right.id : left.id;
+      const loserId = direction === "higher" ? left.id : right.id;
 
       setReveal({
         leftElo: left.eloRating,
@@ -619,7 +501,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
         correct,
       });
       setPhase("revealing");
-      void recordVote(issuedMatchup.id, winnerId);
+      void recordVote(winnerId, loserId);
 
       if (correct) {
         const nextScore = score + 1;
@@ -664,7 +546,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
     } else {
       setReveal(null);
       setPhase("idle");
-      void requestMatchup(recentIds);
+      requestMatchup(recentIds);
     }
   }, [advanceMatchup, matchup, recentIds, requestMatchup]);
 
@@ -673,40 +555,14 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
       return;
     }
 
-    void fetch("/api/faceoff/matchup", {
-      body: JSON.stringify({ matchupId: issuedMatchup.id }),
-      headers: { "Content-Type": "application/json" },
-      method: "PATCH",
-    });
     // A skip replaces the whole pairing, even in the middle of a streak.
     advanceMatchup([matchup[0].id, matchup[1].id]);
   }, [advanceMatchup, issuedMatchup, matchup, phase]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void requestMatchup([]), 0);
+    const timer = window.setTimeout(() => requestMatchup([]), 0);
     return () => window.clearTimeout(timer);
   }, [requestMatchup]);
-
-  useEffect(() => {
-    const refreshLeaderboard = async () => {
-      const response = await fetch("/api/faceoff/leaderboard", { cache: "no-store" }).catch(() => null);
-
-      if (!response?.ok) {
-        return;
-      }
-
-      const body = (await response.json()) as {
-        data: Pick<FaceoffHackathon, "id" | "eloRating" | "faceoffWins" | "faceoffLosses">[];
-      };
-      const currentById = new Map(body.data.map((rating) => [rating.id, rating]));
-      setLivePool((current) =>
-        current.map((hackathon) => ({ ...hackathon, ...(currentById.get(hackathon.id) ?? {}) }))
-      );
-    };
-    const timer = window.setInterval(() => void refreshLeaderboard(), 15_000);
-
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {

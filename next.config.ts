@@ -1,18 +1,13 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
-import { DIRECT_IMAGE_HOSTS, DIRECT_IMAGE_HOST_SUFFIXES } from "./lib/hackathons/logo-hosts";
-
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
-    /* Logo URLs are effectively immutable (content-addressed CDN paths), so
-       optimized variants can outlive short upstream cache headers. */
-    minimumCacheTTL: 2678400,
-    remotePatterns: [
-      ...DIRECT_IMAGE_HOSTS.map((hostname) => ({ protocol: "https" as const, hostname })),
-      ...DIRECT_IMAGE_HOST_SUFFIXES.map((suffix) => ({ protocol: "https" as const, hostname: `*${suffix}` })),
-    ],
+    /* Only write-time-verified HTTPS URLs enter the catalog. Logo components
+       render them unoptimized, but the broad pattern keeps preview/detail
+       rendering compatible without a read-time proxy. */
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
   async redirects() {
     return [

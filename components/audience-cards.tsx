@@ -315,7 +315,7 @@ const audiences: Audience[] = [
     ],
     cta: {
       label: "Join our Discord",
-      href: "https://discord.gg/wcNfUUVgqe",
+      href: "/discord",
       icon: "discord",
       external: true,
     },

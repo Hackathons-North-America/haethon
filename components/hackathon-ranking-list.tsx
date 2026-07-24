@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Crown } from "lucide-react";
 
 import type { HackathonCardData } from "@/components/hackathon-card";
+import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 
 /* Gold/silver/bronze for the top 3 — mirrors the medal treatment in the Face
    Off arena's mini leaderboard so the two views read as one feature. */
@@ -60,7 +61,8 @@ export function HackathonRankingList({
                     alt=""
                     className="size-full object-cover"
                     height={40}
-                    src={`/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`}
+                    src={hackathonLogoSrc(hackathon.id, hackathon.image)}
+                    unoptimized
                     width={40}
                   />
                 ) : (

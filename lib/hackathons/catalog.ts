@@ -4,7 +4,6 @@ import { and, asc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } fr
 import { db } from "@/lib/db";
 import {
   hackathonDates,
-  hackathonFaceoffRatings,
   hackathonLocations,
   hackathonTags,
   hackathons,
@@ -15,7 +14,7 @@ import {
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
 import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
-import { displayEloRating } from "@/lib/hackathons/elo";
+import { getLiveFaceoffRatings } from "@/lib/hackathons/faceoff-service";
 import type { TierLabel } from "@/lib/hackathons/ranking";
 import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
@@ -47,8 +46,7 @@ type CatalogQuery = {
   /* ISO strings (not Dates) so the serialized cache key is stable. */
   startsAfter: string | null;
   startsBefore: string | null;
-  /* A null limit is reserved for the cached browser snapshot used by the
-     catalog page. It lets the browser filter the complete catalog locally. */
+  /* A null limit is reserved for the cached Face Off candidate pool. */
   limit: number | null;
   offset: number;
 };
@@ -141,10 +139,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       travelReimbursement: hackathons.travelReimbursement,
       highSchoolersOnly: hackathons.highSchoolersOnly,
       prizeAmountUsd: hackathons.prizeAmountUsd,
-      eloRating: sql<number>`coalesce(${hackathonFaceoffRatings.eloRating}, 1500)::integer`,
-      faceoffWins: sql<number>`coalesce(${hackathonFaceoffRatings.faceoffWins}, 0)::integer`,
-      faceoffLosses: sql<number>`coalesce(${hackathonFaceoffRatings.faceoffLosses}, 0)::integer`,
-      rankTier: sql<TierLabel>`coalesce(${hackathonFaceoffRatings.rankTier}, 'D')`,
       city: hackathonLocations.city,
       region: hackathonLocations.region,
       country: hackathonLocations.country,
@@ -156,7 +150,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       endsAt: hackathonDates.endsAt,
     })
     .from(hackathons)
-    .leftJoin(hackathonFaceoffRatings, eq(hackathonFaceoffRatings.hackathonId, hackathons.id))
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
@@ -190,8 +183,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
     )
     .$dynamic();
 
-  // Regular API consumers remain paginated. The browse page instead receives
-  // one cached snapshot so changing filters never needs another server query.
+  // Search consumers remain paginated. Face Off receives one cached pool.
   const rows = await (query.limit === null
     ? rowsQuery.offset(query.offset)
     : rowsQuery.limit(query.limit + 1).offset(query.offset));
@@ -255,7 +247,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
   return {
     cards: pageRows.map((row) => {
       const location = formatLocationParts(row);
-      const gamesPlayed = row.faceoffWins + row.faceoffLosses;
 
       return {
         beginnerFriendly: row.beginnerFriendly,
@@ -263,9 +254,9 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         countryCode: row.countryCode ?? null,
         date: formatDateRange(row.startsAt, row.endsAt),
         description: row.description,
-        eloRating: displayEloRating(row.eloRating, gamesPlayed),
-        faceoffWins: row.faceoffWins,
-        faceoffLosses: row.faceoffLosses,
+        eloRating: 1500,
+        faceoffWins: 0,
+        faceoffLosses: 0,
         format: row.format,
         hasDiscord: discordHackathonIds.has(row.id),
         highSchoolersOnly: row.highSchoolersOnly,
@@ -277,7 +268,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         location: location.locality ?? "Location TBA",
         name: row.name,
         prizeAmountUsd: row.prizeAmountUsd,
-        rankTier: row.rankTier,
+        rankTier: "D" as TierLabel,
         slug: row.slug,
         source: row.source ? sourceBadge(row.source) : null,
         startsAt: row.startsAt?.toISOString() ?? null,
@@ -293,6 +284,16 @@ const getCachedCatalogPage = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG
   revalidate: CATALOG_REVALIDATE_SECONDS,
   tags: [CATALOG_CACHE_TAG],
 });
+
+async function withLiveFaceoffRatings(pagePromise: Promise<CatalogPage>) {
+  const [page, ratings] = await Promise.all([pagePromise, getLiveFaceoffRatings()]);
+  const ratingsById = new Map(ratings.map((rating) => [rating.id, rating]));
+
+  return {
+    ...page,
+    cards: page.cards.map((card) => ({ ...card, ...(ratingsById.get(card.id) ?? {}) })),
+  };
+}
 
 export function revalidateHackathonCaches() {
   revalidateTag(CATALOG_CACHE_TAG, "max");
@@ -316,7 +317,7 @@ export function getPublicHackathonCatalog(input: {
   limit?: number;
   offset?: number;
 }): Promise<CatalogPage> {
-  return getCachedCatalogPage({
+  return withLiveFaceoffRatings(getCachedCatalogPage({
     name: (input.name ?? "").trim(),
     countries: [...(input.countries ?? [])].sort(),
     format: input.format ?? null,
@@ -327,16 +328,14 @@ export function getPublicHackathonCatalog(input: {
     startsBefore: roundDownToHourIso(input.startsBefore),
     limit: Math.min(Math.max(input.limit ?? CATALOG_PAGE_SIZE, 1), 50),
     offset: Math.min(Math.max(input.offset ?? 0, 0), 10_000),
-  });
+  }));
 }
 
 /**
- * Returns the complete public catalog as one shared, cached snapshot. The
- * browse page downloads it once and performs all interactive filtering in the
- * browser, avoiding a request/DB-query cycle for every control change.
+ * Returns the complete public catalog as one shared, cached Face Off pool.
  */
 export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
-  return getCachedCatalogPage({
+  return withLiveFaceoffRatings(getCachedCatalogPage({
     name: "",
     countries: [],
     format: null,
@@ -347,7 +346,7 @@ export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
     startsBefore: null,
     limit: null,
     offset: 0,
-  });
+  }));
 }
 
 /**

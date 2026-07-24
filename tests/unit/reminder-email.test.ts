@@ -20,6 +20,9 @@ describe("buildReminderEmail", () => {
     expect(email.html).toContain("https://haethon.dev/my");
     expect(email.html).toContain("https://haethon.dev/api/email/unsubscribe?token=signed-token");
     expect(email.html).toContain("Unsubscribe from all emails");
+    expect(email.html).toContain("#007354");
+    expect(email.html).toContain("#FBF7F0");
+    expect(email.html).not.toContain("#660000");
     expect(email.text).toContain("Hey Ada,");
     expect(email.text).toContain("The event starts in a week");
     expect(email.text).toContain("Unsubscribe from all emails");

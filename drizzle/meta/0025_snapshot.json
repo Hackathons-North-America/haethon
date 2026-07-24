@@ -1,5 +1,5 @@
 {
-  "id": "6dfef828-b57b-473b-8a6c-fb798f3efc1e",
+  "id": "b31acbaf-5634-4447-a8d2-75aaa2780eaa",
   "prevId": "55ecd0e2-e0c8-432d-b5b5-8f696a062849",
   "version": "7",
   "dialect": "postgresql",
@@ -65,24 +65,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "achievements_user_id_users_id_fk": {
           "name": "achievements_user_id_users_id_fk",
           "tableFrom": "achievements",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -157,30 +157,30 @@
           "columns": [
             {
               "expression": "\"name\" gin_trgm_ops",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gin",
-          "concurrently": false
+          "with": {}
         },
         "cities_ascii_name_trgm_idx": {
           "name": "cities_ascii_name_trgm_idx",
           "columns": [
             {
               "expression": "\"ascii_name\" gin_trgm_ops",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gin",
-          "concurrently": false
+          "with": {}
         },
         "cities_country_code_idx": {
           "name": "cities_country_code_idx",
@@ -193,9 +193,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -262,34 +262,34 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "country_alert_subscriptions_user_id_users_id_fk": {
           "name": "country_alert_subscriptions_user_id_users_id_fk",
           "tableFrom": "country_alert_subscriptions",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "country_alert_subscriptions_user_id_unique": {
           "name": "country_alert_subscriptions_user_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "user_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -375,9 +375,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "discord_channels_hackathon_idx": {
           "name": "discord_channels_hackathon_idx",
@@ -390,9 +390,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "discord_channels_series_idx": {
           "name": "discord_channels_series_idx",
@@ -405,60 +405,60 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "discord_channels_guild_id_discord_guilds_id_fk": {
           "name": "discord_channels_guild_id_discord_guilds_id_fk",
           "tableFrom": "discord_channels",
+          "tableTo": "discord_guilds",
           "columnsFrom": [
             "guild_id"
           ],
-          "tableTo": "discord_guilds",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "discord_channels_series_id_hackathon_series_id_fk": {
           "name": "discord_channels_series_id_hackathon_series_id_fk",
           "tableFrom": "discord_channels",
+          "tableTo": "hackathon_series",
           "columnsFrom": [
             "series_id"
           ],
-          "tableTo": "hackathon_series",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "discord_channels_hackathon_id_hackathons_id_fk": {
           "name": "discord_channels_hackathon_id_hackathons_id_fk",
           "tableFrom": "discord_channels",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "discord_channels_channel_snowflake_unique": {
           "name": "discord_channels_channel_snowflake_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "channel_snowflake"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -507,25 +507,25 @@
         "discord_guilds_hackathon_id_hackathons_id_fk": {
           "name": "discord_guilds_hackathon_id_hackathons_id_fk",
           "tableFrom": "discord_guilds",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "discord_guilds_guild_snowflake_unique": {
           "name": "discord_guilds_guild_snowflake_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "guild_snowflake"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -593,47 +593,47 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathon_checkin_codes_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_checkin_codes_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_checkin_codes",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "hackathon_checkin_codes_created_by_user_id_users_id_fk": {
           "name": "hackathon_checkin_codes_created_by_user_id_users_id_fk",
           "tableFrom": "hackathon_checkin_codes",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "hackathon_checkin_codes_code_unique": {
           "name": "hackathon_checkin_codes_code_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "code"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -700,9 +700,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_dates_hackathon_unique_idx": {
           "name": "hackathon_dates_hackathon_unique_idx",
@@ -715,9 +715,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_dates_start_idx": {
           "name": "hackathon_dates_start_idx",
@@ -730,192 +730,30 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathon_dates_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_dates_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_dates",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.hackathon_faceoff_matchups": {
-      "name": "hackathon_faceoff_matchups",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "left_id": {
-          "name": "left_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "right_id": {
-          "name": "right_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "voter_fingerprint": {
-          "name": "voter_fingerprint",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumed_at": {
-          "name": "consumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "skipped_at": {
-          "name": "skipped_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "hackathon_faceoff_matchups_left_idx": {
-          "name": "hackathon_faceoff_matchups_left_idx",
-          "columns": [
-            {
-              "expression": "left_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_matchups_right_idx": {
-          "name": "hackathon_faceoff_matchups_right_idx",
-          "columns": [
-            {
-              "expression": "right_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_matchups_voter_created_idx": {
-          "name": "hackathon_faceoff_matchups_voter_created_idx",
-          "columns": [
-            {
-              "expression": "voter_fingerprint",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_matchups_expires_idx": {
-          "name": "hackathon_faceoff_matchups_expires_idx",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "hackathon_faceoff_matchups_left_id_hackathons_id_fk": {
-          "name": "hackathon_faceoff_matchups_left_id_hackathons_id_fk",
-          "tableFrom": "hackathon_faceoff_matchups",
-          "columnsFrom": [
-            "left_id"
-          ],
-          "tableTo": "hackathons",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "hackathon_faceoff_matchups_right_id_hackathons_id_fk": {
-          "name": "hackathon_faceoff_matchups_right_id_hackathons_id_fk",
-          "tableFrom": "hackathon_faceoff_matchups",
-          "columnsFrom": [
-            "right_id"
-          ],
-          "tableTo": "hackathons",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "hackathon_faceoff_matchups_distinct_pair": {
-          "name": "hackathon_faceoff_matchups_distinct_pair",
-          "value": "\"hackathon_faceoff_matchups\".\"left_id\" <> \"hackathon_faceoff_matchups\".\"right_id\""
-        }
-      },
       "isRLSEnabled": false
     },
     "public.hackathon_faceoff_ratings": {
@@ -948,13 +786,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
-        },
-        "rank_tier": {
-          "name": "rank_tier",
-          "type": "varchar(1)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'D'"
         },
         "version": {
           "name": "version",
@@ -989,61 +820,30 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_ratings_tier_idx": {
-          "name": "hackathon_faceoff_ratings_tier_idx",
-          "columns": [
-            {
-              "expression": "rank_tier",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "elo_rating",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "hackathon_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathon_faceoff_ratings_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_faceoff_ratings_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_faceoff_ratings",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "hackathon_faceoff_ratings_tier_valid": {
-          "name": "hackathon_faceoff_ratings_tier_valid",
-          "value": "\"hackathon_faceoff_ratings\".\"rank_tier\" in ('S', 'A', 'B', 'C', 'D')"
-        },
         "hackathon_faceoff_ratings_wins_nonnegative": {
           "name": "hackathon_faceoff_ratings_wins_nonnegative",
           "value": "\"hackathon_faceoff_ratings\".\"faceoff_wins\" >= 0"
@@ -1055,317 +855,6 @@
         "hackathon_faceoff_ratings_version_nonnegative": {
           "name": "hackathon_faceoff_ratings_version_nonnegative",
           "value": "\"hackathon_faceoff_ratings\".\"version\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.hackathon_faceoff_votes": {
-      "name": "hackathon_faceoff_votes",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "request_id": {
-          "name": "request_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "matchup_id": {
-          "name": "matchup_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "winner_id": {
-          "name": "winner_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "loser_id": {
-          "name": "loser_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "left_id": {
-          "name": "left_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "right_id": {
-          "name": "right_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pair_low_id": {
-          "name": "pair_low_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pair_high_id": {
-          "name": "pair_high_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "voter_user_id": {
-          "name": "voter_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "voter_fingerprint": {
-          "name": "voter_fingerprint",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "winner_elo_before": {
-          "name": "winner_elo_before",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "winner_elo_after": {
-          "name": "winner_elo_after",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "loser_elo_before": {
-          "name": "loser_elo_before",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "loser_elo_after": {
-          "name": "loser_elo_after",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "algorithm_version": {
-          "name": "algorithm_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 2
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "hackathon_faceoff_votes_request_idx": {
-          "name": "hackathon_faceoff_votes_request_idx",
-          "columns": [
-            {
-              "expression": "request_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_votes_winner_idx": {
-          "name": "hackathon_faceoff_votes_winner_idx",
-          "columns": [
-            {
-              "expression": "winner_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_votes_loser_idx": {
-          "name": "hackathon_faceoff_votes_loser_idx",
-          "columns": [
-            {
-              "expression": "loser_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_votes_voter_idx": {
-          "name": "hackathon_faceoff_votes_voter_idx",
-          "columns": [
-            {
-              "expression": "voter_fingerprint",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "hackathon_faceoff_votes_voter_pair_idx": {
-          "name": "hackathon_faceoff_votes_voter_pair_idx",
-          "columns": [
-            {
-              "expression": "voter_fingerprint",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pair_low_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pair_high_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "hackathon_faceoff_votes_matchup_id_hackathon_faceoff_matchups_id_fk": {
-          "name": "hackathon_faceoff_votes_matchup_id_hackathon_faceoff_matchups_id_fk",
-          "tableFrom": "hackathon_faceoff_votes",
-          "columnsFrom": [
-            "matchup_id"
-          ],
-          "tableTo": "hackathon_faceoff_matchups",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
-        },
-        "hackathon_faceoff_votes_winner_id_hackathons_id_fk": {
-          "name": "hackathon_faceoff_votes_winner_id_hackathons_id_fk",
-          "tableFrom": "hackathon_faceoff_votes",
-          "columnsFrom": [
-            "winner_id"
-          ],
-          "tableTo": "hackathons",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
-        },
-        "hackathon_faceoff_votes_loser_id_hackathons_id_fk": {
-          "name": "hackathon_faceoff_votes_loser_id_hackathons_id_fk",
-          "tableFrom": "hackathon_faceoff_votes",
-          "columnsFrom": [
-            "loser_id"
-          ],
-          "tableTo": "hackathons",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
-        },
-        "hackathon_faceoff_votes_left_id_hackathons_id_fk": {
-          "name": "hackathon_faceoff_votes_left_id_hackathons_id_fk",
-          "tableFrom": "hackathon_faceoff_votes",
-          "columnsFrom": [
-            "left_id"
-          ],
-          "tableTo": "hackathons",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
-        },
-        "hackathon_faceoff_votes_right_id_hackathons_id_fk": {
-          "name": "hackathon_faceoff_votes_right_id_hackathons_id_fk",
-          "tableFrom": "hackathon_faceoff_votes",
-          "columnsFrom": [
-            "right_id"
-          ],
-          "tableTo": "hackathons",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
-        },
-        "hackathon_faceoff_votes_voter_user_id_users_id_fk": {
-          "name": "hackathon_faceoff_votes_voter_user_id_users_id_fk",
-          "tableFrom": "hackathon_faceoff_votes",
-          "columnsFrom": [
-            "voter_user_id"
-          ],
-          "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "hackathon_faceoff_votes_distinct_pair": {
-          "name": "hackathon_faceoff_votes_distinct_pair",
-          "value": "\"hackathon_faceoff_votes\".\"winner_id\" <> \"hackathon_faceoff_votes\".\"loser_id\""
-        },
-        "hackathon_faceoff_votes_distinct_positions": {
-          "name": "hackathon_faceoff_votes_distinct_positions",
-          "value": "\"hackathon_faceoff_votes\".\"left_id\" <> \"hackathon_faceoff_votes\".\"right_id\""
-        },
-        "hackathon_faceoff_votes_canonical_pair": {
-          "name": "hackathon_faceoff_votes_canonical_pair",
-          "value": "\"hackathon_faceoff_votes\".\"pair_low_id\" < \"hackathon_faceoff_votes\".\"pair_high_id\""
         }
       },
       "isRLSEnabled": false
@@ -1442,9 +931,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_locations_hackathon_unique_idx": {
           "name": "hackathon_locations_hackathon_unique_idx",
@@ -1457,9 +946,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_locations_country_idx": {
           "name": "hackathon_locations_country_idx",
@@ -1472,9 +961,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_locations_coordinates_idx": {
           "name": "hackathon_locations_coordinates_idx",
@@ -1487,24 +976,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gist",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathon_locations_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_locations_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_locations",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1580,9 +1069,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_results_hackathon_idx": {
           "name": "hackathon_results_hackathon_idx",
@@ -1595,50 +1084,50 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathon_results_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_results_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_results",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "hackathon_results_project_id_projects_id_fk": {
           "name": "hackathon_results_project_id_projects_id_fk",
           "tableFrom": "hackathon_results",
+          "tableTo": "projects",
           "columnsFrom": [
             "project_id"
           ],
-          "tableTo": "projects",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "hackathon_results_user_id_users_id_fk": {
           "name": "hackathon_results_user_id_users_id_fk",
           "tableFrom": "hackathon_results",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1710,9 +1199,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1720,10 +1209,10 @@
       "uniqueConstraints": {
         "hackathon_series_slug_unique": {
           "name": "hackathon_series_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1868,9 +1357,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_submissions_submitter_idx": {
           "name": "hackathon_submissions_submitter_idx",
@@ -1883,9 +1372,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathon_submissions_organization_idx": {
           "name": "hackathon_submissions_organization_idx",
@@ -1898,76 +1387,76 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathon_submissions_submitted_by_user_id_users_id_fk": {
           "name": "hackathon_submissions_submitted_by_user_id_users_id_fk",
           "tableFrom": "hackathon_submissions",
+          "tableTo": "users",
           "columnsFrom": [
             "submitted_by_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "hackathon_submissions_organization_id_organizations_id_fk": {
           "name": "hackathon_submissions_organization_id_organizations_id_fk",
           "tableFrom": "hackathon_submissions",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "hackathon_submissions_matched_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_submissions_matched_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_submissions",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "matched_hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "hackathon_submissions_approved_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_submissions_approved_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_submissions",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "approved_hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "hackathon_submissions_reviewed_by_user_id_users_id_fk": {
           "name": "hackathon_submissions_reviewed_by_user_id_users_id_fk",
           "tableFrom": "hackathon_submissions",
+          "tableTo": "users",
           "columnsFrom": [
             "reviewed_by_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1998,28 +1487,28 @@
         "hackathon_tags_hackathon_id_hackathons_id_fk": {
           "name": "hackathon_tags_hackathon_id_hackathons_id_fk",
           "tableFrom": "hackathon_tags",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "hackathon_tags_tag_id_tags_id_fk": {
           "name": "hackathon_tags_tag_id_tags_id_fk",
           "tableFrom": "hackathon_tags",
+          "tableTo": "tags",
           "columnsFrom": [
             "tag_id"
           ],
-          "tableTo": "tags",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -2197,9 +1686,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathons_status_idx": {
           "name": "hackathons_status_idx",
@@ -2212,9 +1701,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathons_format_idx": {
           "name": "hackathons_format_idx",
@@ -2227,24 +1716,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "hackathons_name_trgm_idx": {
           "name": "hackathons_name_trgm_idx",
           "columns": [
             {
               "expression": "\"name\" gin_trgm_ops",
-              "isExpression": true,
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "gin",
-          "concurrently": false
+          "with": {}
         },
         "hackathons_name_slug_idx": {
           "name": "hackathons_name_slug_idx",
@@ -2263,47 +1752,47 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "hackathons_series_id_hackathon_series_id_fk": {
           "name": "hackathons_series_id_hackathon_series_id_fk",
           "tableFrom": "hackathons",
+          "tableTo": "hackathon_series",
           "columnsFrom": [
             "series_id"
           ],
-          "tableTo": "hackathon_series",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "hackathons_organization_id_organizations_id_fk": {
           "name": "hackathons_organization_id_organizations_id_fk",
           "tableFrom": "hackathons",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "hackathons_slug_unique": {
           "name": "hackathons_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2358,25 +1847,25 @@
         "import_batches_created_by_user_id_users_id_fk": {
           "name": "import_batches_created_by_user_id_users_id_fk",
           "tableFrom": "import_batches",
+          "tableTo": "users",
           "columnsFrom": [
             "created_by_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "import_batches_run_id_unique": {
           "name": "import_batches_run_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "run_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2459,37 +1948,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "import_items_import_batch_id_import_batches_id_fk": {
           "name": "import_items_import_batch_id_import_batches_id_fk",
           "tableFrom": "import_items",
+          "tableTo": "import_batches",
           "columnsFrom": [
             "import_batch_id"
           ],
-          "tableTo": "import_batches",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "import_items_matched_hackathon_id_hackathons_id_fk": {
           "name": "import_items_matched_hackathon_id_hackathons_id_fk",
           "tableFrom": "import_items",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "matched_hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2567,24 +2056,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "notifications_user_id_users_id_fk": {
           "name": "notifications_user_id_users_id_fk",
           "tableFrom": "notifications",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2652,9 +2141,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "organization_memberships_status_idx": {
           "name": "organization_memberships_status_idx",
@@ -2667,37 +2156,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "organization_memberships_organization_id_organizations_id_fk": {
           "name": "organization_memberships_organization_id_organizations_id_fk",
           "tableFrom": "organization_memberships",
+          "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organizations",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "organization_memberships_user_id_users_id_fk": {
           "name": "organization_memberships_user_id_users_id_fk",
           "tableFrom": "organization_memberships",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -2783,10 +2272,10 @@
       "uniqueConstraints": {
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -2862,37 +2351,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "organizer_claims_hackathon_id_hackathons_id_fk": {
           "name": "organizer_claims_hackathon_id_hackathons_id_fk",
           "tableFrom": "organizer_claims",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "organizer_claims_user_id_users_id_fk": {
           "name": "organizer_claims_user_id_users_id_fk",
           "tableFrom": "organizer_claims",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3045,37 +2534,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "projects_user_id_users_id_fk": {
           "name": "projects_user_id_users_id_fk",
           "tableFrom": "projects",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "projects_hackathon_id_hackathons_id_fk": {
           "name": "projects_hackathon_id_hackathons_id_fk",
           "tableFrom": "projects",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3127,9 +2616,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -3215,9 +2704,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "reminders_pending_due_idx": {
           "name": "reminders_pending_due_idx",
@@ -3236,10 +2725,10 @@
             }
           ],
           "isUnique": false,
-          "with": {},
-          "method": "btree",
           "where": "\"reminders\".\"sent_at\" is null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "reminders_user_hackathon_idx": {
           "name": "reminders_user_hackathon_idx",
@@ -3258,9 +2747,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "reminders_pending_delivery_unique_idx": {
           "name": "reminders_pending_delivery_unique_idx",
@@ -3297,38 +2786,38 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"reminders\".\"sent_at\" is null",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
         "reminders_user_id_users_id_fk": {
           "name": "reminders_user_id_users_id_fk",
           "tableFrom": "reminders",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "reminders_hackathon_id_hackathons_id_fk": {
           "name": "reminders_hackathon_id_hackathons_id_fk",
           "tableFrom": "reminders",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3394,24 +2883,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "sources_hackathon_id_hackathons_id_fk": {
           "name": "sources_hackathon_id_hackathons_id_fk",
           "tableFrom": "sources",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3528,17 +3017,17 @@
       "uniqueConstraints": {
         "tags_name_unique": {
           "name": "tags_name_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "name"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "tags_slug_unique": {
           "name": "tags_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -3614,9 +3103,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "user_hackathon_attendance_user_day_idx": {
           "name": "user_hackathon_attendance_user_day_idx",
@@ -3635,9 +3124,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "user_hackathon_attendance_event_user_day_idx": {
           "name": "user_hackathon_attendance_event_user_day_idx",
@@ -3662,37 +3151,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "user_hackathon_attendance_days_user_id_users_id_fk": {
           "name": "user_hackathon_attendance_days_user_id_users_id_fk",
           "tableFrom": "user_hackathon_attendance_days",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "user_hackathon_attendance_days_hackathon_id_hackathons_id_fk": {
           "name": "user_hackathon_attendance_days_hackathon_id_hackathons_id_fk",
           "tableFrom": "user_hackathon_attendance_days",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3791,9 +3280,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "user_hackathon_notification_preferences_user_idx": {
           "name": "user_hackathon_notification_preferences_user_idx",
@@ -3806,9 +3295,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "user_hackathon_notification_preferences_hackathon_idx": {
           "name": "user_hackathon_notification_preferences_hackathon_idx",
@@ -3821,37 +3310,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "user_hackathon_notification_preferences_user_id_users_id_fk": {
           "name": "user_hackathon_notification_preferences_user_id_users_id_fk",
           "tableFrom": "user_hackathon_notification_preferences",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "user_hackathon_notification_preferences_hackathon_id_hackathons_id_fk": {
           "name": "user_hackathon_notification_preferences_hackathon_id_hackathons_id_fk",
           "tableFrom": "user_hackathon_notification_preferences",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3956,9 +3445,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "user_hackathons_event_status_user_idx": {
           "name": "user_hackathons_event_status_user_idx",
@@ -3983,37 +3472,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "user_hackathons_user_id_users_id_fk": {
           "name": "user_hackathons_user_id_users_id_fk",
           "tableFrom": "user_hackathons",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "user_hackathons_hackathon_id_hackathons_id_fk": {
           "name": "user_hackathons_hackathon_id_hackathons_id_fk",
           "tableFrom": "user_hackathons",
+          "tableTo": "hackathons",
           "columnsFrom": [
             "hackathon_id"
           ],
-          "tableTo": "hackathons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -4145,25 +3634,25 @@
         "user_profiles_user_id_users_id_fk": {
           "name": "user_profiles_user_id_users_id_fk",
           "tableFrom": "user_profiles",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "user_profiles_user_id_unique": {
           "name": "user_profiles_user_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "user_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -4252,9 +3741,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -4262,17 +3751,17 @@
       "uniqueConstraints": {
         "users_clerk_user_id_unique": {
           "name": "users_clerk_user_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "clerk_user_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "users_email_unique": {
           "name": "users_email_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -4432,10 +3921,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

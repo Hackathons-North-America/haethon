@@ -213,17 +213,11 @@ export const hackathonFaceoffRatings = pgTable(
     eloRating: integer("elo_rating").notNull().default(1500),
     faceoffWins: integer("faceoff_wins").notNull().default(0),
     faceoffLosses: integer("faceoff_losses").notNull().default(0),
-    /* Global percentile tier, maintained in PostgreSQL whenever Elo changes.
-       Keeping it beside the rating makes catalog filters presentation-only:
-       they cannot silently change a hackathon's tier. */
-    rankTier: varchar("rank_tier", { length: 1 }).notNull().default("D"),
     version: integer("version").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("hackathon_faceoff_ratings_elo_idx").on(table.eloRating, table.hackathonId),
-    index("hackathon_faceoff_ratings_tier_idx").on(table.rankTier, table.eloRating, table.hackathonId),
-    check("hackathon_faceoff_ratings_tier_valid", sql`${table.rankTier} in ('S', 'A', 'B', 'C', 'D')`),
     check("hackathon_faceoff_ratings_wins_nonnegative", sql`${table.faceoffWins} >= 0`),
     check("hackathon_faceoff_ratings_losses_nonnegative", sql`${table.faceoffLosses} >= 0`),
     check("hackathon_faceoff_ratings_version_nonnegative", sql`${table.version} >= 0`),
@@ -390,83 +384,6 @@ export const hackathonCheckinCodes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("hackathon_checkin_codes_hackathon_idx").on(table.hackathonId)]
-);
-
-/* Server-issued matchups make the submitted pair and its left/right placement
-   auditable. An unconsumed row is an impression; skippedAt distinguishes a
-   deliberate skip from an abandoned page. */
-export const hackathonFaceoffMatchups = pgTable(
-  "hackathon_faceoff_matchups",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    leftId: uuid("left_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "cascade" }),
-    rightId: uuid("right_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "cascade" }),
-    voterFingerprint: varchar("voter_fingerprint", { length: 64 }).notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    consumedAt: timestamp("consumed_at", { withTimezone: true }),
-    skippedAt: timestamp("skipped_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("hackathon_faceoff_matchups_left_idx").on(table.leftId),
-    index("hackathon_faceoff_matchups_right_idx").on(table.rightId),
-    index("hackathon_faceoff_matchups_voter_created_idx").on(table.voterFingerprint, table.createdAt),
-    index("hackathon_faceoff_matchups_expires_idx").on(table.expiresAt),
-    check("hackathon_faceoff_matchups_distinct_pair", sql`${table.leftId} <> ${table.rightId}`),
-  ]
-);
-
-/* The vote log is immutable audit data. requestId makes retries idempotent;
-   canonical pair ids make same-voter/pair throttling indexable; before/after
-   snapshots plus algorithmVersion allow deterministic reconciliation. */
-export const hackathonFaceoffVotes = pgTable(
-  "hackathon_faceoff_votes",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    requestId: uuid("request_id").defaultRandom().notNull(),
-    matchupId: uuid("matchup_id").references(() => hackathonFaceoffMatchups.id, { onDelete: "set null" }),
-    winnerId: uuid("winner_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "restrict" }),
-    loserId: uuid("loser_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "restrict" }),
-    leftId: uuid("left_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "restrict" }),
-    rightId: uuid("right_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "restrict" }),
-    pairLowId: uuid("pair_low_id").notNull(),
-    pairHighId: uuid("pair_high_id").notNull(),
-    voterUserId: uuid("voter_user_id").references(() => users.id, { onDelete: "set null" }),
-    voterFingerprint: varchar("voter_fingerprint", { length: 64 }).notNull(),
-    winnerEloBefore: integer("winner_elo_before").notNull(),
-    winnerEloAfter: integer("winner_elo_after").notNull(),
-    loserEloBefore: integer("loser_elo_before").notNull(),
-    loserEloAfter: integer("loser_elo_after").notNull(),
-    algorithmVersion: integer("algorithm_version").notNull().default(2),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("hackathon_faceoff_votes_request_idx").on(table.requestId),
-    index("hackathon_faceoff_votes_winner_idx").on(table.winnerId),
-    index("hackathon_faceoff_votes_loser_idx").on(table.loserId),
-    index("hackathon_faceoff_votes_voter_idx").on(table.voterFingerprint, table.createdAt),
-    index("hackathon_faceoff_votes_voter_pair_idx").on(
-      table.voterFingerprint,
-      table.pairLowId,
-      table.pairHighId,
-      table.createdAt
-    ),
-    check("hackathon_faceoff_votes_distinct_pair", sql`${table.winnerId} <> ${table.loserId}`),
-    check("hackathon_faceoff_votes_distinct_positions", sql`${table.leftId} <> ${table.rightId}`),
-    check("hackathon_faceoff_votes_canonical_pair", sql`${table.pairLowId} < ${table.pairHighId}`),
-  ]
 );
 
 export const reminders = pgTable(
@@ -807,35 +724,12 @@ export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
     fields: [hackathons.id],
     references: [hackathonFaceoffRatings.hackathonId],
   }),
-  faceoffWinsLog: many(hackathonFaceoffVotes, { relationName: "faceoffWinner" }),
-  faceoffLossesLog: many(hackathonFaceoffVotes, { relationName: "faceoffLoser" }),
 }));
 
 export const hackathonFaceoffRatingsRelations = relations(hackathonFaceoffRatings, ({ one }) => ({
   hackathon: one(hackathons, {
     fields: [hackathonFaceoffRatings.hackathonId],
     references: [hackathons.id],
-  }),
-}));
-
-export const hackathonFaceoffVotesRelations = relations(hackathonFaceoffVotes, ({ one }) => ({
-  matchup: one(hackathonFaceoffMatchups, {
-    fields: [hackathonFaceoffVotes.matchupId],
-    references: [hackathonFaceoffMatchups.id],
-  }),
-  winner: one(hackathons, {
-    fields: [hackathonFaceoffVotes.winnerId],
-    references: [hackathons.id],
-    relationName: "faceoffWinner",
-  }),
-  loser: one(hackathons, {
-    fields: [hackathonFaceoffVotes.loserId],
-    references: [hackathons.id],
-    relationName: "faceoffLoser",
-  }),
-  voter: one(users, {
-    fields: [hackathonFaceoffVotes.voterUserId],
-    references: [users.id],
   }),
 }));
 
@@ -853,6 +747,4 @@ export type SelectHackathonSeries = typeof hackathonSeries.$inferSelect;
 export type SelectHackathon = typeof hackathons.$inferSelect;
 export type SelectUser = typeof users.$inferSelect;
 export type SelectHackathonSubmission = typeof hackathonSubmissions.$inferSelect;
-export type SelectHackathonFaceoffVote = typeof hackathonFaceoffVotes.$inferSelect;
 export type SelectHackathonFaceoffRating = typeof hackathonFaceoffRatings.$inferSelect;
-export type SelectHackathonFaceoffMatchup = typeof hackathonFaceoffMatchups.$inferSelect;

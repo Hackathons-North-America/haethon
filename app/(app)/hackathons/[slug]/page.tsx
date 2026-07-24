@@ -5,11 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or } from "drizzle-orm";
 import {
   ArrowLeft,
   ArrowUpRight,
-  BellRing,
   CalendarClock,
   CalendarDays,
   CircleCheck,
@@ -37,7 +36,6 @@ import {
   hackathonTags,
   hackathons,
   organizations,
-  reminders,
   tags,
   userHackathonNotificationPreferences,
   userHackathons,
@@ -49,7 +47,6 @@ import {
   getSelectableReminderTypesForStatus,
   selectableReminderTypes,
 } from "@/lib/hackathons/reminder-plan";
-import { formatReminderDate, reminderTypeLabels } from "@/lib/hackathons/reminder-labels";
 
 /* "archived" is viewable here (unlike the catalog) so old links to
    pre-half-year rows never land on a 404. */
@@ -246,7 +243,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
 
   const { hackathon, tagRows, discordChannelLink } = pageData;
 
-  const [[tracked], upcomingReminders, notificationPreferenceRows] = await Promise.all([
+  const [[tracked], notificationPreferenceRows] = await Promise.all([
     user
       ? db
           .select({ applicationStatus: userHackathons.applicationStatus })
@@ -254,19 +251,6 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           .where(and(eq(userHackathons.userId, user.id), eq(userHackathons.hackathonId, hackathon.id)))
           .limit(1)
       : Promise.resolve([] as { applicationStatus: string }[]),
-    user
-      ? db
-          .select({
-            id: reminders.id,
-            type: reminders.type,
-            scheduledFor: reminders.scheduledFor,
-          })
-          .from(reminders)
-          .where(
-            and(eq(reminders.userId, user.id), eq(reminders.hackathonId, hackathon.id), isNull(reminders.sentAt))
-          )
-          .orderBy(asc(reminders.scheduledFor))
-      : Promise.resolve([]),
     user
       ? db
           .select({
@@ -347,6 +331,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
                 fill
                 sizes="80px"
                 src={hackathonLogoSrc(hackathon.id, hackathon.imageUrl)}
+                unoptimized
               />
             ) : (
               <span className="text-xl font-semibold text-pine">{getInitials(hackathon.name) || "HN"}</span>
@@ -520,18 +505,6 @@ export default async function HackathonDetailPage({ params }: PageProps) {
               hackathonId={hackathon.id}
               initialPreferences={notificationPreferences}
             />
-          ) : null}
-          {upcomingReminders.length ? (
-            <ul className="mt-5 space-y-2 border-t border-ink/10 pt-4">
-              {upcomingReminders.map((reminder) => (
-                <li className="flex items-center gap-2 text-sm text-ink/70" key={reminder.id}>
-                  <BellRing aria-hidden="true" className="size-3.5 shrink-0 text-pine" />
-                  <span>
-                    {reminderTypeLabels[reminder.type] ?? reminder.type} · {formatReminderDate(reminder.scheduledFor)}
-                  </span>
-                </li>
-              ))}
-            </ul>
           ) : null}
         </section>
       </div>

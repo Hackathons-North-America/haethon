@@ -12,8 +12,7 @@ type FaceoffVoteResult = {
     | "daily_limit"
     | "ineligible_pair"
     | "invalid_pair"
-    | "missing_rating"
-    | "slow_down";
+    | "missing_rating";
   winner_id: string | null;
   loser_id: string | null;
   winner_elo_before: number | null;
@@ -29,7 +28,6 @@ const outcomeResponse: Record<Exclude<FaceoffVoteResult["outcome"], "ok">, { err
   ineligible_pair: { error: "This matchup is no longer eligible.", status: 409 },
   invalid_pair: { error: "The matchup is invalid.", status: 400 },
   missing_rating: { error: "A rating record is missing.", status: 500 },
-  slow_down: { error: "Slow down a bit.", status: 429 },
 };
 
 export async function POST(request: Request) {

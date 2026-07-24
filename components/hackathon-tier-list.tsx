@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import type { HackathonCardData } from "@/components/hackathon-card";
+import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { assignTiers } from "@/lib/hackathons/ranking";
 import type { TierLabel } from "@/lib/hackathons/ranking";
 
@@ -72,7 +73,8 @@ export function HackathonTierList({ hackathons }: { hackathons: (HackathonCardDa
                         alt=""
                         className="size-full object-cover"
                         height={56}
-                        src={`/api/hackathons/${encodeURIComponent(hackathon.id)}/logo`}
+                        src={hackathonLogoSrc(hackathon.id, hackathon.image)}
+                        unoptimized
                         width={56}
                       />
                     ) : (

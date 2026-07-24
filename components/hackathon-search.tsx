@@ -28,10 +28,14 @@ import type { GeoPoint } from "@/lib/geo";
 import { countryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
 import { assignTiers, sortByEloDescending, sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
-import type { TierLabel } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
-import { datePeriodOptions, distanceOptions, viewModeOptions } from "@/lib/hackathons/search-filters";
+import {
+  datePeriodOptions,
+  dateRangeForPeriod,
+  distanceOptions,
+  viewModeOptions,
+} from "@/lib/hackathons/search-filters";
 import type {
   DatePeriod,
   DistanceFilter,
@@ -48,6 +52,7 @@ const formatPopoverId = "hackathon-format-popover";
 const featurePopoverId = "hackathon-feature-popover";
 const moreFiltersId = "hackathon-more-filters";
 const navMenuId = "hackathon-nav-menu";
+const SEARCH_PAGE_SIZE = 30;
 
 type OpenPopover = "location" | "date" | "format" | "features" | null;
 type LocationMode = "country" | "near_me";
@@ -105,7 +110,8 @@ function replaceSearchUrl(
     travelReimbursement,
     view,
   }: HackathonSearchFilters,
-  basePath: string
+  basePath: string,
+  searched: boolean
 ) {
   const params = new URLSearchParams();
 
@@ -143,6 +149,10 @@ function replaceSearchUrl(
     params.set("view", view);
   }
 
+  if (searched) {
+    params.set("search", "1");
+  }
+
   const query = params.toString();
   window.history.replaceState(null, "", query ? `${basePath}?${query}` : basePath);
 }
@@ -156,11 +166,15 @@ export type HackathonCardHelpers = {
 
 export function HackathonSearch({
   initialFilters,
+  initialHasMore = false,
+  initialHasSearched = false,
   initialHackathons,
   basePath = "/hackathons",
   renderCard,
 }: {
   initialFilters: HackathonSearchFilters;
+  initialHasMore?: boolean;
+  initialHasSearched?: boolean;
   initialHackathons: HackathonCardData[];
   /* Path the filter state is written back to via history.replaceState. Defaults
      to the public page; the admin view passes its own route. */
@@ -182,6 +196,11 @@ export function HackathonSearch({
   const [highSchoolersOnly, setHighSchoolersOnly] = useState<FeatureFilter>(initialFilters.highSchoolersOnly);
   const [view, setView] = useState<HackathonViewMode>(initialFilters.view);
   const [catalog, setCatalog] = useState(initialHackathons);
+  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [hasSearched, setHasSearched] = useState(initialHasSearched);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
   /* Which sub-panel the merged Location popover shows. Resets to "country" every
      time the popover opens (see the Location button's onClick). */
@@ -198,38 +217,6 @@ export function HackathonSearch({
   const countrySearchRef = useRef<HTMLInputElement>(null);
   const countryRowRef = useRef<HTMLDivElement>(null);
   const [countriesOverflow, setCountriesOverflow] = useState(false);
-
-  useEffect(() => {
-    if (view === "grid") {
-      return;
-    }
-
-    const refreshRatings = async () => {
-      const response = await fetch("/api/faceoff/leaderboard", { cache: "no-store" }).catch(() => null);
-
-      if (!response?.ok) {
-        return;
-      }
-
-      const body = (await response.json()) as {
-        data: {
-          id: string;
-          eloRating: number;
-          faceoffWins: number;
-          faceoffLosses: number;
-          rankTier: TierLabel;
-        }[];
-      };
-      const ratingsById = new Map(body.data.map((rating) => [rating.id, rating]));
-      setCatalog((current) =>
-        current.map((hackathon) => ({ ...hackathon, ...(ratingsById.get(hackathon.id) ?? {}) }))
-      );
-    };
-    void refreshRatings();
-    const timer = window.setInterval(() => void refreshRatings(), 15_000);
-
-    return () => window.clearInterval(timer);
-  }, [view]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -321,16 +308,6 @@ export function HackathonSearch({
     locateWithBrowser();
   }
 
-  /* Runs on every load, prompt-free, so the Browse/Ranking views can push the
-     visitor's own country to the top without them doing anything. Distance
-     picks trigger the full locate() (with a browser-prompt fallback) from
-     their own click handler; this only ever does the silent IP lookup. */
-  useEffect(() => {
-    const timeout = setTimeout(() => void locateViaIp(), 0);
-
-    return () => clearTimeout(timeout);
-  }, []);
-
   useEffect(() => {
     const row = countryRowRef.current;
 
@@ -380,8 +357,8 @@ export function HackathonSearch({
   );
   const activeFilters = useMemo(() => hasActiveFilters(currentFilters), [currentFilters]);
   const filteredHackathons = useMemo(
-    () => filterLocalHackathonCatalog(catalog, currentFilters, origin),
-    [catalog, currentFilters, origin]
+    () => filterLocalHackathonCatalog(catalog, appliedFilters, origin),
+    [appliedFilters, catalog, origin]
   );
   /* eloRating/countryCode are optional on HackathonCardData (some call sites,
      like the admin preview card, don't have them) but always present on the
@@ -418,8 +395,8 @@ export function HackathonSearch({
   }, [countryQuery]);
 
   useEffect(() => {
-    replaceSearchUrl(currentFilters, basePath);
-  }, [basePath, currentFilters]);
+    replaceSearchUrl({ ...appliedFilters, view }, basePath, hasSearched);
+  }, [appliedFilters, basePath, hasSearched, view]);
 
   const cardHelpers = useMemo<HackathonCardHelpers>(
     () => ({
@@ -501,7 +478,74 @@ export function HackathonSearch({
     setFormat(nextFormat);
   }
 
+  async function searchHackathons(filters: HackathonSearchFilters, offset = 0, append = false) {
+    setIsSearching(true);
+    setSearchError(null);
+    setOpenPopover(null);
+
+    if (filters.distanceKm !== "any" && !origin && locationState !== "locating") {
+      void locate();
+    }
+
+    const params = new URLSearchParams({
+      limit: String(SEARCH_PAGE_SIZE),
+      offset: String(offset),
+    });
+    const dateRange = dateRangeForPeriod(filters.datePeriod);
+
+    if (filters.name.trim()) params.set("q", filters.name.trim());
+    filters.countries.forEach((country) => params.append("countries", country));
+    if (filters.format !== "any") params.set("format", filters.format);
+    if (filters.beginnerFriendly !== "any") {
+      params.set("beginnerFriendly", String(filters.beginnerFriendly === "on"));
+    }
+    if (filters.travelReimbursement !== "any") {
+      params.set("travelReimbursement", String(filters.travelReimbursement === "on"));
+    }
+    if (filters.highSchoolersOnly !== "any") {
+      params.set("highSchoolersOnly", String(filters.highSchoolersOnly === "on"));
+    }
+    if (dateRange) {
+      params.set("startsAfter", dateRange.startsAfter.toISOString());
+      params.set("startsBefore", dateRange.startsBefore.toISOString());
+    }
+
+    try {
+      const response = await fetch(`/api/hackathons?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error("Search request failed.");
+      }
+
+      const body = (await response.json()) as {
+        data: HackathonCardData[];
+        hasMore: boolean;
+      };
+
+      setCatalog((current) => (append ? [...current, ...body.data] : body.data));
+      setHasMore(body.hasMore);
+      setAppliedFilters(filters);
+      setHasSearched(true);
+    } catch {
+      setSearchError("Couldn’t load hackathons. Please try again.");
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
   function clearSearch() {
+    const clearedFilters: HackathonSearchFilters = {
+      beginnerFriendly: "any",
+      countries: [],
+      datePeriod: "any",
+      distanceKm: "any",
+      format: "any",
+      highSchoolersOnly: "any",
+      name: "",
+      travelReimbursement: "any",
+      view,
+    };
+
     setName("");
     setCountries([]);
     setCountryQuery("");
@@ -511,6 +555,11 @@ export function HackathonSearch({
     setBeginnerFriendly("any");
     setTravelReimbursement("any");
     setHighSchoolersOnly("any");
+    setAppliedFilters(clearedFilters);
+    setCatalog([]);
+    setHasMore(false);
+    setHasSearched(false);
+    setSearchError(null);
   }
 
   return (
@@ -620,6 +669,7 @@ export function HackathonSearch({
             ref={filterFormRef}
             onSubmit={(event) => {
               event.preventDefault();
+              void searchHackathons(currentFilters);
             }}
           >
             {/* Primary bar: Location · Date · Features. Name and Format live in
@@ -1009,6 +1059,14 @@ export function HackathonSearch({
               >
                 {moreFiltersOpen ? "Fewer" : "More"}
               </button>
+              <button
+                className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-pine px-6 text-sm font-bold text-wheat shadow-[0_10px_24px_-10px_rgba(0,115,84,0.65)] transition-colors hover:bg-pine/90 disabled:cursor-wait disabled:opacity-60 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
+                disabled={isSearching}
+                type="submit"
+              >
+                <Search aria-hidden="true" className="size-4" />
+                {isSearching ? "Searching…" : "Search"}
+              </button>
             </div>
             </div>
 
@@ -1100,11 +1158,15 @@ export function HackathonSearch({
           </form>
 
           <div className="mt-4 min-h-6 px-2 text-sm text-navy/55 dark:text-wheat/55" role="status">
-            {activeFilters ? (
+            {searchError ? (
+              <span className="font-semibold text-cabernet dark:text-[#e4a3ab]">{searchError}</span>
+            ) : hasSearched ? (
               <span>
                 Showing {filteredHackathons.length} {filteredHackathons.length === 1 ? "hackathon" : "hackathons"} matching your search.
               </span>
-            ) : null}
+            ) : (
+              <span>Choose your filters, then press Search to load hackathons.</span>
+            )}
           </div>
         </div>
       </section>
@@ -1123,7 +1185,15 @@ export function HackathonSearch({
             </p>
           ) : null}
 
-          {filteredHackathons.length ? (
+          {!hasSearched ? (
+            <div className="rounded-xl border border-dashed border-navy/15 bg-ivory/60 p-10 text-center dark:border-white/15 dark:bg-white/5">
+              <Search aria-hidden="true" className="mx-auto size-6 text-navy/35 dark:text-wheat/35" />
+              <h2 className="mt-3 text-xl font-semibold text-navy dark:text-wheat">Search the hackathon catalog</h2>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-navy/55 dark:text-wheat/55">
+                Results are loaded only after you press Search, keeping the full catalog out of the initial page payload.
+              </p>
+            </div>
+          ) : filteredHackathons.length ? (
             view === "tier" ? (
               <HackathonTierList hackathons={rankableHackathons} />
             ) : view === "ranking" ? (
@@ -1171,6 +1241,19 @@ export function HackathonSearch({
               </p>
             </div>
           )}
+
+          {hasSearched && hasMore ? (
+            <div className="mt-10 flex justify-center">
+              <button
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-navy/15 px-6 text-sm font-semibold text-navy transition-colors hover:border-navy disabled:cursor-wait disabled:opacity-50 dark:border-white/15 dark:text-wheat dark:hover:border-white/60"
+                disabled={isSearching}
+                onClick={() => void searchHackathons(appliedFilters, catalog.length, true)}
+                type="button"
+              >
+                {isSearching ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
     </>

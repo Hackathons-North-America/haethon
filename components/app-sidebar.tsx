@@ -49,7 +49,7 @@ export function AppSidebar({
       ? [{ href: "/account/settings", icon: Settings, label: "Account Settings" }]
       : [{ href: "/sign-in", icon: LogIn, label: "Login" }]),
     {
-      href: "https://discord.gg/wcNfUUVgqe",
+      href: "/discord",
       icon: DiscordIcon,
       label: "Join our Discord",
       external: true,
