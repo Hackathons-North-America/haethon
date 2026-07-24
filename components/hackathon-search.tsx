@@ -437,20 +437,10 @@ export function HackathonSearch({
       ),
     [rankableHackathons]
   );
-  /* Position within the Elo-ranked order, shown as the corner number on the
-     card cover — continuous across the upcoming/past split like the grid. */
-  const cardRanks = useMemo(
-    () => new Map(eloRankedHackathons.map((hackathon, index) => [hackathon.id, index + 1] as const)),
-    [eloRankedHackathons]
-  );
   const renderCardNode =
     renderCard ??
     ((hackathon: HackathonCardData) => (
-      <HackathonCard
-        hackathon={hackathon}
-        rank={cardRanks.get(hackathon.id)}
-        tier={faceoffTiers.get(hackathon.id)}
-      />
+      <HackathonCard hackathon={hackathon} tier={faceoffTiers.get(hackathon.id)} />
     ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";

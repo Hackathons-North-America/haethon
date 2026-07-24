@@ -475,7 +475,6 @@ export function HackathonCard({
   cornerAction,
   hackathon,
   preview = false,
-  rank,
   reminder,
   tier,
 }: {
@@ -485,8 +484,6 @@ export function HackathonCard({
   cornerAction?: ReactNode;
   hackathon: HackathonCardData;
   preview?: boolean;
-  /* Ranked-list position, shown zero-padded in the cover's top-right corner. */
-  rank?: number;
   /* When set, the footer swaps the save control for an inline reminder
      picker that expands below the card — used on the My Hackathons board. */
   reminder?: HackathonCardReminder;
@@ -546,12 +543,6 @@ export function HackathonCard({
             className={`absolute left-3 top-3 z-[2] px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${TIER_BADGE_STYLES[tier]}`}
           >
             Tier {tier}
-          </span>
-        ) : null}
-
-        {rank ? (
-          <span className="absolute right-3 top-3 z-[2] bg-ink/85 px-2 py-1 font-mono text-[11px] font-semibold tracking-[0.08em] text-paper">
-            {String(rank).padStart(2, "0")}
           </span>
         ) : null}
       </div>

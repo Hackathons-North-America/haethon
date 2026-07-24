@@ -318,20 +318,25 @@ export function AccountProfileForm({ firstName, lastName, profile }: ProfileForm
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setStatus("idle");
-            setSocialDrafts(draftsFromValues(values));
-            setSkillsDraft(sanitizeSkills(values.skills ?? []));
-            setFieldErrors({});
-            setIsEditing(true);
-          }}
-          className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:absolute sm:right-0 sm:top-0 sm:mt-0"
-        >
-          <Pencil aria-hidden="true" className="size-4" />
-          Edit profile
-        </button>
+        {/* The global pill hover effect forces rounded-full buttons to
+            position: relative, so the top-right placement lives on a wrapper
+            instead of the button itself. */}
+        <div className="sm:absolute sm:right-0 sm:top-14">
+          <button
+            type="button"
+            onClick={() => {
+              setStatus("idle");
+              setSocialDrafts(draftsFromValues(values));
+              setSkillsDraft(sanitizeSkills(values.skills ?? []));
+              setFieldErrors({});
+              setIsEditing(true);
+            }}
+            className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:mt-0"
+          >
+            <Pencil aria-hidden="true" className="size-4" />
+            Edit profile
+          </button>
+        </div>
       </div>
 
       <div className="pb-2 pt-5">
