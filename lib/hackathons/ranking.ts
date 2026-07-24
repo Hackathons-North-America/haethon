@@ -24,6 +24,14 @@ export const TIER_PERCENTAGES: Record<TierLabel, number> = {
   D: 39,
 };
 
+export function tierForPosition(position: number, population: number): TierLabel {
+  if (position <= Math.ceil(population * 0.01)) return "S";
+  if (position <= Math.ceil(population * 0.11)) return "A";
+  if (position <= Math.ceil(population * 0.31)) return "B";
+  if (position <= Math.ceil(population * 0.61)) return "C";
+  return "D";
+}
+
 export type RankDirection = "higher" | "lower";
 
 /**

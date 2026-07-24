@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown, ChevronUp, RotateCcw, Swords, X } from "lucide-react";
 
-import { displayEloRating, isProvisional } from "@/lib/hackathons/elo";
+import { displayEloRating } from "@/lib/hackathons/elo";
 import { pickChallenger, pickMatchup, pushRecentIds } from "@/lib/hackathons/faceoff-pairing";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { isRankGuessCorrect, sortByEloDescending } from "@/lib/hackathons/ranking";
@@ -58,10 +58,6 @@ function getInitials(name: string) {
 function limitWords(name: string, max = 5) {
   const words = name.split(/\s+/).filter(Boolean);
   return words.length <= max ? name : `${words.slice(0, max).join(" ")}…`;
-}
-
-function formatPrize(amount: number | null) {
-  return amount ? `$${amount.toLocaleString("en-US")} prize pool` : "Prize pool TBA";
 }
 
 type RGB = { r: number; g: number; b: number };
@@ -209,30 +205,28 @@ function ArenaSide({
   const heading = lightBg ? "text-navy" : "text-white";
   const soft = lightBg ? "text-navy/70" : "text-white/80";
   const faint = lightBg ? "text-navy/55" : "text-white/65";
-  const chip = lightBg ? "border-navy/20 bg-white/40 text-navy/75" : "border-white/25 bg-black/20 text-white/85";
   const guessButton = lightBg
     ? "border-navy/45 text-navy hover:bg-navy/10 focus-visible:outline-navy/50"
     : "border-white/60 text-white hover:bg-white/15 focus-visible:outline-white/70";
-  const gamesPlayed = hackathon.faceoffWins + hackathon.faceoffLosses;
 
   return (
     <div
       className="relative flex flex-col items-center justify-center gap-5 px-6 py-12 text-center sm:min-h-[32rem] sm:px-10 sm:py-16 lg:min-h-screen"
       style={{ background: sideBackground(color) }}
     >
-      <div className="relative grid size-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/25 text-2xl font-semibold text-white shadow-[0_16px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-sm sm:size-28">
-        {hackathon.image ? (
-          <Image
-            alt=""
-            className="object-cover"
-            fill
-            sizes="112px"
-            src={hackathonLogoSrc(hackathon.id, hackathon.image)}
-            unoptimized
-          />
-        ) : (
-          getInitials(hackathon.name) || "HN"
-        )}
+      <div className="relative grid size-48 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/25 text-4xl font-semibold text-white shadow-[0_16px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-sm sm:size-56">
+          {hackathon.image ? (
+            <Image
+              alt=""
+              className="object-cover"
+              fill
+              sizes="224px"
+              src={hackathonLogoSrc(hackathon.id, hackathon.image)}
+              unoptimized
+            />
+          ) : (
+            getInitials(hackathon.name) || "HN"
+          )}
       </div>
 
       <div className="flex flex-col items-center gap-1.5">
@@ -245,93 +239,84 @@ function ArenaSide({
         {hackathon.description ? (
           <p className={`line-clamp-2 max-w-sm text-[13px] leading-5 ${faint}`}>{hackathon.description}</p>
         ) : null}
-        <span
-          className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[11px] font-semibold ${chip}`}
-        >
-          {formatPrize(hackathon.prizeAmountUsd)}
-        </span>
       </div>
 
       <div className="flex min-h-[8.5rem] flex-col items-center justify-center gap-2">
         {side === "left" ? (
-          <>
-            <div className="grid grid-cols-2 items-center gap-5">
-              <div>
-                <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
-                  {reveal ? reveal.leftElo : hackathon.eloRating}
-                </p>
-                <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
+            <>
+              <div className="grid grid-cols-2 items-center gap-5">
+                <div>
+                  <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
+                    {reveal ? reveal.leftElo : hackathon.eloRating}
+                  </p>
+                  <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
+                </div>
+                <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
+                  <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>
+                  <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${faint}`}>
+                    Overall rank
+                  </p>
+                </div>
               </div>
-              <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
-                <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>
-                <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${faint}`}>
-                  Overall rank
-                </p>
+            </>
+          ) : reveal ? (
+            <div className="relative flex flex-col items-center gap-2">
+              {reveal.correct && phase === "revealing" && !reduceMotion ? <ConfettiBurst burstId={burstId} /> : null}
+              <div className="grid grid-cols-2 items-center gap-5">
+                <div>
+                  <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
+                    <CountUp reduceMotion={reduceMotion} value={reveal.rightElo} />
+                  </p>
+                  <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
+                </div>
+                <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
+                  <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>
+                  <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${faint}`}>
+                    Overall rank
+                  </p>
+                </div>
               </div>
+              <motion.span
+                animate={{ opacity: 1, scale: 1 }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-xs font-bold uppercase tracking-wide text-white shadow-lg ${
+                  reveal.correct ? "bg-pine" : "bg-cabernet"
+                }`}
+                initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
+                transition={{ ...springTransition, delay: reduceMotion ? 0 : 0.55 }}
+              >
+                {reveal.correct ? (
+                  <Check aria-hidden="true" className="size-3.5" />
+                ) : (
+                  <X aria-hidden="true" className="size-3.5" />
+                )}
+                {reveal.correct ? "Correct" : "Wrong"}
+              </motion.span>
             </div>
-            <p className={`font-mono text-[11px] ${faint}`}>
-              {hackathon.faceoffWins}W&ndash;{hackathon.faceoffLosses}L
-              {isProvisional(gamesPlayed) ? " · provisional" : ""}
-            </p>
-          </>
-        ) : reveal ? (
-          <div className="relative flex flex-col items-center gap-2">
-            {reveal.correct && phase === "revealing" && !reduceMotion ? <ConfettiBurst burstId={burstId} /> : null}
-            <div className="grid grid-cols-2 items-center gap-5">
-              <div>
-                <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
-                  <CountUp reduceMotion={reduceMotion} value={reveal.rightElo} />
-                </p>
-                <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
-              </div>
-              <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
-                <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>
-                <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${faint}`}>
-                  Overall rank
-                </p>
-              </div>
-            </div>
-            <motion.span
-              animate={{ opacity: 1, scale: 1 }}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-xs font-bold uppercase tracking-wide text-white shadow-lg ${
-                reveal.correct ? "bg-[#18785C]" : "bg-cabernet"
-              }`}
-              initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
-              transition={{ ...springTransition, delay: reduceMotion ? 0 : 0.55 }}
-            >
-              {reveal.correct ? (
-                <Check aria-hidden="true" className="size-3.5" />
-              ) : (
-                <X aria-hidden="true" className="size-3.5" />
-              )}
-              {reveal.correct ? "Correct" : "Wrong"}
-            </motion.span>
-          </div>
-        ) : (
-          <>
-            <button
-              className={`inline-flex min-h-11 w-44 items-center justify-center gap-2 rounded-full border-2 text-sm font-bold uppercase tracking-[0.08em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${guessButton}`}
-              disabled={phase !== "idle"}
-              onClick={() => onGuess("higher")}
-              type="button"
-            >
-              Higher
-              <ChevronUp aria-hidden="true" className="size-4" />
-            </button>
-            <button
-              className={`inline-flex min-h-11 w-44 items-center justify-center gap-2 rounded-full border-2 text-sm font-bold uppercase tracking-[0.08em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${guessButton}`}
-              disabled={phase !== "idle"}
-              onClick={() => onGuess("lower")}
-              type="button"
-            >
-              Lower
-              <ChevronDown aria-hidden="true" className="size-4" />
-            </button>
-            <p className={`mt-1 max-w-[16rem] text-[13px] font-semibold ${soft}`}>
-              rank than {limitWords(opponentName)}
-            </p>
-          </>
-        )}
+          ) : (
+            <>
+              <button
+                className={`inline-flex min-h-11 w-44 items-center justify-center gap-2 rounded-full border-2 text-sm font-bold uppercase tracking-[0.08em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${guessButton}`}
+                disabled={phase !== "idle"}
+                onClick={() => onGuess("higher")}
+                type="button"
+              >
+                Higher
+                <ChevronUp aria-hidden="true" className="size-4" />
+              </button>
+              <button
+                className={`inline-flex min-h-11 w-44 items-center justify-center gap-2 rounded-full border-2 text-sm font-bold uppercase tracking-[0.08em] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${guessButton}`}
+                disabled={phase !== "idle"}
+                onClick={() => onGuess("lower")}
+                type="button"
+              >
+                Lower
+                <ChevronDown aria-hidden="true" className="size-4" />
+              </button>
+              <p className={`mt-1 max-w-[16rem] text-[13px] font-semibold ${soft}`}>
+                rank than {limitWords(opponentName)}
+              </p>
+            </>
+          )}
       </div>
     </div>
   );
@@ -695,7 +680,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
 
         {matchup ? (
           <>
-            <span className="absolute left-1/2 top-4 z-20 -translate-x-1/2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white drop-shadow-md">
+            <span className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-white/45 bg-black/20 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white shadow-sm backdrop-blur-sm">
               Rank
             </span>
             <motion.div
@@ -713,7 +698,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
             </span>
             <button
               aria-label="Skip both hackathons and show a new matchup"
-              className="absolute bottom-16 left-1/2 z-20 min-h-10 -translate-x-1/2 text-sm font-bold text-white drop-shadow-md transition-opacity hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50 sm:bottom-4"
+              className="absolute bottom-16 left-1/2 z-20 inline-flex min-h-10 -translate-x-1/2 items-center justify-center rounded-full border border-white/45 bg-black/20 px-5 py-2 text-sm font-bold text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50 sm:bottom-4"
               disabled={phase !== "idle" || isLoadingMatchup}
               onClick={skipMatchup}
               type="button"

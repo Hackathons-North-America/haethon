@@ -6,6 +6,7 @@ import {
   sortByEloDescending,
   sortByEloWithLocalBoost,
   TIER_PERCENTAGES,
+  tierForPosition,
 } from "@/lib/hackathons/ranking";
 
 function card(
@@ -70,7 +71,7 @@ describe("assignTiers", () => {
     expect(Object.values(TIER_PERCENTAGES).reduce((total, percentage) => total + percentage, 0)).toBe(100);
   });
 
-  it("groups the persisted global tiers, highest first", () => {
+  it("groups the cached global tiers, highest first", () => {
     const cards = [
       card("s", 2000, null, "S"),
       card("a", 1900, null, "A"),
@@ -103,5 +104,15 @@ describe("assignTiers", () => {
     const groups = assignTiers([legacy]);
 
     expect(groups.find((group) => group.tier === "D")?.hackathons.map((entry) => entry.id)).toEqual(["legacy"]);
+  });
+});
+
+describe("tierForPosition", () => {
+  it("maps the global 1/10/20/30/39 percentile boundaries", () => {
+    expect(tierForPosition(1, 100)).toBe("S");
+    expect(tierForPosition(11, 100)).toBe("A");
+    expect(tierForPosition(31, 100)).toBe("B");
+    expect(tierForPosition(61, 100)).toBe("C");
+    expect(tierForPosition(62, 100)).toBe("D");
   });
 });

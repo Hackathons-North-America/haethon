@@ -427,59 +427,62 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          {hackathon.startsAt ? (
-            <AddToCalendarButton
-              description={hackathon.shortDescription}
-              endsAt={(hackathon.endsAt ?? hackathon.startsAt).toISOString()}
-              location={
-                hackathon.format === "online"
-                  ? "Online"
-                  : [hackathon.venue, hackathon.city, hackathon.region, hackathon.country]
-                      .filter(Boolean)
-                      .join(", ")
-              }
-              startsAt={hackathon.startsAt.toISOString()}
-              title={hackathon.name}
-              url={hackathon.websiteUrl}
-            />
-          ) : null}
-          {applyUrl ? (
-            <a
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
-              href={applyUrl}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Website link
-              <ArrowUpRight aria-hidden="true" className="size-4" />
-            </a>
-          ) : null}
-          {discordChannelLink ? (
-            <a
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-[#5865F2] hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
-              href={discordChannelLink}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <DiscordGlyph className="size-4" />
-              Chat on Discord
-            </a>
-          ) : null}
-          {hackathon.websiteUrl && hackathon.websiteUrl !== applyUrl ? (
-            <a
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-ink hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
-              href={hackathon.websiteUrl}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Event website
-              <ArrowUpRight aria-hidden="true" className="size-4" />
-            </a>
-          ) : null}
-        </div>
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Actions</h2>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {hackathon.startsAt ? (
+              <AddToCalendarButton
+                description={hackathon.shortDescription}
+                endsAt={(hackathon.endsAt ?? hackathon.startsAt).toISOString()}
+                location={
+                  hackathon.format === "online"
+                    ? "Online"
+                    : [hackathon.venue, hackathon.city, hackathon.region, hackathon.country]
+                        .filter(Boolean)
+                        .join(", ")
+                }
+                startsAt={hackathon.startsAt.toISOString()}
+                title={hackathon.name}
+                url={hackathon.websiteUrl}
+              />
+            ) : null}
+            {applyUrl ? (
+              <a
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+                href={applyUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Website link
+                <ArrowUpRight aria-hidden="true" className="size-4" />
+              </a>
+            ) : null}
+            {discordChannelLink ? (
+              <a
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-[#5865F2] hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+                href={discordChannelLink}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <DiscordGlyph className="size-4" />
+                Chat on Discord
+              </a>
+            ) : null}
+            {hackathon.websiteUrl && hackathon.websiteUrl !== applyUrl ? (
+              <a
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-ink hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+                href={hackathon.websiteUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Event website
+                <ArrowUpRight aria-hidden="true" className="size-4" />
+              </a>
+            ) : null}
+          </div>
+        </section>
 
-        <section className="mt-8 border border-ink/15 p-5">
+        <section className="mt-8 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Your status</h2>
           <p className="mt-2 text-sm text-ink/55">
             Set where you are with this hackathon and we&apos;ll remind you about the right deadlines: applications,

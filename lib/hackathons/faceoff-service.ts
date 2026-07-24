@@ -4,18 +4,10 @@ import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { hackathonFaceoffRatings, hackathons } from "@/lib/db/schema";
 import { displayEloRating } from "@/lib/hackathons/elo";
-import type { TierLabel } from "@/lib/hackathons/ranking";
+import { tierForPosition } from "@/lib/hackathons/ranking";
 
 export const FACEOFF_CACHE_SECONDS = 60;
 const publicStatuses = ["upcoming", "live", "completed"] as const;
-
-function tierForPosition(position: number, population: number): TierLabel {
-  if (position <= Math.ceil(population * 0.01)) return "S";
-  if (position <= Math.ceil(population * 0.11)) return "A";
-  if (position <= Math.ceil(population * 0.31)) return "B";
-  if (position <= Math.ceil(population * 0.61)) return "C";
-  return "D";
-}
 
 /**
  * The rating table is the complete Face Off source of truth. Rank and tier are
