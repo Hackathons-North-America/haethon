@@ -13,7 +13,7 @@ import {
 import { LandingReveal } from "@/components/landing-reveal";
 import { PolaroidFrame, mobilePolaroids } from "@/components/polaroid-frame";
 import { PrimaryNav } from "@/components/primary-nav";
-import { TracedBorder } from "@/components/traced-border";
+import { HoverUnderline } from "@/components/hover-underline";
 
 const coveragePillars = [
   {
@@ -60,7 +60,7 @@ export default function Home() {
             >
               Open App
               <span aria-hidden="true">→</span>
-              <TracedBorder />
+              <HoverUnderline className="inset-x-8 bottom-3 sm:inset-x-10 sm:bottom-3.5" />
             </Link>
           </LandingReveal>
         </div>
@@ -168,7 +168,7 @@ export default function Home() {
                     →
                   </span>
                 </span>
-                <TracedBorder />
+                <HoverUnderline className="bottom-1 left-4 right-5" />
               </Link>
             </div>
           </div>
@@ -209,7 +209,7 @@ export default function Home() {
                     →
                   </span>
                 </span>
-                <TracedBorder />
+                <HoverUnderline className="bottom-1 left-4 right-5" />
               </Link>
             </div>
           </div>

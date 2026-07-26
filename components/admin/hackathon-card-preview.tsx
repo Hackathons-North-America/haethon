@@ -79,7 +79,6 @@ export function previewPayloadToCard(payload: PreviewPayload, id = "admin-previe
     highSchoolersOnly: payload.highSchoolersOnly === true,
     id,
     image: text(payload.imageUrl) || null,
-    isSaved: false,
     country: text(payload.format, "in_person") === "online" ? null : text(payload.country) || null,
     location: locationText(payload),
     name,

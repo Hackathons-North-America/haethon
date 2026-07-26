@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { DiscordIcon } from "@/components/discord-icon";
-import { TracedBorder } from "@/components/traced-border";
+import { HoverUnderline } from "@/components/hover-underline";
 
 export function PrimaryNav() {
   return (
@@ -41,21 +41,21 @@ export function PrimaryNav() {
             <span className="hidden sm:inline">Join our Discord</span>
             <span className="sm:hidden">Discord</span>
             <DiscordIcon className="h-[0.8rem] w-auto" />
-            <TracedBorder />
+            <HoverUnderline className="inset-x-3.5 bottom-1 sm:inset-x-5" />
           </Link>
           <Link
             className="group relative rounded-full px-3 py-2 text-[0.8rem] font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-4"
             href="/about"
           >
             About
-            <TracedBorder />
+            <HoverUnderline className="inset-x-3 bottom-1 sm:inset-x-4" />
           </Link>
           <Link
             className="group relative rounded-full px-4 py-2 text-[0.8rem] font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-5"
             href="/hackathons"
           >
             Open App
-            <TracedBorder />
+            <HoverUnderline className="inset-x-4 bottom-1 sm:inset-x-5" />
           </Link>
         </div>
       </nav>

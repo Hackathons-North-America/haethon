@@ -9,7 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const role = roleFromSessionClaims(sessionClaims);
 
   return (
-    <div data-app-surface className="relative flex min-h-screen flex-col lg:flex-row">
+    <div className="relative flex min-h-screen flex-col lg:flex-row">
       <AppSidebar isAdmin={isAdminRole(role)} isOrganizer={role === "organizer"} isSignedIn={Boolean(userId)} />
       <AppShellContent>{children}</AppShellContent>
       <AppShellWipe />

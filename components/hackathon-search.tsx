@@ -1199,7 +1199,7 @@ export function HackathonSearch({
             ) : (
               <>
                 {upcomingHackathons.length ? (
-                  <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {upcomingHackathons.map((hackathon) => (
                       <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                     ))}
@@ -1222,7 +1222,7 @@ export function HackathonSearch({
                       </span>
                       <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
                     </div>
-                    <div className="mt-10 grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-10 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {pastHackathons.map((hackathon) => (
                         <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                       ))}

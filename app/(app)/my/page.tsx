@@ -75,7 +75,6 @@ function toCardData(row: PipelineRow, hasDiscord: boolean, source: HackathonSour
     hasDiscord,
     id: row.hackathonId,
     image: row.imageUrl,
-    isSaved: true,
     location: location.locality ?? "Location TBA",
     name: row.hackathonName,
     slug: row.slug,

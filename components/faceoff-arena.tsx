@@ -42,6 +42,15 @@ type Reveal = {
   correct: boolean;
 };
 
+/* Post-vote rating movement for one hackathon, shown once the background vote
+   resolves. Values are display Elo so deltas match the numbers on screen. */
+type EloShift = {
+  eloBefore: number;
+  eloAfter: number;
+  rankBefore: number;
+  rankAfter: number;
+};
+
 const HIGH_SCORE_KEY = "haethon-faceoff-high-score";
 
 const springTransition = { type: "spring" as const, stiffness: 300, damping: 30 };
@@ -149,10 +158,17 @@ function ConfettiBurst({ burstId }: { burstId: number }) {
   );
 }
 
-/* Eases the challenger's prestige up from the Elo baseline — the "number
-   spins up" beat that makes the reveal land. */
-function CountUp({ reduceMotion, value }: { reduceMotion: boolean; value: number }) {
-  const [display, setDisplay] = useState(() => (reduceMotion ? value : Math.min(1000, value)));
+/* Eases a rating between values — the "number spins up" beat on reveal (via
+   `from`), then the shorter tick to the post-vote rating. Each animation
+   starts from the currently displayed number, so an Elo update landing
+   mid-spin stays smooth instead of snapping. */
+function CountUp({ from, reduceMotion, value }: { from?: number; reduceMotion: boolean; value: number }) {
+  const [display, setDisplay] = useState(() => (reduceMotion ? value : (from ?? value)));
+  const displayRef = useRef(display);
+
+  useEffect(() => {
+    displayRef.current = display;
+  }, [display]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -160,7 +176,12 @@ function CountUp({ reduceMotion, value }: { reduceMotion: boolean; value: number
       return;
     }
 
-    const start = Math.min(1000, value);
+    const start = displayRef.current;
+
+    if (start === value) {
+      return;
+    }
+
     const duration = 800;
     const startedAt = performance.now();
     let frame = requestAnimationFrame(function tick(now: number) {
@@ -179,6 +200,54 @@ function CountUp({ reduceMotion, value }: { reduceMotion: boolean; value: number
   return <>{display}</>;
 }
 
+function EloDeltaChip({ delta, reduceMotion }: { delta: number; reduceMotion: boolean }) {
+  return (
+    <motion.span
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      className={`absolute -top-2 left-full ml-1.5 rounded-full px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums text-white shadow-lg ${
+        delta > 0 ? "bg-pine" : "bg-cabernet"
+      }`}
+      initial={reduceMotion ? false : { opacity: 0, scale: 0.6, y: 6 }}
+      transition={springTransition}
+    >
+      {delta > 0 ? `+${delta}` : delta}
+    </motion.span>
+  );
+}
+
+function RankReadout({
+  faint,
+  heading,
+  overallRank,
+  reduceMotion,
+  shift,
+}: {
+  faint: string;
+  heading: string;
+  overallRank: number;
+  reduceMotion: boolean;
+  shift: EloShift | null;
+}) {
+  if (!shift || shift.rankBefore === shift.rankAfter) {
+    return <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>;
+  }
+
+  const movedUp = shift.rankAfter < shift.rankBefore;
+  const Arrow = movedUp ? ChevronUp : ChevronDown;
+
+  return (
+    <motion.p
+      animate={{ opacity: 1 }}
+      className={`font-mono text-3xl font-bold tabular-nums ${heading}`}
+      initial={reduceMotion ? false : { opacity: 0 }}
+    >
+      <span className={`mr-1.5 align-middle text-base font-semibold ${faint}`}>#{shift.rankBefore} →</span>
+      #{shift.rankAfter}
+      <Arrow aria-hidden="true" className="mb-1 ml-0.5 inline size-5" />
+    </motion.p>
+  );
+}
+
 function ArenaSide({
   burstId,
   hackathon,
@@ -188,6 +257,7 @@ function ArenaSide({
   phase,
   reduceMotion,
   reveal,
+  shift,
   side,
 }: {
   burstId: number;
@@ -198,6 +268,7 @@ function ArenaSide({
   phase: Phase;
   reduceMotion: boolean;
   reveal: Reveal | null;
+  shift: EloShift | null;
   side: "left" | "right";
 }) {
   const color = useArenaColor(hackathon.id);
@@ -246,13 +317,27 @@ function ArenaSide({
             <>
               <div className="grid grid-cols-2 items-center gap-5">
                 <div>
-                  <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
-                    {reveal ? reveal.leftElo : hackathon.eloRating}
-                  </p>
+                  <span className="relative inline-block">
+                    <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
+                      <CountUp
+                        reduceMotion={reduceMotion}
+                        value={shift ? shift.eloAfter : reveal ? reveal.leftElo : hackathon.eloRating}
+                      />
+                    </p>
+                    {shift && shift.eloAfter !== shift.eloBefore ? (
+                      <EloDeltaChip delta={shift.eloAfter - shift.eloBefore} reduceMotion={reduceMotion} />
+                    ) : null}
+                  </span>
                   <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
                 </div>
                 <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
-                  <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>
+                  <RankReadout
+                    faint={faint}
+                    heading={heading}
+                    overallRank={overallRank}
+                    reduceMotion={reduceMotion}
+                    shift={shift}
+                  />
                   <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${faint}`}>
                     Overall rank
                   </p>
@@ -264,13 +349,28 @@ function ArenaSide({
               {reveal.correct && phase === "revealing" && !reduceMotion ? <ConfettiBurst burstId={burstId} /> : null}
               <div className="grid grid-cols-2 items-center gap-5">
                 <div>
-                  <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
-                    <CountUp reduceMotion={reduceMotion} value={reveal.rightElo} />
-                  </p>
+                  <span className="relative inline-block">
+                    <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
+                      <CountUp
+                        from={Math.min(1000, reveal.rightElo)}
+                        reduceMotion={reduceMotion}
+                        value={shift ? shift.eloAfter : reveal.rightElo}
+                      />
+                    </p>
+                    {shift && shift.eloAfter !== shift.eloBefore ? (
+                      <EloDeltaChip delta={shift.eloAfter - shift.eloBefore} reduceMotion={reduceMotion} />
+                    ) : null}
+                  </span>
                   <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
                 </div>
                 <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
-                  <p className={`font-mono text-3xl font-bold tabular-nums ${heading}`}>#{overallRank}</p>
+                  <RankReadout
+                    faint={faint}
+                    heading={heading}
+                    overallRank={overallRank}
+                    reduceMotion={reduceMotion}
+                    shift={shift}
+                  />
                   <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${faint}`}>
                     Overall rank
                   </p>
@@ -330,6 +430,10 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [reveal, setReveal] = useState<Reveal | null>(null);
+  const [voteShift, setVoteShift] = useState<Record<string, EloShift> | null>(null);
+  /* Bumped whenever the matchup advances, so a vote response that arrives
+     after the arena moved on can't paint its shift onto the next pairing. */
+  const shiftEpochRef = useRef(0);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -391,9 +495,11 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
     (justShownIds: string[], anchorId?: string) => {
       const nextRecent = pushRecentIds(recentIds, ...justShownIds);
 
+      shiftEpochRef.current += 1;
       setRecentIds(nextRecent);
       setIssuedMatchup(null);
       setReveal(null);
+      setVoteShift(null);
       setPhase("idle");
       requestMatchup(nextRecent, anchorId);
     },
@@ -402,8 +508,11 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
 
   /* The vote rides along in the background: the streak verdict is already
      decided client-side, so a rate limit or dropped connection never stalls
-     the game — it only pauses the ranking side effect. */
+     the game — it only pauses the ranking side effect. When the response
+     lands, the reveal gains the Elo/rank movement it caused. */
   const recordVote = useCallback(async (winnerId: string, loserId: string) => {
+    const epoch = shiftEpochRef.current;
+
     try {
       const response = await fetch("/api/faceoff/vote", {
         body: JSON.stringify({
@@ -431,31 +540,65 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
         };
       };
 
-      setLivePool((current) =>
-        current.map((hackathon) => {
-          if (hackathon.id === body.data.winner.id) {
-            const faceoffWins = hackathon.faceoffWins + 1;
-            const gamesPlayed = faceoffWins + hackathon.faceoffLosses;
-            return {
-              ...hackathon,
-              eloRating: displayEloRating(body.data.winner.eloAfter, gamesPlayed),
-              faceoffWins,
-            };
-          }
+      const currentPool = livePoolRef.current;
+      const nextPool = currentPool.map((hackathon) => {
+        if (hackathon.id === body.data.winner.id) {
+          const faceoffWins = hackathon.faceoffWins + 1;
+          const gamesPlayed = faceoffWins + hackathon.faceoffLosses;
+          return {
+            ...hackathon,
+            eloRating: displayEloRating(body.data.winner.eloAfter, gamesPlayed),
+            faceoffWins,
+          };
+        }
 
-          if (hackathon.id === body.data.loser.id) {
-            const faceoffLosses = hackathon.faceoffLosses + 1;
-            const gamesPlayed = hackathon.faceoffWins + faceoffLosses;
-            return {
-              ...hackathon,
-              eloRating: displayEloRating(body.data.loser.eloAfter, gamesPlayed),
-              faceoffLosses,
-            };
-          }
+        if (hackathon.id === body.data.loser.id) {
+          const faceoffLosses = hackathon.faceoffLosses + 1;
+          const gamesPlayed = hackathon.faceoffWins + faceoffLosses;
+          return {
+            ...hackathon,
+            eloRating: displayEloRating(body.data.loser.eloAfter, gamesPlayed),
+            faceoffLosses,
+          };
+        }
 
-          return hackathon;
-        })
-      );
+        return hackathon;
+      });
+
+      setLivePool(nextPool);
+
+      if (epoch !== shiftEpochRef.current) {
+        return;
+      }
+
+      const ranksBefore = new Map(sortByEloDescending(currentPool).map((hackathon, index) => [hackathon.id, index + 1]));
+      const ranksAfter = new Map(sortByEloDescending(nextPool).map((hackathon, index) => [hackathon.id, index + 1]));
+      const shiftFor = (id: string): EloShift | null => {
+        const before = currentPool.find((hackathon) => hackathon.id === id);
+        const after = nextPool.find((hackathon) => hackathon.id === id);
+
+        if (!before || !after) {
+          return null;
+        }
+
+        return {
+          eloBefore: before.eloRating,
+          eloAfter: after.eloRating,
+          rankBefore: ranksBefore.get(id) ?? currentPool.length,
+          rankAfter: ranksAfter.get(id) ?? nextPool.length,
+        };
+      };
+      const shifts: Record<string, EloShift> = {};
+
+      for (const id of [body.data.winner.id, body.data.loser.id]) {
+        const shift = shiftFor(id);
+
+        if (shift) {
+          shifts[id] = shift;
+        }
+      }
+
+      setVoteShift(shifts);
     } catch {
       // Offline vote — the guess already resolved, so nothing to surface.
     }
@@ -506,7 +649,9 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
         // Chain: the revealed challenger stays on as the left-side champion.
         setTimeout(() => advanceMatchup([left.id, right.id], right.id), reduceMotion ? 900 : 1900);
       } else {
-        setTimeout(() => setPhase("gameover"), reduceMotion ? 900 : 1900);
+        // Held longer than the win beat so the Elo/rank movement is readable
+        // before the game-over overlay covers the arena.
+        setTimeout(() => setPhase("gameover"), reduceMotion ? 2000 : 3200);
       }
     },
     [
@@ -587,6 +732,30 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
     }`;
   }, [reveal, matchup, notice, score]);
 
+  /* Separate live region so the rating movement is announced on its own when
+     the vote resolves, without re-reading the whole verdict. */
+  const shiftAnnouncement = useMemo(() => {
+    if (!voteShift || !matchup || !reveal) {
+      return "";
+    }
+
+    const parts = matchup.flatMap((hackathon) => {
+      const shift = voteShift[hackathon.id];
+
+      if (!shift || (shift.eloAfter === shift.eloBefore && shift.rankAfter === shift.rankBefore)) {
+        return [];
+      }
+
+      const delta = shift.eloAfter - shift.eloBefore;
+      const rankPart =
+        shift.rankAfter !== shift.rankBefore ? `, moving from rank #${shift.rankBefore} to #${shift.rankAfter}` : "";
+
+      return [`${hackathon.name} ${delta >= 0 ? "gains" : "loses"} ${Math.abs(delta)} ELO to ${shift.eloAfter}${rankPart}`];
+    });
+
+    return parts.length ? `Ratings updated: ${parts.join("; ")}.` : "";
+  }, [voteShift, matchup, reveal]);
+
   if (livePool.length < 2) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-3xl border border-navy/10 bg-ivory p-10 text-center dark:border-white/10 dark:bg-white/5">
@@ -602,6 +771,9 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
     <div className="relative isolate w-full">
       <div aria-live="polite" className="sr-only">
         {announcement}
+      </div>
+      <div aria-live="polite" className="sr-only">
+        {shiftAnnouncement}
       </div>
 
       <div className="relative min-h-screen w-full overflow-hidden">
@@ -625,6 +797,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
                 phase={phase}
                 reduceMotion={reduceMotion}
                 reveal={reveal}
+                shift={reveal ? (voteShift?.[matchup[0].id] ?? null) : null}
                 side="left"
               />
               <ArenaSide
@@ -637,6 +810,7 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
                 phase={phase}
                 reduceMotion={reduceMotion}
                 reveal={reveal}
+                shift={reveal ? (voteShift?.[matchup[1].id] ?? null) : null}
                 side="right"
               />
             </motion.div>

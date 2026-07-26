@@ -425,10 +425,6 @@ export const userHackathonUpdateSchema = z.object({
   notes: optionalString(2000),
 });
 
-export const hackathonSaveSchema = z.object({
-  isSaved: z.boolean(),
-});
-
 export const hackathonTrackSchema = z.object({
   applicationStatus: z.enum(["interested", "applied", "accepted"]),
 });

@@ -96,7 +96,6 @@ function AdminHackathonCard({
       <HackathonCard
         hackathon={{
           ...previewPayloadToCard(itemToPreviewPayload(item), item.id),
-          isSaved: false,
         }}
         preview
       />

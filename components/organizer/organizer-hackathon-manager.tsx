@@ -466,7 +466,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
           <div className="grid gap-5 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.1fr)]">
             <div className="xl:sticky xl:top-6 xl:self-start">
               <HackathonCard
-                hackathon={{ ...previewPayloadToCard(previewPayload, item.id), isSaved: false }}
+                hackathon={previewPayloadToCard(previewPayload, item.id)}
                 preview
               />
             </div>

@@ -199,7 +199,6 @@ export function HackathonCreateForm() {
         <HackathonCard
           hackathon={{
             ...previewPayloadToCard(previewPayload),
-            isSaved: false,
           }}
           preview
         />

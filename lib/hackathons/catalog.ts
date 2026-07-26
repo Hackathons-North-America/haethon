@@ -350,31 +350,39 @@ export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
 }
 
 /**
- * Overlays the signed-in user's saved state onto cached public cards.
+ * Overlays the signed-in user's pipeline stage onto cached public cards.
  * This is the only per-request query the catalog surfaces need, and it
  * hits the unique index on (user_id, hackathon_id).
  */
 export async function applyUserCardState<Card extends { id: string }>(
   cards: Card[],
   userId: string | null | undefined
-): Promise<(Card & { isSaved: boolean })[]> {
+): Promise<(Card & { trackedStatus: string | null })[]> {
   const hackathonIds = cards.map((card) => card.id);
 
-  const savedRows =
+  const trackedRows =
     userId && hackathonIds.length
       ? await db
           .select({
             hackathonId: userHackathons.hackathonId,
+            applicationStatus: userHackathons.applicationStatus,
             isSaved: userHackathons.isSaved,
           })
           .from(userHackathons)
           .where(and(eq(userHackathons.userId, userId), inArray(userHackathons.hackathonId, hackathonIds)))
       : [];
 
-  const savedByHackathon = new Map(savedRows.map((row) => [row.hackathonId, row.isSaved]));
+  // Mirrors the My Hackathons visibility rule: an unsaved row still at the
+  // default "interested" stage is not on the board, so its card shows no
+  // active stage either.
+  const statusByHackathon = new Map(
+    trackedRows
+      .filter((row) => row.isSaved || row.applicationStatus !== "interested")
+      .map((row) => [row.hackathonId, row.applicationStatus as string])
+  );
 
   return cards.map((card) => ({
     ...card,
-    isSaved: savedByHackathon.get(card.id) ?? false,
+    trackedStatus: statusByHackathon.get(card.id) ?? null,
   }));
 }

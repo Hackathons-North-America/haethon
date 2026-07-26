@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BellPlus, Bookmark, Check, ChevronDown, Swords } from "lucide-react";
+import { BellPlus, Check, ChevronDown, Swords } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
+import type { TrackableStatus } from "@/components/hackathon-status-tracker";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
 import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
@@ -33,7 +34,6 @@ export type HackathonCardData = {
   /** The event's dates have passed; shown only for recurring (annual) series
       until the next edition is published. */
   isPast?: boolean;
-  isSaved: boolean;
   /** City-centroid coordinates used by the browser-side distance filter. */
   latitude?: number | null;
   longitude?: number | null;
@@ -46,6 +46,9 @@ export type HackathonCardData = {
   source?: HackathonSourceBadge | null;
   startsAt?: string | null;
   tags?: string[];
+  /** The signed-in user's pipeline stage for this hackathon (null/undefined
+      when it isn't on their My Hackathons board). */
+  trackedStatus?: string | null;
   travelReimbursement?: boolean;
 };
 
@@ -53,18 +56,32 @@ function handleUnauthenticated() {
   window.location.href = "/sign-in";
 }
 
-function getBookmarkCountryDisplay(country: string): { label: string; underlineClass: string } {
+/* Only Canada and the United States get flag-colored treatment; every other
+   country renders in the line's default ink color. */
+function getCountryDisplay(country: string): {
+  label: string;
+  textClass: string;
+  underlineClass: string;
+} {
   const key = country.trim().toLowerCase();
 
   if (key === "united states" || key === "united states of america" || key === "usa") {
-    return { label: "United States", underlineClass: "underline decoration-[#5A6CFF] underline-offset-2" };
+    return {
+      label: "United States",
+      textClass: "text-[#5A6CFF]",
+      underlineClass: "underline decoration-[#5A6CFF] underline-offset-2",
+    };
   }
 
   if (key === "canada") {
-    return { label: "Canada", underlineClass: "underline decoration-[#D9043D] underline-offset-2" };
+    return {
+      label: "Canada",
+      textClass: "text-[#D9043D]",
+      underlineClass: "underline decoration-[#D9043D] underline-offset-2",
+    };
   }
 
-  return { label: country.trim(), underlineClass: "" };
+  return { label: country.trim(), textClass: "", underlineClass: "" };
 }
 
 function getInitials(name: string) {
@@ -104,37 +121,63 @@ const TIER_BADGE_STYLES: Record<TierLabel, string> = {
   D: "bg-[#2563EB] text-white",
 };
 
-function BookmarkButton({
+const cardStages: { value: TrackableStatus; label: string }[] = [
+  { value: "interested", label: "Interested" },
+  { value: "applied", label: "Applied" },
+  { value: "accepted", label: "Accepted" },
+];
+
+const cardStageOrder: Record<string, number> = {
+  interested: 0,
+  applied: 1,
+  accepted: 2,
+  attended: 3,
+  won: 3,
+};
+
+/* Vertical pipeline picker shown where the tag chips used to sit. Selecting a
+   stage tracks the hackathon on the My Hackathons board at that stage;
+   clicking the active stage again untracks it — this replaces the old
+   bookmark toggle as the way cards are saved to the dashboard. */
+function CardStatusPicker({
   hackathonId,
   hackathonName,
-  initialSaved,
+  initialStatus,
   preview = false,
 }: {
   hackathonId: string;
   hackathonName: string;
-  initialSaved: boolean;
+  initialStatus?: string | null;
   preview?: boolean;
 }) {
-  const [saved, setSaved] = useState(initialSaved);
-  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState(initialStatus ?? null);
+  const [pending, setPending] = useState(false);
 
-  async function toggleSaved() {
-    if (preview) {
+  const currentOrder = status ? cardStageOrder[status] ?? -1 : -1;
+  const isPastPipeline = status === "attended" || status === "won";
+
+  async function selectStage(nextStatus: TrackableStatus) {
+    if (preview || pending || isPastPipeline) {
       return;
     }
 
-    const nextSaved = !saved;
-    const previousSaved = saved;
+    const previousStatus = status;
+    const untracking = status === nextStatus;
 
-    setSaved(nextSaved);
-    setSaving(true);
+    setStatus(untracking ? null : nextStatus);
+    setPending(true);
 
     try {
-      const response = await fetch(`/api/hackathons/${encodeURIComponent(hackathonId)}/save`, {
-        body: JSON.stringify({ isSaved: nextSaved }),
-        headers: { "Content-Type": "application/json" },
-        method: "PATCH",
-      });
+      const response = await fetch(
+        `/api/hackathons/${encodeURIComponent(hackathonId)}/track`,
+        untracking
+          ? { method: "DELETE" }
+          : {
+              body: JSON.stringify({ applicationStatus: nextStatus }),
+              headers: { "Content-Type": "application/json" },
+              method: "PATCH",
+            }
+      );
 
       if (response.status === 401) {
         handleUnauthenticated();
@@ -142,38 +185,66 @@ function BookmarkButton({
       }
 
       if (!response.ok) {
-        throw new Error("Could not save hackathon.");
+        throw new Error("Could not update status.");
       }
-
-      const payload = (await response.json()) as { data?: { isSaved?: boolean } };
-      setSaved(Boolean(payload.data?.isSaved));
     } catch {
-      setSaved(previousSaved);
+      setStatus(previousStatus);
     } finally {
-      setSaving(false);
+      setPending(false);
     }
   }
 
+  if (isPastPipeline) {
+    return (
+      <div className="mt-auto pt-4">
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium leading-4 text-pine">
+          <Check aria-hidden="true" className="size-3" strokeWidth={3} />
+          {status === "won" ? "Won" : "Attended"}
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <button
-      aria-label={`${saved ? "Remove" : "Add"} ${hackathonName} ${
-        saved ? "from" : "to"
-      } library`}
-      aria-disabled={preview || undefined}
-      aria-pressed={saved}
-      disabled={saving}
-      className={`relative z-10 inline-flex min-h-10 shrink-0 items-center px-1 transition-colors hover:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
-        saved ? "text-pine" : "text-ink"
-      } disabled:cursor-wait disabled:opacity-70`}
-      onClick={toggleSaved}
-      type="button"
+    <div
+      aria-label={`Track ${hackathonName}`}
+      className="relative z-10 mt-auto flex min-w-0 flex-col items-start gap-1.5 pt-4"
+      role="group"
     >
-      <Bookmark
-        aria-hidden="true"
-        className={`size-[1.15rem] ${saved ? "fill-current" : "fill-transparent"}`}
-        strokeWidth={2.35}
-      />
-    </button>
+      {cardStages.map((stage) => {
+        const active = status === stage.value;
+        const reached = currentOrder >= cardStageOrder[stage.value];
+
+        return (
+          <button
+            aria-pressed={active}
+            /* Named group (`group/stage`) so the underline only answers this
+               button's hover, not the card-level `group` hover. */
+            className={`group/stage relative inline-flex min-h-7 items-center gap-1 text-left text-[11px] font-medium leading-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine disabled:cursor-wait disabled:opacity-60 ${
+              reached ? "text-pine" : "text-ink/55 hover:text-ink"
+            }`}
+            disabled={pending}
+            key={stage.value}
+            onClick={() => selectStage(stage.value)}
+            title={
+              active
+                ? `Remove ${hackathonName} from your dashboard`
+                : `Mark ${hackathonName} as ${stage.label.toLowerCase()}`
+            }
+            type="button"
+          >
+            {reached ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
+            {stage.label}
+            {/* Same slide-in underline as HoverUnderline on the home page,
+                scoped to the named group above. */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-1 h-[1.5px] origin-left scale-x-0 bg-moss transition-transform! duration-300! ease-out! group-hover/stage:scale-x-100 motion-reduce:transition-none!"
+            />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -534,12 +605,12 @@ function BookmarkPageCard({
   preview: boolean;
   reminder?: HackathonCardReminder;
 }) {
-  const countryDisplay = hackathon.country ? getBookmarkCountryDisplay(hackathon.country) : null;
+  const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const location = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
 
   return (
     <article
-      className={`group relative flex min-w-0 flex-col border border-ink/15 bg-paper p-4 transition-colors hover:border-ink/40 ${
+      className={`group relative flex min-w-0 flex-col border border-ink/15 bg-paper p-4 ${
         hackathon.isPast ? "opacity-70 hover:opacity-100 focus-within:opacity-100" : ""
       }`}
       style={getAccentStyle(hackathon.name)}
@@ -625,27 +696,20 @@ function BookmarkPageCard({
         </div>
       </div>
 
-      <div className="relative z-10 mt-auto pt-3 text-base leading-6">
-        {reminder ? (
+      {reminder || cornerAction ? (
+        <div className="relative z-10 mt-auto pt-3 text-base leading-6">
           <div className="flex items-start justify-between gap-2">
-            <ReminderControl
-              hackathonId={reminder.hackathonId}
-              options={reminder.options}
-              statusLabel={reminder.statusLabel}
-            />
-            {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
+            {reminder ? (
+              <ReminderControl
+                hackathonId={reminder.hackathonId}
+                options={reminder.options}
+                statusLabel={reminder.statusLabel}
+              />
+            ) : null}
+            {cornerAction ? <div className="relative z-20 ml-auto shrink-0">{cornerAction}</div> : null}
           </div>
-        ) : (
-          <div className="flex items-center justify-end gap-3">
-            <BookmarkButton
-              hackathonId={hackathon.id}
-              hackathonName={hackathon.name}
-              initialSaved={hackathon.isSaved}
-              preview={preview}
-            />
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -685,23 +749,12 @@ export function HackathonCard({
 
   const date = splitDateRange(hackathon.date);
   const weekday = getWeekday(hackathon.startsAt);
-  const cardTags = Array.from(
-    new Map(
-      [
-        hackathon.beginnerFriendly ? "Beginner friendly" : null,
-        hackathon.travelReimbursement ? "Travel support" : null,
-        hackathon.highSchoolersOnly ? "High school only" : null,
-        ...(hackathon.tags ?? []),
-        ...themeTagsFromDescription(hackathon.description),
-      ]
-        .filter((tag): tag is string => Boolean(tag))
-        .map((tag) => [tag.toLowerCase(), tag] as const)
-    ).values()
-  );
+  const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
+  const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
 
   return (
     <article
-      className={`group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper outline outline-0 outline-black transition-[outline-width,color,background-color,opacity] hover:outline-1 ${
+      className={`group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
@@ -759,23 +812,12 @@ export function HackathonCard({
               Past edition
             </span>
           ) : null}
-          {cardTags.length ? (
-            <div
-              aria-label={`Tags: ${cardTags.join(", ")}`}
-              className="mt-auto flex min-w-0 flex-col items-start gap-1.5 pt-4"
-              title={cardTags.join(", ")}
-            >
-              {cardTags.map((tag) => (
-                <span
-                  className="max-w-full break-words bg-pine/10 px-2 py-1 text-[11px] font-medium leading-4 text-pine"
-                  key={tag}
-                  title={tag}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
+          <CardStatusPicker
+            hackathonId={hackathon.id}
+            hackathonName={hackathon.name}
+            initialStatus={hackathon.trackedStatus}
+            preview={preview}
+          />
         </div>
 
         <div
@@ -787,7 +829,19 @@ export function HackathonCard({
             {hackathon.name}
           </h2>
 
-          <p className="mt-4 line-clamp-4 text-sm leading-6 text-ink/70">
+          {locationLine ? (
+            <p className="mt-1 truncate text-[18.2px] leading-[26px] text-ink/60">
+              {countryDisplay ? (
+                <>
+                  <span className={countryDisplay.textClass}>{countryDisplay.label}</span>
+                  {hackathon.location ? ", " : null}
+                </>
+              ) : null}
+              {hackathon.location}
+            </p>
+          ) : null}
+
+          <p className="mt-3 line-clamp-4 text-sm leading-6 text-ink/70">
             {cardDescription(hackathon)}
           </p>
 
@@ -801,21 +855,15 @@ export function HackathonCard({
                 />
                 {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
               </div>
-            ) : (
-              <div className="flex items-center justify-end gap-3">
-                {hackathon.hasDiscord ? (
-                  <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-[#5865F2]">
-                    <DiscordGlyph className="size-4" />
-                    Discord
-                  </span>
-                ) : null}
-                <BookmarkButton
-                  hackathonId={hackathon.id}
-                  hackathonName={hackathon.name}
-                  initialSaved={hackathon.isSaved}
-                  preview={preview}
-                />
+            ) : hackathon.hasDiscord ? (
+              <div className="flex min-h-10 items-center justify-end gap-3">
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-[#5865F2]">
+                  <DiscordGlyph className="size-4" />
+                  Discord
+                </span>
               </div>
+            ) : (
+              <div aria-hidden="true" className="min-h-10" />
             )}
           </div>
         </div>

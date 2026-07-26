@@ -160,7 +160,6 @@ export function HackathonEditDialog({
             <HackathonCard
               hackathon={{
                 ...previewPayloadToCard(previewPayload, item.id),
-                isSaved: false,
               }}
               preview
             />
