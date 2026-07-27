@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, ChevronDown, ChevronUp, RotateCcw, Swords, X } from "lucide-react";
 
@@ -106,14 +106,19 @@ function cssColor(color: RGB) {
   return `rgb(${color.r} ${color.g} ${color.b})`;
 }
 
-function sideBackground(color: RGB) {
-  const light = mixColor(color, WHITE, 0.22);
-  const dark = mixColor(color, SHADOW, 0.38);
-  return `linear-gradient(168deg, ${cssColor(light)} 0%, ${cssColor(color)} 52%, ${cssColor(dark)} 100%)`;
-}
-
-function isLightColor(color: RGB) {
-  return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255 > 0.64;
+/* The arena ground is paper, so the side color only ever appears as an accent.
+   Each variant is published as a CSS variable on the side element:
+   `--accent` for decorative marks (edge stripe, glow, borders) and
+   `--accent-ink` for anything carrying text, darkened far enough to clear
+   contrast on white. The `-dark` pair mirrors both for dark mode. */
+function accentVariables(color: RGB): CSSProperties {
+  return {
+    "--accent": cssColor(color),
+    "--accent-ink": cssColor(mixColor(color, SHADOW, 0.3)),
+    "--accent-ink-dark": cssColor(mixColor(color, WHITE, 0.5)),
+    "--accent-soft": cssColor(mixColor(color, WHITE, 0.9)),
+    "--accent-soft-dark": cssColor(mixColor(color, SHADOW, 0.82)),
+  } as CSSProperties;
 }
 
 /* A deterministic palette color gives each hackathon a stable arena treatment
@@ -272,20 +277,26 @@ function ArenaSide({
   side: "left" | "right";
 }) {
   const color = useArenaColor(hackathon.id);
-  const lightBg = isLightColor(color);
-  const heading = lightBg ? "text-navy" : "text-white";
-  const soft = lightBg ? "text-navy/70" : "text-white/80";
-  const faint = lightBg ? "text-navy/55" : "text-white/65";
-  const guessButton = lightBg
-    ? "border-navy/45 text-navy hover:bg-navy/10 focus-visible:outline-navy/50"
-    : "border-white/60 text-white hover:bg-white/15 focus-visible:outline-white/70";
+  const heading = "text-ink dark:text-paper";
+  const soft = "text-ink/70 dark:text-paper/70";
+  const faint = "text-ink/50 dark:text-paper/50";
+  const accentText = "text-[var(--accent-ink)] dark:text-[var(--accent-ink-dark)]";
+  const guessButton = `border-[var(--accent)]/45 hover:bg-[var(--accent)]/10 focus-visible:outline-[var(--accent)]/60 ${accentText}`;
 
   return (
     <div
-      className="relative flex flex-col items-center justify-center gap-5 px-6 py-12 text-center sm:min-h-[32rem] sm:px-10 sm:py-16 lg:min-h-screen"
-      style={{ background: sideBackground(color) }}
+      className="relative isolate flex flex-col items-center justify-center gap-5 bg-paper px-6 py-12 text-center dark:bg-[#131211] sm:min-h-[32rem] sm:px-10 sm:py-16 lg:min-h-screen"
+      style={accentVariables(color)}
     >
-      <div className="relative grid size-48 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/25 text-4xl font-semibold text-white shadow-[0_16px_40px_-12px_rgba(0,0,0,0.45)] backdrop-blur-sm sm:size-56">
+      {/* The two colored marks that anchor the side: a hairline edge stripe and
+          a soft bloom behind the logo. Everything else stays paper. */}
+      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-[var(--accent)]" />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-72 -translate-x-1/2 -translate-y-[70%] rounded-full bg-[var(--accent)] opacity-[0.09] blur-3xl dark:opacity-20"
+      />
+
+      <div className="relative grid size-48 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)] text-4xl font-semibold shadow-[0_18px_44px_-24px_var(--accent)] dark:bg-[var(--accent-soft-dark)] sm:size-56">
           {hackathon.image ? (
             <Image
               alt=""
@@ -296,7 +307,7 @@ function ArenaSide({
               unoptimized
             />
           ) : (
-            getInitials(hackathon.name) || "HN"
+            <span className={accentText}>{getInitials(hackathon.name) || "HN"}</span>
           )}
       </div>
 
@@ -318,7 +329,7 @@ function ArenaSide({
               <div className="grid grid-cols-2 items-center gap-5">
                 <div>
                   <span className="relative inline-block">
-                    <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
+                    <p className={`font-mono text-4xl font-bold tabular-nums ${accentText}`}>
                       <CountUp
                         reduceMotion={reduceMotion}
                         value={shift ? shift.eloAfter : reveal ? reveal.leftElo : hackathon.eloRating}
@@ -330,7 +341,7 @@ function ArenaSide({
                   </span>
                   <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
                 </div>
-                <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
+                <div className="border-l border-ink/15 pl-5 dark:border-paper/15">
                   <RankReadout
                     faint={faint}
                     heading={heading}
@@ -350,7 +361,7 @@ function ArenaSide({
               <div className="grid grid-cols-2 items-center gap-5">
                 <div>
                   <span className="relative inline-block">
-                    <p className={`font-mono text-4xl font-bold tabular-nums ${heading}`}>
+                    <p className={`font-mono text-4xl font-bold tabular-nums ${accentText}`}>
                       <CountUp
                         from={Math.min(1000, reveal.rightElo)}
                         reduceMotion={reduceMotion}
@@ -363,7 +374,7 @@ function ArenaSide({
                   </span>
                   <p className={`font-mono text-[11px] font-semibold uppercase tracking-[0.16em] ${faint}`}>ELO</p>
                 </div>
-                <div className={`border-l pl-5 ${lightBg ? "border-navy/20" : "border-white/25"}`}>
+                <div className="border-l border-ink/15 pl-5 dark:border-paper/15">
                   <RankReadout
                     faint={faint}
                     heading={heading}
@@ -789,7 +800,7 @@ export function FaceoffArena({
           {matchup ? (
             <motion.div
               animate={{ opacity: 1, x: 0 }}
-              className="grid grid-cols-1 sm:grid-cols-2"
+              className="grid grid-cols-1 sm:grid-cols-2 sm:divide-x sm:divide-ink/10 sm:dark:divide-paper/10"
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -32 }}
               initial={reduceMotion ? false : { opacity: 0, x: 32 }}
               key={`${matchup[0].id}-${matchup[1].id}`}
@@ -825,16 +836,16 @@ export function FaceoffArena({
           ) : isLoadingMatchup ? (
             <div
               aria-label="Loading matchup"
-              className="relative grid min-h-screen grid-cols-2 overflow-hidden bg-[#182a44]"
+              className="relative grid min-h-screen grid-cols-2 divide-x divide-ink/10 overflow-hidden bg-paper dark:divide-paper/10 dark:bg-[#131211]"
               key="matchup-loading"
               role="status"
             >
-              <div className="bg-[linear-gradient(168deg,#445a78_0%,#223653_55%,#111c2e_100%)]" />
-              <div className="bg-[linear-gradient(168deg,#a74854_0%,#721c24_55%,#3d0f14_100%)]" />
+              <div className="border-t-4 border-navy/30" />
+              <div className="border-t-4 border-cabernet/30" />
               <motion.div
                 animate={reduceMotion ? undefined : { opacity: [0.55, 1, 0.55], scale: [0.96, 1.04, 0.96] }}
                 aria-hidden="true"
-                className="absolute left-1/2 top-1/2 grid size-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-white font-serif text-sm font-bold text-black shadow-[0_8px_24px_-4px_rgba(0,0,0,0.5)]"
+                className="absolute left-1/2 top-1/2 grid size-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-ink/15 bg-white font-serif text-sm font-bold text-ink shadow-[0_10px_28px_-10px_rgba(27,25,23,0.45)] dark:border-paper/20 dark:bg-[#1b1b1b] dark:text-paper"
                 transition={reduceMotion ? undefined : { duration: 1.4, ease: "easeInOut", repeat: Infinity }}
               >
                 VS
@@ -842,14 +853,14 @@ export function FaceoffArena({
             </div>
           ) : (
             <div
-              className="grid min-h-screen place-items-center bg-[linear-gradient(168deg,#445a78_0%,#223653_55%,#111c2e_100%)] px-6 text-center"
+              className="grid min-h-screen place-items-center bg-paper px-6 text-center dark:bg-[#131211]"
               key="matchup-error"
             >
-              <div className="flex max-w-sm flex-col items-center gap-4 text-white">
-                <Swords aria-hidden="true" className="size-7 opacity-70" />
+              <div className="flex max-w-sm flex-col items-center gap-4 text-ink dark:text-paper">
+                <Swords aria-hidden="true" className="size-7 opacity-50" />
                 <p className="text-sm font-semibold">{notice ?? "No matchup is ready."}</p>
                 <button
-                  className="rounded-full border border-white/50 bg-white/10 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-white/20"
+                  className="rounded-full border border-ink/15 bg-white px-5 py-2 text-sm font-bold text-ink transition-colors hover:bg-ink/5 dark:border-paper/20 dark:bg-white/10 dark:text-paper dark:hover:bg-white/20"
                   onClick={() => void requestMatchup(recentIds)}
                   type="button"
                 >
@@ -862,25 +873,25 @@ export function FaceoffArena({
 
         {matchup ? (
           <>
-            <span className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-white/45 bg-black/20 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white shadow-sm backdrop-blur-sm">
+            <span className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-ink/12 bg-white/85 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ink/70 shadow-sm backdrop-blur-sm dark:border-paper/15 dark:bg-black/40 dark:text-paper/70">
               Rank
             </span>
             <motion.div
               animate={reduceMotion ? undefined : { scale: [1, 1.06, 1] }}
-              className="pointer-events-none absolute left-1/2 top-1/2 z-20 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-white font-serif text-sm font-bold text-black shadow-[0_8px_24px_-4px_rgba(0,0,0,0.5)] sm:size-16"
+              className="pointer-events-none absolute left-1/2 top-1/2 z-20 grid size-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-ink/15 bg-white font-serif text-sm font-bold text-ink shadow-[0_10px_28px_-10px_rgba(27,25,23,0.45)] dark:border-paper/20 dark:bg-[#1b1b1b] dark:text-paper sm:size-16"
               transition={reduceMotion ? undefined : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
             >
               VS
             </motion.div>
-            <span className="absolute bottom-4 left-5 z-20 font-mono text-xs font-bold text-white drop-shadow-md">
+            <span className="absolute bottom-4 left-5 z-20 font-mono text-xs font-bold text-ink/60 dark:text-paper/60">
               High Score: {highScore}
             </span>
-            <span className="absolute bottom-4 right-5 z-20 font-mono text-xs font-bold text-white drop-shadow-md">
+            <span className="absolute bottom-4 right-5 z-20 font-mono text-xs font-bold text-ink/60 dark:text-paper/60">
               Score: {score}
             </span>
             <button
               aria-label="Skip both hackathons and show a new matchup"
-              className="absolute bottom-16 left-1/2 z-20 inline-flex min-h-10 -translate-x-1/2 items-center justify-center rounded-full border border-white/45 bg-black/20 px-5 py-2 text-sm font-bold text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50 sm:bottom-4"
+              className="absolute bottom-16 left-1/2 z-20 inline-flex min-h-10 -translate-x-1/2 items-center justify-center rounded-full border border-ink/12 bg-white/85 px-5 py-2 text-sm font-bold text-ink/75 shadow-sm backdrop-blur-sm transition-colors hover:bg-ink/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink/40 disabled:cursor-not-allowed disabled:opacity-50 dark:border-paper/15 dark:bg-black/40 dark:text-paper/75 dark:hover:bg-white/10 sm:bottom-4"
               disabled={phase !== "idle" || isLoadingMatchup}
               onClick={skipMatchup}
               type="button"
@@ -894,25 +905,25 @@ export function FaceoffArena({
           {phase === "gameover" && matchup && reveal ? (
             <motion.div
               animate={{ opacity: 1 }}
-              className="absolute inset-0 z-40 grid place-items-center bg-navy/55 p-6 backdrop-blur-sm"
+              className="absolute inset-0 z-40 grid place-items-center bg-ink/25 p-6 backdrop-blur-sm"
               exit={{ opacity: 0 }}
               initial={reduceMotion ? false : { opacity: 0 }}
             >
               <motion.div
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="w-full max-w-sm rounded-3xl border border-navy/10 bg-ivory p-6 text-center shadow-2xl dark:border-white/10 dark:bg-[#1b1b1b]"
+                className="w-full max-w-sm rounded-3xl border border-ink/10 bg-white p-6 text-center shadow-2xl dark:border-white/10 dark:bg-[#1b1b1b]"
                 initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.95 }}
                 transition={springTransition}
               >
                 <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-cabernet dark:text-[#e4a3ab]">
                   Streak over
                 </p>
-                <h2 className="mt-2 font-serif text-xl font-semibold leading-7 text-navy dark:text-wheat">
+                <h2 className="mt-2 font-serif text-xl font-semibold leading-7 text-ink dark:text-paper">
                   {limitWords(matchup[1].name)} was ranked #{reveal.rightRank} —{" "}
                   {reveal.rightRank <= reveal.leftRank ? "higher" : "lower"} than {limitWords(matchup[0].name)} at #
                   {reveal.leftRank}.
                 </h2>
-                <p className="mt-3 font-mono text-sm font-semibold text-navy/60 dark:text-wheat/60">
+                <p className="mt-3 font-mono text-sm font-semibold text-ink/60 dark:text-paper/60">
                   Score {score} &middot; Best {highScore}
                 </p>
                 <button

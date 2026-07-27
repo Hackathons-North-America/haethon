@@ -1,11 +1,11 @@
 "use client";
 
-import { ComponentType, FormEvent, useEffect, useState } from "react";
-import { Globe, Pencil, Save, X } from "lucide-react";
-import { FaLinkedin } from "react-icons/fa6";
-import { SiDevpost, SiGithub, SiInstagram, SiX } from "react-icons/si";
+import { FormEvent, useEffect, useState } from "react";
+import { Pencil, Save, X } from "lucide-react";
 
 import { SkillsField } from "@/components/forms/skills-field";
+import { ShareProfileDialog } from "@/components/forms/share-profile-dialog";
+import { buildProfileLinks, ProfileSkillsSection, ProfileSocialsSection } from "@/components/profile/profile-sections";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { containsProfanity } from "@/lib/validations/profanity";
 import {
@@ -14,8 +14,6 @@ import {
   parseSocialInput,
   type SocialPlatformKey,
 } from "@/lib/validations/social";
-
-type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" }>;
 
 type ProfileValues = {
   firstName?: string | null;
@@ -38,12 +36,7 @@ type ProfileFormProps = {
   firstName: string | null;
   lastName: string | null;
   profile: ProfileValues | null;
-};
-
-type ProfileLink = {
-  href: string;
-  icon: IconComponent;
-  label: string;
+  shareToken: string | null;
 };
 
 const inputClassName =
@@ -91,26 +84,7 @@ function draftsFromValues(values: ProfileValues) {
 
 type SocialDrafts = ReturnType<typeof draftsFromValues>;
 
-function labelFromUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname.replace(/^www\./, "") + parsed.pathname.replace(/\/$/, "");
-  } catch {
-    return url;
-  }
-}
-
-function compactHandle(url: string, fallback: string) {
-  try {
-    const parsed = new URL(url);
-    const handle = parsed.pathname.split("/").filter(Boolean).at(-1);
-    return handle ? `/${handle}` : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-export function AccountProfileForm({ firstName, lastName, profile }: ProfileFormProps) {
+export function AccountProfileForm({ firstName, lastName, profile, shareToken }: ProfileFormProps) {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState<ProfileValues>({
@@ -286,15 +260,7 @@ export function AccountProfileForm({ firstName, lastName, profile }: ProfileForm
 
   const skills = values.skills ?? [];
   const displayName = [values.firstName, values.lastName].filter(Boolean).join(" ").trim();
-  const rawLinks: { label: string; href: string | null | undefined; icon: IconComponent }[] = [
-    { label: values.githubUrl ? compactHandle(values.githubUrl, "GitHub") : "GitHub", href: values.githubUrl, icon: SiGithub },
-    { label: values.linkedinUrl ? compactHandle(values.linkedinUrl, "LinkedIn") : "LinkedIn", href: values.linkedinUrl, icon: FaLinkedin },
-    { label: values.instagramUrl ? compactHandle(values.instagramUrl, "Instagram") : "Instagram", href: values.instagramUrl, icon: SiInstagram },
-    { label: values.xUrl ? compactHandle(values.xUrl, "X") : "X", href: values.xUrl, icon: SiX },
-    { label: values.devpostUrl ? labelFromUrl(values.devpostUrl) : "Devpost", href: values.devpostUrl, icon: SiDevpost },
-    { label: values.portfolioUrl ? labelFromUrl(values.portfolioUrl) : "Portfolio", href: values.portfolioUrl, icon: Globe },
-  ];
-  const links = rawLinks.filter((link): link is ProfileLink => Boolean(link.href));
+  const links = buildProfileLinks(values);
 
   return (
     <section>
@@ -321,7 +287,7 @@ export function AccountProfileForm({ firstName, lastName, profile }: ProfileForm
         {/* The global pill hover effect forces rounded-full buttons to
             position: relative, so the top-right placement lives on a wrapper
             instead of the button itself. */}
-        <div className="sm:absolute sm:right-0 sm:top-14">
+        <div className="mt-8 flex flex-col items-start gap-1 sm:absolute sm:right-0 sm:top-14 sm:mt-0 sm:items-end">
           <button
             type="button"
             onClick={() => {
@@ -331,57 +297,21 @@ export function AccountProfileForm({ firstName, lastName, profile }: ProfileForm
               setFieldErrors({});
               setIsEditing(true);
             }}
-            className="mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:mt-0"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
           >
             <Pencil aria-hidden="true" className="size-4" />
             Edit profile
           </button>
+          <ShareProfileDialog initialShareToken={shareToken} />
         </div>
       </div>
 
-      <div className="pb-2 pt-5">
-        <h2 className="font-serif text-4xl font-semibold tracking-[-0.035em] text-navy dark:text-wheat sm:text-5xl">Socials</h2>
-        {links.length > 0 ? (
-          <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            {links.map(({ href, icon: Icon, label }) => (
-              <a
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/10 bg-ivory px-3.5 py-2 text-sm text-navy/65 transition hover:border-pine hover:text-pine dark:border-white/10 dark:bg-white/5 dark:text-wheat/65 dark:hover:border-moss/60 dark:hover:text-moss"
-                href={href}
-                key={href}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <Icon aria-hidden="true" className="size-4 shrink-0" />
-                <span className="break-all">{label}</span>
-              </a>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-navy/55 dark:text-wheat/55">Add social profiles to display them here.</p>
-        )}
-      </div>
+      <ProfileSocialsSection emptyText="Add social profiles to display them here." links={links} />
 
-      <div className="pb-2 pt-16 sm:pt-20">
-        <h2 className="font-serif text-4xl font-semibold tracking-[-0.035em] text-navy dark:text-wheat sm:text-5xl">Skills</h2>
-        {skills.length > 0 ? (
-          // Stored skills are already in canonical order, so each language sits
-          // next to its own frameworks without needing explicit headers.
-          <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            {skills.map((skill) => (
-              <span
-                className="inline-flex min-h-10 items-center rounded-full bg-navy px-3.5 py-2 text-sm font-medium text-wheat dark:bg-wheat dark:text-[#141414]"
-                key={skill}
-              >
-                {skill}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-navy/55 dark:text-wheat/55">
-            Add the languages and frameworks you know to display them here.
-          </p>
-        )}
-      </div>
+      <ProfileSkillsSection
+        emptyText="Add the languages and frameworks you know to display them here."
+        skills={skills}
+      />
 
       {status === "saved" ? <p className="mt-3 text-center text-sm font-semibold text-[#027A48]">Saved</p> : null}
 

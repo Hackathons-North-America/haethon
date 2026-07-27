@@ -76,6 +76,26 @@ export type SocialParseResult =
   | { ok: true; handle: string; url: string }
   | { ok: false; error: string };
 
+/**
+ * Last line of defence before a stored URL becomes an href. Everything written
+ * through the profile API is already validated, but rows predating that
+ * validation (or written by any future path) must never be able to turn into a
+ * `javascript:` / `data:` link — especially on the public share page, where the
+ * viewer is not the person who typed the value.
+ */
+export function safeExternalUrl(raw: string | null | undefined): string | null {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const url = new URL(raw.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function hostMatches(hostname: string, allowed: string[]) {
   const host = hostname.toLowerCase().replace(/^www\./, "");
   return allowed.some((candidate) => host === candidate || host.endsWith(`.${candidate}`));

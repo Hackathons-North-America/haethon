@@ -833,11 +833,11 @@ function CardReminderMenu({
   );
 }
 
-/* The band of actions between the cover image and the card body: calendar, the
-   event's Discord channel, a Face Off matchup anchored on this hackathon, and
-   reminders. Sits above the card-wide detail link, so each one is clickable
-   without opening the hackathon. */
-function CardActionBar({
+/* The card's actions — calendar, the event's Discord channel, a Face Off
+   matchup anchored on this hackathon, and reminders — stacked at the foot of
+   the date column. Each entry lifts itself over the card-wide detail link, so
+   it stays clickable without opening the hackathon. */
+function CardActionStack({
   hackathon,
   preview,
   showReminder,
@@ -853,28 +853,27 @@ function CardActionBar({
 
   useDismissOnOutside(openMenu !== null, rootRef, () => setOpenMenu(null));
 
-  /* Its own band on the card's paper, ruled off the cover above and the body
-     below in the card's own black — no gradient wash, so the labels never sit
-     on the artwork. `relative` both anchors the dropdowns and lifts the row
-     over the card-wide detail link. */
-  const rowClassName =
-    "relative z-20 flex shrink-0 items-stretch border-b border-black bg-paper";
+  /* Bottom-anchored under the date block so a row of cards lines its actions up
+     on one baseline. Deliberately unpositioned: the dropdowns inside are still
+     DOM children — which is what keeps outside-click dismissal working — but
+     resolve their `absolute` against the card rather than this narrow column. */
+  const stackClassName = "mt-auto flex min-w-0 flex-col items-start gap-2.5 pt-8";
 
   /* Preview cards (the landing backdrop, admin approval previews) stand in for
-     a real card, so the row still shows — but as labels, since there is no
+     a real card, so the stack still shows — but as labels, since there is no
      hackathon behind them to link to or set reminders on. */
   if (preview) {
     return (
-      <div aria-hidden="true" className={rowClassName}>
+      <div aria-hidden="true" className={stackClassName}>
         {hackathon.startsAt ? <span className={cardActionClassName}>Add to calendar</span> : null}
         {hackathon.discordUrl ? (
           <span className={cardActionClassName}>
-            <DiscordGlyph className="hidden size-3 shrink-0 text-[#5865F2] @[30rem]:block" />
+            <DiscordGlyph className="size-3 shrink-0 text-[#5865F2]" />
             Chat on Discord
           </span>
         ) : null}
         <span className={cardActionClassName}>
-          <Swords className="hidden size-3 shrink-0 @[30rem]:block" />
+          <Swords className="size-3 shrink-0" />
           Face Off
         </span>
         {showReminder ? <span className={cardActionClassName}>Add reminder</span> : null}
@@ -883,7 +882,7 @@ function CardActionBar({
   }
 
   return (
-    <div className={rowClassName} ref={rootRef}>
+    <div className={stackClassName} ref={rootRef}>
       {hackathon.startsAt ? (
         <CardCalendarMenu
           hackathon={hackathon}
@@ -899,10 +898,11 @@ function CardActionBar({
           rel="noopener noreferrer"
           target="_blank"
         >
-          {/* Blurple on paper, but inherits the label's color once the button
-              fills on hover, where the brand color would muddy against pine. */}
-          <DiscordGlyph className="hidden size-3 shrink-0 text-[#5865F2] group-hover/action:text-current @[30rem]:block" />
+          {/* Blurple on paper, but inherits the label's color on hover so the
+              glyph darkens along with the words instead of staying brand-bright. */}
+          <DiscordGlyph className="size-3 shrink-0 text-[#5865F2] group-hover/action:text-current" />
           Chat on Discord
+          <CardActionUnderline />
         </a>
       ) : null}
 
@@ -910,8 +910,9 @@ function CardActionBar({
         className={cardActionClassName}
         href={hackathon.slug ? `/face-off?hackathon=${encodeURIComponent(hackathon.slug)}` : "/face-off"}
       >
-        <Swords aria-hidden="true" className="hidden size-3 shrink-0 @[30rem]:block" />
+        <Swords aria-hidden="true" className="size-3 shrink-0" />
         Face Off
+        <CardActionUnderline />
       </Link>
 
       {showReminder ? (
@@ -1165,9 +1166,14 @@ export function HackathonCard({
         )}
       </div>
 
-      {/* Ruled band of its own between the cover and the body. Not clipped, so
-          its menus can drop down and open over the card body below. */}
-      <CardActionBar hackathon={hackathon} preview={preview} showReminder={!reminder} />
+      {/* Ruled band of its own between the cover and the body, carrying the
+          pipeline stages one cell apiece. */}
+      <CardStatusBar
+        hackathonId={hackathon.id}
+        hackathonName={hackathon.name}
+        initialStatus={hackathon.trackedStatus}
+        preview={preview}
+      />
 
       <div className="grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] @[26rem]:grid-cols-[8.5rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col border-r border-ink/35 px-4 py-6 @[26rem]:px-5 @[26rem]:py-7">
@@ -1177,12 +1183,7 @@ export function HackathonCard({
               Past edition
             </span>
           ) : null}
-          <CardStatusPicker
-            hackathonId={hackathon.id}
-            hackathonName={hackathon.name}
-            initialStatus={hackathon.trackedStatus}
-            preview={preview}
-          />
+          <CardActionStack hackathon={hackathon} preview={preview} showReminder={!reminder} />
         </div>
 
         <div

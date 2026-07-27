@@ -54,11 +54,20 @@ const columns = [
   { label: "Status", icon: BadgeCheck },
 ];
 
-export function AttendedHackathonsTable({ rows }: { rows: AttendedHackathonRow[] }) {
+export function AttendedHackathonsTable({
+  rows,
+  readOnly = false,
+  emptyText = "Hackathons attended will appear here.",
+}: {
+  rows: AttendedHackathonRow[];
+  /** Visitors of a shared profile see the data but never the check-in form. */
+  readOnly?: boolean;
+  emptyText?: string;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (!rows.length) {
-    return <p className="text-sm text-navy/55 dark:text-wheat/55">Hackathons attended will appear here.</p>;
+    return <p className="text-sm text-navy/55 dark:text-wheat/55">{emptyText}</p>;
   }
 
   return (
@@ -80,7 +89,7 @@ export function AttendedHackathonsTable({ rows }: { rows: AttendedHackathonRow[]
           {rows.map((row) => {
             // Verified attendance is settled, so only self-reported rows expand
             // to reveal the organizer check-in form.
-            const expandable = row.tier !== "verified";
+            const expandable = !readOnly && row.tier !== "verified";
             const isOpen = expandedId === row.id;
 
             return (

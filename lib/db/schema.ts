@@ -109,6 +109,11 @@ export const userProfiles = pgTable("user_profiles", {
   portfolioUrl: text("portfolio_url"),
   skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   isPublic: boolean("is_public").notNull().default(true),
+  // Capability token for the public share link (/p/<token>). Null means the
+  // profile is not shared; disabling clears it and regenerating replaces it,
+  // so a leaked link dies the moment either happens.
+  shareToken: varchar("share_token", { length: 64 }).unique(),
+  shareTokenCreatedAt: timestamp("share_token_created_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
