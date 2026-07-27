@@ -198,7 +198,36 @@ export const countryOptions = [
   "Zimbabwe",
 ] as const;
 
+export const pinnedCountryOptions = [
+  "Canada",
+  "United States",
+  "Singapore",
+  "United Kingdom",
+  "Germany",
+  "France",
+  "Netherlands",
+  "Spain",
+  "Italy",
+] as const satisfies readonly (typeof countryOptions)[number][];
+
 const countryOptionSet = new Set<string>(countryOptions);
+const pinnedCountryOptionSet = new Set<string>(pinnedCountryOptions);
+
+export function filterCountryOptions(query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchingCountries = countryOptions.filter(
+    (country) => !normalizedQuery || country.toLowerCase().includes(normalizedQuery)
+  );
+
+  if (normalizedQuery) {
+    return matchingCountries;
+  }
+
+  return [
+    ...pinnedCountryOptions,
+    ...matchingCountries.filter((country) => !pinnedCountryOptionSet.has(country)),
+  ];
+}
 
 export function normalizeCountrySelections(values: readonly string[]) {
   const selectedCountries: string[] = [];

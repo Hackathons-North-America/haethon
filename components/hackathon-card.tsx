@@ -142,37 +142,52 @@ const TIER_STREAK_RGB: Record<TierLabel, string> = {
   D: "96 165 250",
 };
 
-/* Each variant is a pair of overlapping radial-gradient ellipses whose union
-   forms one irregular light swathe — top-right arc, left blob, bottom sweep,
-   and so on. Two lobes are enough to break the perfect-ellipse look while
-   keeping the streak a minority of the card. */
-const STREAK_VARIANTS: [string, string][] = [
-  ["46% 60% at 84% 16%", "30% 44% at 62% 48%"],
-  ["48% 58% at 10% 52%", "30% 40% at 32% 24%"],
-  ["52% 46% at 60% 94%", "34% 42% at 88% 66%"],
-  ["42% 52% at 44% 6%", "30% 44% at 70% 28%"],
-  ["36% 70% at 92% 55%", "26% 40% at 72% 80%"],
-];
-
-/* Tiling grayscale noise, desaturated feTurbulence. Masked to the streak's own
-   shape so the grain speckles the tinted area and fades out with it. */
+/* Tiling grayscale noise: desaturated feTurbulence pushed to high contrast so
+   the speckle survives overlay-blending onto a pale tint. Masked to the
+   streak's own shape so the grain rides the tinted area and dissolves with it. */
 const STREAK_NOISE_URI =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncG type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncB type='linear' slope='2.4' intercept='-0.7'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-/* The tinted wash and the grain mask for one card. Which variant a card gets is
-   hashed off its name — same trick as getAccentStyle — so the streak reads as
-   random across a grid but never moves between renders. */
+/* Tiny LCG so a card's streak can be \"random\" yet deterministic: seeding off
+   the name keeps the shape identical between server and client renders (no
+   hydration mismatch) and stable across visits, unlike Math.random(). */
+function seededRandom(seed: number) {
+  let state = seed >>> 0 || 1;
+
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+/* The tinted wash and the grain mask for one card: two or three radial-gradient
+   lobes with name-seeded sizes and centers (allowed to hang off the edges), so
+   every card grows its own irregular swathe instead of drawing from a fixed
+   set of shapes. The grain mask falls off later than the wash, dissolving the
+   streak's rim into loose speckle the way the airbrushed tickets do. */
 function getTierStreak(name: string, tier: TierLabel) {
-  const hash = Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0);
-  const shapes = STREAK_VARIANTS[hash % STREAK_VARIANTS.length] ?? STREAK_VARIANTS[0];
+  const seed = Array.from(name).reduce(
+    (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
+    0
+  );
+  const random = seededRandom(seed);
+  const lobeCount = 2 + Math.floor(random() * 2);
+  const lobes = Array.from({ length: lobeCount }, () => {
+    const radiusX = Math.round(22 + random() * 26);
+    const radiusY = Math.round(28 + random() * 34);
+    const centerX = Math.round(random() * 130 - 15);
+    const centerY = Math.round(random() * 130 - 15);
+
+    return `${radiusX}% ${radiusY}% at ${centerX}% ${centerY}%`;
+  });
   const rgb = TIER_STREAK_RGB[tier];
 
   return {
-    wash: shapes
-      .map((shape) => `radial-gradient(${shape}, rgb(${rgb} / 0.5) 0%, rgb(${rgb} / 0) 70%)`)
+    wash: lobes
+      .map((lobe) => `radial-gradient(${lobe}, rgb(${rgb} / 0.5) 0%, rgb(${rgb} / 0) 70%)`)
       .join(", "),
-    mask: shapes
-      .map((shape) => `radial-gradient(${shape}, black 0%, transparent 74%)`)
+    mask: lobes
+      .map((lobe) => `radial-gradient(${lobe}, black 0%, transparent 92%)`)
       .join(", "),
   };
 }
@@ -275,9 +290,10 @@ function CardStatusBar({
           <button
             aria-pressed={active}
             /* Stages reached so far read in pine; the rest sit back in muted
-               ink until the pointer fills the cell. */
+               ink until the pointer fills the cell. The selected stage keeps
+               that pine fill in its resting state. */
             className={`${cardBandCellClassName} disabled:cursor-wait disabled:opacity-60 ${
-              reached ? "text-pine" : "text-ink/55"
+              active ? "bg-pine text-paper" : reached ? "text-pine" : "text-ink/55"
             }`}
             disabled={pending}
             key={stage.value}

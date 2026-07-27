@@ -24,7 +24,7 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import { HackathonRankingList } from "@/components/hackathon-ranking-list";
 import { HackathonTierList } from "@/components/hackathon-tier-list";
 import type { GeoPoint } from "@/lib/geo";
-import { countryOptions } from "@/lib/hackathons/countries";
+import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
 import { assignTiers, sortByEloDescending, sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
@@ -391,11 +391,7 @@ export function HackathonSearch({
     [eloRankedHackathons]
   );
   const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
-  const filteredCountries = useMemo(() => {
-    const query = countryQuery.trim().toLowerCase();
-
-    return countryOptions.filter((option) => !query || option.toLowerCase().includes(query));
-  }, [countryQuery]);
+  const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
 
   useEffect(() => {
     replaceSearchUrl({ ...appliedFilters, view }, basePath, hasSearched);

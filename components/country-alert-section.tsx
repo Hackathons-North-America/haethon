@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BellPlus, Check, ChevronDown, Globe2, Search, Trash2 } from "lucide-react";
 
-import { countryOptions } from "@/lib/hackathons/countries";
+import { filterCountryOptions } from "@/lib/hackathons/countries";
 
 export type CountryAlertSubscription = {
   country: string;
@@ -57,11 +57,7 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
     };
   }, [open]);
 
-  const filteredCountries = useMemo(() => {
-    const query = countryQuery.trim().toLowerCase();
-
-    return countryOptions.filter((option) => !query || option.toLowerCase().includes(query));
-  }, [countryQuery]);
+  const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
 
   function toggleOpen() {
     setOpen((current) => {

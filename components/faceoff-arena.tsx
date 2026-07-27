@@ -127,6 +127,77 @@ function useArenaColor(hackathonId: string): RGB {
   return useMemo(() => fallbackColorFor(hackathonId), [hackathonId]);
 }
 
+/* A small seeded generator keeps each arena's loose, poster-like pattern
+   visually random while remaining identical across renders and hydration. */
+function seededNumber(seed: string, index: number) {
+  let hash = 2166136261;
+
+  for (const char of `${seed}-${index}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0) / 4294967295;
+}
+
+function ArenaBackdrop({ id, side }: { id: string; side: "left" | "right" }) {
+  const marks = useMemo(
+    () =>
+      Array.from({ length: 16 }, (_, index) => {
+        const size = 18 + seededNumber(id, index * 7 + 1) * 88;
+        const shape = index % 4;
+
+        return {
+          id: `${id}-mark-${index}`,
+          left: `${4 + seededNumber(id, index * 7 + 2) * 88}%`,
+          opacity: 0.055 + seededNumber(id, index * 7 + 3) * 0.075,
+          rotation: `${Math.round(seededNumber(id, index * 7 + 4) * 150 - 75)}deg`,
+          shape,
+          size,
+          top: `${5 + seededNumber(id, index * 7 + 5) * 88}%`,
+        };
+      }),
+    [id]
+  );
+
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <span
+        className={`absolute top-[42%] size-[min(72rem,125vw)] -translate-y-1/2 rounded-full bg-[var(--accent)] opacity-[0.15] blur-[90px] dark:opacity-25 ${
+          side === "left" ? "left-[42%] -translate-x-1/2" : "right-[42%] translate-x-1/2"
+        }`}
+      />
+      <span
+        className={`absolute bottom-[-18%] size-[min(48rem,90vw)] rounded-full bg-[var(--accent)] opacity-[0.08] blur-[110px] dark:opacity-[0.14] ${
+          side === "left" ? "left-[-24%]" : "right-[-24%]"
+        }`}
+      />
+      {marks.map((mark) => (
+        <span
+          className={
+            mark.shape === 0
+              ? "absolute rounded-full border-2 border-[var(--accent)]"
+              : mark.shape === 1
+                ? "absolute border border-[var(--accent)] bg-[var(--accent)]/20"
+                : mark.shape === 2
+                  ? "absolute h-[3px] rounded-full bg-[var(--accent)]"
+                  : "absolute rounded-full bg-[var(--accent)]"
+          }
+          key={mark.id}
+          style={{
+            height: mark.shape === 2 ? 3 : mark.shape === 3 ? Math.max(5, mark.size * 0.12) : mark.size,
+            left: mark.left,
+            opacity: mark.opacity,
+            rotate: mark.rotation,
+            top: mark.top,
+            width: mark.shape === 2 ? mark.size * 1.6 : mark.shape === 3 ? Math.max(5, mark.size * 0.12) : mark.size,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 /* Deterministic per-index jitter (no Math.random) so the burst layout stays
    stable across re-renders — fourteen particles is plenty for the spread to
    still read as "confetti" rather than a perfect ring. */
@@ -288,13 +359,10 @@ function ArenaSide({
       className="relative isolate flex flex-col items-center justify-center gap-5 bg-paper px-6 py-12 text-center dark:bg-[#131211] sm:min-h-[32rem] sm:px-10 sm:py-16 lg:min-h-screen"
       style={accentVariables(color)}
     >
-      {/* The two colored marks that anchor the side: a hairline edge stripe and
-          a soft bloom behind the logo. Everything else stays paper. */}
+      {/* A broad color wash and scattered geometric marks give each matchup a
+          distinct arena while keeping the content comfortably legible. */}
       <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-[var(--accent)]" />
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 size-72 -translate-x-1/2 -translate-y-[70%] rounded-full bg-[var(--accent)] opacity-[0.09] blur-3xl dark:opacity-20"
-      />
+      <ArenaBackdrop id={hackathon.id} side={side} />
 
       <div className="relative grid size-48 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)] text-4xl font-semibold shadow-[0_18px_44px_-24px_var(--accent)] dark:bg-[var(--accent-soft-dark)] sm:size-56">
           {hackathon.image ? (
