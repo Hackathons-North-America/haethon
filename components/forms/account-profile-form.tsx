@@ -36,8 +36,8 @@ type ProfileValues = {
 type ProfileFormProps = {
   firstName: string | null;
   lastName: string | null;
+  username: string;
   profile: ProfileValues | null;
-  shareToken: string | null;
   devpostImport: DevpostImportState;
 };
 
@@ -86,7 +86,7 @@ function draftsFromValues(values: ProfileValues) {
 
 type SocialDrafts = ReturnType<typeof draftsFromValues>;
 
-export function AccountProfileForm({ firstName, lastName, profile, shareToken, devpostImport }: ProfileFormProps) {
+export function AccountProfileForm({ firstName, lastName, username, profile, devpostImport }: ProfileFormProps) {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState<ProfileValues>({
@@ -263,6 +263,17 @@ export function AccountProfileForm({ firstName, lastName, profile, shareToken, d
   const skills = values.skills ?? [];
   const displayName = [values.firstName, values.lastName].filter(Boolean).join(" ").trim();
   const links = buildProfileLinks(values);
+  const parsedDevpost = parseSocialInput("devpostUrl", values.devpostUrl ?? "");
+  const currentDevpostHandle = parsedDevpost.ok ? parsedDevpost.handle : null;
+  const matchesInitialDevpostHandle =
+    Boolean(currentDevpostHandle) &&
+    currentDevpostHandle?.toLowerCase() === devpostImport.handle?.toLowerCase();
+  const currentDevpostImport: DevpostImportState = {
+    handle: currentDevpostHandle,
+    code: matchesInitialDevpostHandle ? devpostImport.code : null,
+    verified: matchesInitialDevpostHandle && devpostImport.verified,
+    lastImportedAt: matchesInitialDevpostHandle ? devpostImport.lastImportedAt : null,
+  };
 
   return (
     <section>
@@ -304,8 +315,11 @@ export function AccountProfileForm({ firstName, lastName, profile, shareToken, d
             <Pencil aria-hidden="true" className="size-4" />
             Edit profile
           </button>
-          <ShareProfileDialog initialShareToken={shareToken} />
-          <DevpostImportDialog initialState={devpostImport} />
+          <ShareProfileDialog username={username} />
+          <DevpostImportDialog
+            key={currentDevpostHandle?.toLowerCase() ?? "no-devpost-profile"}
+            initialState={currentDevpostImport}
+          />
         </div>
       </div>
 

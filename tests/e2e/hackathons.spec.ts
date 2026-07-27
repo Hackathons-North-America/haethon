@@ -1,5 +1,22 @@
 import { expect, test } from "@playwright/test";
 
+test("opens details only from the card's More info link", async ({ page }) => {
+  await page.goto("/hackathons");
+
+  const firstCard = page.locator("article").first();
+  const browseUrl = page.url();
+
+  await firstCard.getByRole("heading").click();
+  await expect(page).toHaveURL(browseUrl);
+
+  const moreInfoLink = firstCard.getByRole("link", { name: "More info" });
+  await expect(moreInfoLink).toBeVisible();
+  await expect(moreInfoLink).toHaveAttribute("href", /^\/hackathons\/[^/]+$/);
+
+  await moreInfoLink.click();
+  await expect(page).toHaveURL(/\/hackathons\/[^/]+$/);
+});
+
 test("opens the hackathons browse page from the home nav", async ({ page }) => {
   await page.goto("/");
 

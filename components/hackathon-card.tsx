@@ -160,35 +160,37 @@ function seededRandom(seed: number) {
   };
 }
 
-/* The tinted wash and the grain mask for one card: two or three radial-gradient
-   lobes with name-seeded sizes and centers (allowed to hang off the edges), so
-   every card grows its own irregular swathe instead of drawing from a fixed
-   set of shapes. The grain mask falls off later than the wash, dissolving the
-   streak's rim into loose speckle the way the airbrushed tickets do. */
+/* The tinted wash and the grain mask for one card. The reference tickets use
+   one broad, off-canvas airbrushed ellipse: its edge crosses the ticket as a
+   soft crescent instead of reading as a collection of circular glows. A
+   name-seeded edge and vertical anchor keep the cards varied while retaining
+   that single sweeping silhouette. The narrow second gradient brightens the
+   curved shoulder, and the grain mask falls off just beyond it. */
 function getTierStreak(name: string, tier: TierLabel) {
   const seed = Array.from(name).reduce(
     (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
     0
   );
   const random = seededRandom(seed);
-  const lobeCount = 2 + Math.floor(random() * 2);
-  const lobes = Array.from({ length: lobeCount }, () => {
-    const radiusX = Math.round(22 + random() * 26);
-    const radiusY = Math.round(28 + random() * 34);
-    const centerX = Math.round(random() * 130 - 15);
-    const centerY = Math.round(random() * 130 - 15);
-
-    return `${radiusX}% ${radiusY}% at ${centerX}% ${centerY}%`;
-  });
+  const entersFromLeft = random() < 0.72;
+  const centerX = Math.round(
+    entersFromLeft ? -18 + random() * 24 : 94 + random() * 24
+  );
+  const centerY = Math.round(14 + random() * 72);
+  const radiusX = Math.round(48 + random() * 16);
+  const radiusY = Math.round(56 + random() * 30);
+  const shoulderRadiusX = radiusX + Math.round(2 + random() * 4);
+  const shoulderRadiusY = radiusY + Math.round(2 + random() * 5);
+  const ellipse = `ellipse ${radiusX}% ${radiusY}% at ${centerX}% ${centerY}%`;
+  const shoulder = `ellipse ${shoulderRadiusX}% ${shoulderRadiusY}% at ${centerX}% ${centerY}%`;
   const rgb = TIER_STREAK_RGB[tier];
 
   return {
-    wash: lobes
-      .map((lobe) => `radial-gradient(${lobe}, rgb(${rgb} / 0.5) 0%, rgb(${rgb} / 0) 70%)`)
-      .join(", "),
-    mask: lobes
-      .map((lobe) => `radial-gradient(${lobe}, black 0%, transparent 92%)`)
-      .join(", "),
+    wash: [
+      `radial-gradient(${shoulder}, transparent 46%, rgb(${rgb} / 0.2) 52%, rgb(${rgb} / 0.08) 61%, transparent 72%)`,
+      `radial-gradient(${ellipse}, rgb(${rgb} / 0.46) 0%, rgb(${rgb} / 0.44) 40%, rgb(${rgb} / 0.28) 53%, rgb(${rgb} / 0.1) 65%, transparent 76%)`,
+    ].join(", "),
+    mask: `radial-gradient(${shoulder}, black 0%, black 58%, transparent 82%)`,
   };
 }
 
@@ -978,18 +980,39 @@ function CardActionStack({
   );
 }
 
-/* Footer link out to the organizer's own site. The card body opens our detail
-   page, so this is the one way off the card to the real event site — hence the
-   corner placement and the outward arrow. Rendered as a small-caps mono label
-   so it reads as card metadata rather than competing with the pipeline
-   buttons, and lifted above the card-wide detail link with `z-20`. */
+const cardFooterLinkClassName =
+  "relative z-20 inline-flex min-h-8 items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine @[26rem]:text-[11px]";
+
+/* Explicit route to our detail page. Keeping navigation on a named text link
+   lets the rest of the card remain a non-interactive surface. */
+function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
+  if (!hackathon.slug) {
+    return null;
+  }
+
+  return preview ? (
+    <span aria-hidden="true" className={cardFooterLinkClassName}>
+      More info
+    </span>
+  ) : (
+    <Link
+      className={cardFooterLinkClassName}
+      href={`/hackathons/${hackathon.slug}`}
+      title={`View ${hackathon.name} details`}
+    >
+      More info
+    </Link>
+  );
+}
+
+/* Footer link out to the organizer's own site. Rendered as a small-caps mono
+   label so it reads as card metadata rather than competing with the pipeline
+   buttons. */
 function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
   if (!hackathon.websiteUrl) {
     return null;
   }
 
-  const className =
-    "relative z-20 inline-flex min-h-8 items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine @[26rem]:text-[11px]";
   const label = (
     <>
       Visit website
@@ -1000,12 +1023,12 @@ function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData;
   /* Preview cards (landing backdrop, admin approval previews) stand in for a
      real listing, so the label shows but never navigates. */
   return preview ? (
-    <span aria-hidden="true" className={className}>
+    <span aria-hidden="true" className={cardFooterLinkClassName}>
       {label}
     </span>
   ) : (
     <a
-      className={className}
+      className={cardFooterLinkClassName}
       href={hackathon.websiteUrl}
       rel="noopener noreferrer"
       target="_blank"
@@ -1184,15 +1207,6 @@ export function HackathonCard({
         hackathon.isPast ? "opacity-70 hover:opacity-100 focus-within:opacity-100" : ""
       }`}
     >
-      {hackathon.slug && !preview ? (
-        <Link
-          aria-label={`View ${hackathon.name} details`}
-          className="absolute inset-0 z-[1]"
-          draggable={false}
-          href={`/hackathons/${hackathon.slug}`}
-        />
-      ) : null}
-
       <div
         className={`relative w-full shrink-0 overflow-hidden border-b border-black ${
           compact ? "aspect-[5/2]" : "aspect-[2/1]"
@@ -1304,6 +1318,7 @@ export function HackathonCard({
                 />
               ) : null}
               <div className="ml-auto flex shrink-0 items-center gap-3">
+                <CardMoreInfoLink hackathon={hackathon} preview={preview} />
                 <CardWebsiteLink hackathon={hackathon} preview={preview} />
                 {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
               </div>

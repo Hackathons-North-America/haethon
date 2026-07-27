@@ -33,9 +33,10 @@ export default async function AccountPage() {
 
   const devpostState = profile
     ? devpostVerificationState(profile)
-    : { handle: null, verified: false, lastImportedAt: null };
+    : { handle: null, code: null, verified: false, lastImportedAt: null };
   const devpostImport = {
     handle: devpostState.handle,
+    code: devpostState.code,
     verified: devpostState.verified,
     lastImportedAt: devpostState.lastImportedAt?.toISOString() ?? null,
   };
@@ -48,8 +49,8 @@ export default async function AccountPage() {
             <AccountProfileForm
               firstName={context.user.firstName}
               lastName={context.user.lastName}
+              username={context.user.username}
               profile={profile ?? null}
-              shareToken={profile?.shareToken ?? null}
               devpostImport={devpostImport}
             />
           </section>

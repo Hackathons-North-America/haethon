@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import type { ElementType } from "react";
+import { useState, type ElementType, type FocusEvent } from "react";
 
 import { DiscordIcon } from "@/components/discord-icon";
 import {
@@ -31,14 +31,18 @@ const items: SidebarLink[] = [
   { href: "/account", icon: CircleUser, label: "Hacker Profile" },
 ];
 
-// Desktop rail: collapsed shows icons only, hover/keyboard-focus slides the
-// panel open over the page content (Instagram-style) instead of pushing it.
-// The <aside> keeps the collapsed width so the layout gutter never reflows.
-// Keyboard focus uses :focus-visible rather than :focus-within so a mouse click
-// on a link doesn't pin the rail open once the pointer leaves.
-const expand = "lg:group-hover:w-64 lg:group-has-[:focus-visible]:w-64";
-const revealLabel =
-  "lg:translate-x-2 lg:opacity-0 lg:transition-[opacity,transform] lg:duration-700 lg:ease-out lg:group-hover:translate-x-0 lg:group-hover:opacity-100 lg:group-hover:delay-300 lg:group-has-[:focus-visible]:translate-x-0 lg:group-has-[:focus-visible]:opacity-100 lg:group-has-[:focus-visible]:delay-300 motion-reduce:lg:translate-x-0 motion-reduce:lg:transition-none";
+const collapsedWidth = 76;
+const expandedWidth = 256;
+
+// A near-critically-damped spring gives the rail Instagram's quick start and
+// soft finish. Unlike a duration-based CSS transition, it also keeps its
+// current velocity when the pointer reverses direction midway through.
+const panelSpring = {
+  type: "spring",
+  stiffness: 320,
+  damping: 32,
+  mass: 0.9,
+} as const;
 
 export function AppSidebar({
   isAdmin,
@@ -51,6 +55,21 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const prefersReducedMotion = useReducedMotion();
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasKeyboardFocus, setHasKeyboardFocus] = useState(false);
+  const isExpanded = isHovered || hasKeyboardFocus;
+
+  function handleFocusCapture(event: FocusEvent<HTMLElement>) {
+    if ((event.target as HTMLElement).matches(":focus-visible")) {
+      setHasKeyboardFocus(true);
+    }
+  }
+
+  function handleBlurCapture(event: FocusEvent<HTMLElement>) {
+    if (!event.relatedTarget || !event.currentTarget.contains(event.relatedTarget as Node)) {
+      setHasKeyboardFocus(false);
+    }
+  }
 
   const links: SidebarLink[] = [
     ...items,
@@ -81,14 +100,33 @@ export function AppSidebar({
     <>
       <motion.aside
         animate={{ opacity: 1, x: 0 }}
-        className="group z-40 hidden bg-paper lg:sticky lg:top-0 lg:block lg:h-screen lg:w-[4.75rem] lg:shrink-0"
+        className="z-40 hidden bg-paper lg:sticky lg:top-0 lg:block lg:h-screen lg:w-[4.75rem] lg:shrink-0"
         initial={prefersReducedMotion ? false : { opacity: 0, x: "-1.75rem" }}
+        onBlurCapture={handleBlurCapture}
+        onFocusCapture={handleFocusCapture}
+        onPointerEnter={() => setIsHovered(true)}
+        onPointerLeave={() => setIsHovered(false)}
         transition={{ delay: 0.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div
-          className={`lg:absolute lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[4.75rem] lg:flex-col lg:overflow-hidden lg:border-r lg:border-ink/15 lg:bg-paper lg:transition-[width,box-shadow] lg:duration-[1200ms] lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:group-hover:shadow-[10px_0_40px_-16px_rgba(27,25,23,0.35)] lg:group-has-[:focus-visible]:shadow-[10px_0_40px_-16px_rgba(27,25,23,0.35)] motion-reduce:lg:transition-none ${expand}`}
+        <motion.div
+          animate={{
+            width: isExpanded ? expandedWidth : collapsedWidth,
+            boxShadow: isExpanded
+              ? "10px 0 40px -16px rgba(27, 25, 23, 0.35)"
+              : "0 0 0 0 rgba(27, 25, 23, 0)",
+          }}
+          className="lg:absolute lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[4.75rem] lg:will-change-[width] lg:flex-col lg:overflow-hidden lg:border-r lg:border-ink/15 lg:bg-paper"
+          initial={false}
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : {
+                  width: panelSpring,
+                  boxShadow: { duration: 0.22, ease: "easeOut" },
+                }
+          }
         >
-          <div className="flex items-center gap-4 px-5 pb-0 pt-5 lg:block lg:shrink-0 lg:px-0 lg:pt-6 lg:text-center lg:transition-[padding] lg:duration-300 lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:group-hover:px-7 lg:group-hover:text-left lg:group-has-[:focus-visible]:px-7 lg:group-has-[:focus-visible]:text-left">
+          <div className="flex items-center gap-4 px-5 pb-0 pt-5 lg:w-[4.75rem] lg:shrink-0 lg:justify-center lg:px-0 lg:pt-6">
             <Link className="block" href={isSignedIn ? "/?home" : "/"}>
               <span className="whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-ink lg:text-xl">
                 HNA
@@ -115,12 +153,30 @@ export function AppSidebar({
                   target={external ? "_blank" : undefined}
                 >
                   <Icon aria-hidden="true" className="size-4 shrink-0 lg:size-5" />
-                  <span className={`whitespace-nowrap ${revealLabel}`}>{label}</span>
+                  <motion.span
+                    animate={{
+                      opacity: isExpanded ? 1 : 0,
+                      x: isExpanded ? 0 : -6,
+                    }}
+                    className="whitespace-nowrap"
+                    initial={false}
+                    transition={
+                      prefersReducedMotion
+                        ? { duration: 0 }
+                        : {
+                            delay: isExpanded ? 0.065 : 0,
+                            duration: isExpanded ? 0.2 : 0.12,
+                            ease: isExpanded ? [0.16, 1, 0.3, 1] : "easeOut",
+                          }
+                    }
+                  >
+                    {label}
+                  </motion.span>
                 </Link>
               );
             })}
           </nav>
-        </div>
+        </motion.div>
       </motion.aside>
 
       {/* Phone tab bar: fixed to the bottom so it survives scrolling, padded for

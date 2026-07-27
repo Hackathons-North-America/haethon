@@ -146,7 +146,7 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
   return (
     <section aria-label="Country alerts" className="relative z-30 mb-10">
       <div
-        className="relative flex flex-col gap-2 rounded-[2.35rem] border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-2 shadow-[0_10px_36px_rgba(0,0,0,0.14)] md:flex-row md:items-center"
+        className="relative flex flex-col gap-2 rounded-[2.35rem] border border-navy/10 p-2 dark:border-white/10 md:flex-row md:items-center"
         ref={rootRef}
       >
         <div className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-center rounded-[2rem] px-6 py-3">

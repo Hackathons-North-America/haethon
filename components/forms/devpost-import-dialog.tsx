@@ -6,6 +6,7 @@ import { Check, Copy, Download, Loader2, ScanSearch, Trophy, X } from "lucide-re
 
 export type DevpostImportState = {
   handle: string | null;
+  code: string | null;
   verified: boolean;
   lastImportedAt: string | null;
 };
@@ -80,7 +81,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [verified, setVerified] = useState(initialState.verified);
-  const [code, setCode] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(initialState.code);
   const [copied, setCopied] = useState(false);
   const [working, setWorking] = useState<"code" | "confirm" | "scan" | "import" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -216,16 +217,24 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
 
   const hasHandle = Boolean(initialState.handle);
 
+  function openDialog() {
+    setError(null);
+    setSummary(null);
+    setScan(null);
+    setIsOpen(true);
+
+    // The instructions promise a code "below", so create it as soon as the
+    // dialog opens instead of requiring a second, easy-to-miss click.
+    if (hasHandle && !verified && !code) {
+      void requestCode();
+    }
+  }
+
   return (
     <>
       <button
         type="button"
-        onClick={() => {
-          setError(null);
-          setSummary(null);
-          setScan(null);
-          setIsOpen(true);
-        }}
+        onClick={openDialog}
         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
       >
         <Download aria-hidden="true" className="size-4" />
@@ -354,7 +363,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
                           className={primaryButtonClassName}
                         >
                           {working === "code" ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
-                          Get my code
+                          {working === "code" ? "Creating your code" : "Get my code"}
                         </button>
                       )}
                     </div>

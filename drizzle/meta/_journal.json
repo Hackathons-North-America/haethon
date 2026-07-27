@@ -204,6 +204,13 @@
       "when": 1785192440377,
       "tag": "0028_lame_boomer",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1785195178395,
+      "tag": "0029_permanent_profile_usernames",
+      "breakpoints": true
     }
   ]
 }

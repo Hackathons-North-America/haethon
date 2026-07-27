@@ -76,6 +76,9 @@ export const users = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     clerkUserId: text("clerk_user_id").notNull().unique(),
     email: text("email").notNull().unique(),
+    // Permanent public-profile handle. It is assigned when the local user is
+    // created and deliberately left unchanged by later Clerk profile syncs.
+    username: varchar("username", { length: 48 }).notNull().unique(),
     firstName: text("first_name"),
     lastName: text("last_name"),
     imageUrl: text("image_url"),
@@ -118,11 +121,6 @@ export const userProfiles = pgTable("user_profiles", {
   portfolioUrl: text("portfolio_url"),
   skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   isPublic: boolean("is_public").notNull().default(true),
-  // Capability token for the public share link (/p/<token>). Null means the
-  // profile is not shared; disabling clears it and regenerating replaces it,
-  // so a leaked link dies the moment either happens.
-  shareToken: varchar("share_token", { length: 64 }).unique(),
-  shareTokenCreatedAt: timestamp("share_token_created_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

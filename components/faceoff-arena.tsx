@@ -106,11 +106,9 @@ function cssColor(color: RGB) {
   return `rgb(${color.r} ${color.g} ${color.b})`;
 }
 
-/* The arena ground is paper, so the side color only ever appears as an accent.
-   Each variant is published as a CSS variable on the side element:
-   `--accent` for decorative marks (edge stripe, glow, borders) and
-   `--accent-ink` for anything carrying text, darkened far enough to clear
-   contrast on white. The `-dark` pair mirrors both for dark mode. */
+/* Each hackathon color expands into the ink and surface shades used across
+   its side of the arena. Ink variants remain dark/light enough for readable
+   text in the corresponding theme. */
 function accentVariables(color: RGB): CSSProperties {
   return {
     "--accent": cssColor(color),
@@ -127,8 +125,8 @@ function useArenaColor(hackathonId: string): RGB {
   return useMemo(() => fallbackColorFor(hackathonId), [hackathonId]);
 }
 
-/* A small seeded generator keeps each arena's loose, poster-like pattern
-   visually random while remaining identical across renders and hydration. */
+/* A small seeded generator keeps each arena's gradient field visually random
+   while remaining identical across renders and hydration. */
 function seededNumber(seed: string, index: number) {
   let hash = 2166136261;
 
@@ -140,61 +138,23 @@ function seededNumber(seed: string, index: number) {
   return (hash >>> 0) / 4294967295;
 }
 
-function ArenaBackdrop({ id, side }: { id: string; side: "left" | "right" }) {
-  const marks = useMemo(
-    () =>
-      Array.from({ length: 16 }, (_, index) => {
-        const size = 18 + seededNumber(id, index * 7 + 1) * 88;
-        const shape = index % 4;
-
-        return {
-          id: `${id}-mark-${index}`,
-          left: `${4 + seededNumber(id, index * 7 + 2) * 88}%`,
-          opacity: 0.055 + seededNumber(id, index * 7 + 3) * 0.075,
-          rotation: `${Math.round(seededNumber(id, index * 7 + 4) * 150 - 75)}deg`,
-          shape,
-          size,
-          top: `${5 + seededNumber(id, index * 7 + 5) * 88}%`,
-        };
-      }),
+function ArenaBackdrop({ id }: { id: string }) {
+  const gradient = useMemo(
+    () => ({
+      bloomX: Math.round(15 + seededNumber(id, 1) * 70),
+      bloomY: Math.round(15 + seededNumber(id, 2) * 70),
+    }),
     [id]
   );
 
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      <span
-        className={`absolute top-[42%] size-[min(72rem,125vw)] -translate-y-1/2 rounded-full bg-[var(--accent)] opacity-[0.15] blur-[90px] dark:opacity-25 ${
-          side === "left" ? "left-[42%] -translate-x-1/2" : "right-[42%] translate-x-1/2"
-        }`}
-      />
-      <span
-        className={`absolute bottom-[-18%] size-[min(48rem,90vw)] rounded-full bg-[var(--accent)] opacity-[0.08] blur-[110px] dark:opacity-[0.14] ${
-          side === "left" ? "left-[-24%]" : "right-[-24%]"
-        }`}
-      />
-      {marks.map((mark) => (
-        <span
-          className={
-            mark.shape === 0
-              ? "absolute rounded-full border-2 border-[var(--accent)]"
-              : mark.shape === 1
-                ? "absolute border border-[var(--accent)] bg-[var(--accent)]/20"
-                : mark.shape === 2
-                  ? "absolute h-[3px] rounded-full bg-[var(--accent)]"
-                  : "absolute rounded-full bg-[var(--accent)]"
-          }
-          key={mark.id}
-          style={{
-            height: mark.shape === 2 ? 3 : mark.shape === 3 ? Math.max(5, mark.size * 0.12) : mark.size,
-            left: mark.left,
-            opacity: mark.opacity,
-            rotate: mark.rotation,
-            top: mark.top,
-            width: mark.shape === 2 ? mark.size * 1.6 : mark.shape === 3 ? Math.max(5, mark.size * 0.12) : mark.size,
-          }}
-        />
-      ))}
-    </div>
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 -z-10"
+      style={{
+        background: `radial-gradient(circle at ${gradient.bloomX}% ${gradient.bloomY}%, color-mix(in srgb, var(--accent) 34%, transparent) 0%, color-mix(in srgb, var(--accent) 18%, transparent) 34%, transparent 70%)`,
+      }}
+    />
   );
 }
 
@@ -359,10 +319,10 @@ function ArenaSide({
       className="relative isolate flex flex-col items-center justify-center gap-5 bg-paper px-6 py-12 text-center dark:bg-[#131211] sm:min-h-[32rem] sm:px-10 sm:py-16 lg:min-h-screen"
       style={accentVariables(color)}
     >
-      {/* A broad color wash and scattered geometric marks give each matchup a
-          distinct arena while keeping the content comfortably legible. */}
+      {/* One full-bleed radial gradient fills each side using only the normal
+          page ground and its accent. The bloom position is seeded per event. */}
       <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-[var(--accent)]" />
-      <ArenaBackdrop id={hackathon.id} side={side} />
+      <ArenaBackdrop id={hackathon.id} />
 
       <div className="relative grid size-48 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)] text-4xl font-semibold shadow-[0_18px_44px_-24px_var(--accent)] dark:bg-[var(--accent-soft-dark)] sm:size-56">
           {hackathon.image ? (

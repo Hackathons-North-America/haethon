@@ -14,29 +14,25 @@ import {
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
 import { loadProfilePageData } from "@/lib/profile/profile-page-data";
-import { isProfileShareToken } from "@/lib/profile/share-token";
 import { sanitizeSkills } from "@/lib/profile/skills";
+import { isProfileUsername } from "@/lib/profile/username";
 
-// Rendered per request so revoking or regenerating a token takes effect
-// immediately — a cached copy would keep serving a link the owner turned off.
 export const dynamic = "force-dynamic";
 
-type PageProps = { params: Promise<{ token: string }> };
+type PageProps = { params: Promise<{ username: string }> };
 
 /**
- * Resolves the share token to its owner. The token is the only credential:
- * it is 256 bits of CSPRNG output, so a lookup miss is the whole access check.
  * Columns are listed explicitly — email, Clerk id, and notification state are
  * deliberately absent so they cannot leak into the page or its RSC payload.
  */
-async function loadSharedProfile(token: string) {
-  if (!isProfileShareToken(token)) {
+async function loadSharedProfile(username: string) {
+  if (!isProfileUsername(username)) {
     return null;
   }
 
   const [row] = await db
     .select({
-      userId: userProfiles.userId,
+      userId: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
       bio: userProfiles.bio,
@@ -49,32 +45,29 @@ async function loadSharedProfile(token: string) {
       devpostUrl: userProfiles.devpostUrl,
       portfolioUrl: userProfiles.portfolioUrl,
     })
-    .from(userProfiles)
-    .innerJoin(users, eq(users.id, userProfiles.userId))
-    .where(eq(userProfiles.shareToken, token))
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(eq(users.username, username))
     .limit(1);
 
   return row ?? null;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { token } = await params;
-  const profile = await loadSharedProfile(token);
+  const { username } = await params;
+  const profile = await loadSharedProfile(username);
   const displayName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
 
   return {
     title: displayName ? `${displayName} · HNA` : "Hacker profile · HNA",
     description: displayName ? `${displayName}'s hackathon profile on HNA.` : undefined,
-    // The URL is a secret, so it must never end up in a search index or in the
-    // Referer header of an outbound click from this page.
     robots: { index: false, follow: false, nocache: true },
-    referrer: "no-referrer",
   };
 }
 
 export default async function SharedProfilePage({ params }: PageProps) {
-  const { token } = await params;
-  const profile = await loadSharedProfile(token);
+  const { username } = await params;
+  const profile = await loadSharedProfile(username);
 
   if (!profile) {
     notFound();

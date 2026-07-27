@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { createPermanentProfileUsername } from "@/lib/profile/username";
 
 type SessionMetadata = {
   role?: "user" | "admin" | "organizer" | "sponsor";
@@ -96,6 +97,11 @@ export async function syncCurrentUser() {
     .values({
       clerkUserId: user.id,
       email: user.primaryEmailAddress.emailAddress,
+      username: createPermanentProfileUsername({
+        clerkUsername: user.username,
+        email: user.primaryEmailAddress.emailAddress,
+        clerkUserId: user.id,
+      }),
       firstName: user.firstName,
       lastName: user.lastName,
       imageUrl: user.imageUrl,
