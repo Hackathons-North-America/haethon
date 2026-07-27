@@ -607,7 +607,9 @@ export function HackathonSearch({
           </div>
 
           <form
-            className="relative z-30 mx-auto w-full max-w-[1800px]"
+            /* Narrower than the 1800px results grid on purpose — a full-width
+               pill stretches the three fields far past the text they hold. */
+            className="relative z-30 mx-auto w-full max-w-[56rem]"
             ref={filterFormRef}
             onSubmit={(event) => {
               event.preventDefault();
@@ -620,12 +622,12 @@ export function HackathonSearch({
                 pill radius only applies while collapsed — a rounded-full corner
                 on a two-row card reads as a lozenge. */}
             <div
-              className={`flex flex-col rounded-[2.25rem] border border-navy/12 dark:border-white/12 bg-white dark:bg-white/[0.04] p-1 shadow-[0_16px_44px_-20px_rgba(29,42,68,0.35)] ${
+              className={`flex flex-col rounded-[2.25rem] border border-navy/12 dark:border-white/12 bg-white dark:bg-white/[0.04] p-2 shadow-[0_16px_44px_-20px_rgba(29,42,68,0.35)] ${
                 moreFiltersOpen ? "" : "md:rounded-full"
               }`}
             >
             <div className="flex flex-col gap-1 md:flex-row md:items-center">
-            <div className="relative min-h-[3rem] min-w-0 flex-[1.25]">
+            <div className="relative min-h-[4.2rem] min-w-0 flex-[1.25]">
               {countries.map((country) => (
                 <input key={country} name="countries" type="hidden" value={country} />
               ))}
@@ -634,7 +636,7 @@ export function HackathonSearch({
                 aria-controls={locationPopoverId}
                 aria-expanded={openPopover === "location"}
                 aria-label="Location"
-                className={`flex min-h-[3rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-1.5 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
                   openPopover === "location" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                 }`}
                 onClick={() => {
@@ -644,12 +646,12 @@ export function HackathonSearch({
                 }}
                 type="button"
               >
-                <span className="flex items-center gap-1.5 text-xs font-semibold leading-4 text-navy dark:text-wheat">
+                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
                   <Globe2 aria-hidden="true" className="size-3.5" />
                   Location
                 </span>
                 {countries.length ? (
-                  <span className="relative mt-0.5 block min-w-0">
+                  <span className="relative mt-1 block min-w-0">
                     <span className="flex min-w-0 flex-nowrap gap-1.5 overflow-hidden" ref={countryRowRef}>
                       {countries.map((country) => (
                         <span
@@ -670,11 +672,11 @@ export function HackathonSearch({
                     ) : null}
                   </span>
                 ) : distanceKm !== "any" ? (
-                  <span className="mt-0.5 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">
+                  <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">
                     {locationState === "locating" ? "Finding you..." : selectedDistanceLabel}
                   </span>
                 ) : (
-                  <span className="mt-0.5 text-sm leading-5 text-navy/55 dark:text-wheat/55">Country or near me</span>
+                  <span className="mt-1 text-sm leading-5 text-navy/55 dark:text-wheat/55">Country or near me</span>
                 )}
               </button>
               {openPopover === "location" ? (
@@ -865,25 +867,25 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-7 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
+            <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
 
-            <div className="relative min-h-[3rem] min-w-0 flex-1">
+            <div className="relative min-h-[4.2rem] min-w-0 flex-1">
               <input name="datePeriod" type="hidden" value={datePeriod} />
               <button
                 aria-controls={datePopoverId}
                 aria-expanded={openPopover === "date"}
                 aria-label="Date"
-                className={`flex min-h-[3rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-1.5 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
                   openPopover === "date" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                 }`}
                 onClick={() => setOpenPopover((current) => (current === "date" ? null : "date"))}
                 type="button"
               >
-                <span className="flex items-center gap-1.5 text-xs font-semibold leading-4 text-navy dark:text-wheat">
+                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
                   <CalendarDays aria-hidden="true" className="size-3.5" />
                   Date
                 </span>
-                <span className="mt-0.5 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedDateLabel}</span>
+                <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedDateLabel}</span>
               </button>
               {openPopover === "date" ? (
                 <div
@@ -925,9 +927,9 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-7 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
+            <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
 
-            <div className="relative min-h-[3rem] min-w-0 flex-[1.5]">
+            <div className="relative min-h-[4.2rem] min-w-0 flex-[1.5]">
               {featureTags.map((tag) =>
                 tag.value !== "any" ? <input key={tag.key} name={tag.key} type="hidden" value={tag.value} /> : null
               )}
@@ -935,20 +937,20 @@ export function HackathonSearch({
                 aria-controls={featurePopoverId}
                 aria-expanded={openPopover === "features"}
                 aria-labelledby="hackathon-feature-filters-label"
-                className={`flex min-h-[3rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-1.5 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
                   openPopover === "features" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                 }`}
                 onClick={() => setOpenPopover((current) => (current === "features" ? null : "features"))}
                 type="button"
               >
                 <span
-                  className="flex items-center gap-1.5 text-xs font-semibold leading-4 text-navy dark:text-wheat"
+                  className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat"
                   id="hackathon-feature-filters-label"
                 >
                   <Settings2 aria-hidden="true" className="size-3.5" />
                   Features
                 </span>
-                <span className="mt-0.5 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">
+                <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">
                   {selectedFeatureLabels.length ? selectedFeatureLabels.join(", ") : "Add features"}
                 </span>
               </button>
@@ -1003,7 +1005,7 @@ export function HackathonSearch({
               <button
                 aria-controls={moreFiltersId}
                 aria-expanded={moreFiltersOpen}
-                className="shrink-0 px-4 py-1.5 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
+                className="shrink-0 px-4 py-3 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
                 onClick={() => setMoreFiltersOpen((open) => !open)}
                 type="button"
               >
@@ -1026,8 +1028,8 @@ export function HackathonSearch({
               <>
                 <span aria-hidden="true" className="mx-6 my-1 h-px bg-navy/10 dark:bg-white/10" />
                 <div className="flex flex-col gap-1 md:flex-row md:items-center" id={moreFiltersId}>
-                <label className="flex min-h-[3rem] min-w-0 flex-1 flex-col justify-start rounded-full px-6 py-1.5 text-left focus-within:bg-ivory dark:focus-within:bg-white/10 hover:bg-ivory dark:hover:bg-white/10">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold leading-4 text-navy dark:text-wheat">
+                <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-full px-6 py-3 text-left focus-within:bg-ivory dark:focus-within:bg-white/10 hover:bg-ivory dark:hover:bg-white/10">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
                     <Search aria-hidden="true" className="size-3.5" />
                     Name
                   </span>
@@ -1041,25 +1043,25 @@ export function HackathonSearch({
                   />
                 </label>
 
-                <span aria-hidden="true" className="hidden h-7 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
+                <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
 
-                <div className="relative min-h-[3rem] min-w-0 flex-1">
+                <div className="relative min-h-[4.2rem] min-w-0 flex-1">
                   <input name="format" type="hidden" value={format} />
                   <button
                     aria-controls={formatPopoverId}
                     aria-expanded={openPopover === "format"}
                     aria-label="Format"
-                    className={`flex min-h-[3rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-1.5 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+                    className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
                       openPopover === "format" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                     }`}
                     onClick={() => setOpenPopover((current) => (current === "format" ? null : "format"))}
                     type="button"
                   >
-                    <span className="flex items-center gap-1.5 text-xs font-semibold leading-4 text-navy dark:text-wheat">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
                       <MapPin aria-hidden="true" className="size-3.5" />
                       Format
                     </span>
-                    <span className="mt-0.5 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedFormatLabel}</span>
+                    <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedFormatLabel}</span>
                   </button>
                   {openPopover === "format" ? (
                     <div
@@ -1104,27 +1106,27 @@ export function HackathonSearch({
                   ) : null}
                 </div>
 
-                <span aria-hidden="true" className="hidden h-7 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
+                <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
 
                 {/* View picker — Browse / Tier List / Ranking. Changes how the
                     results below are laid out rather than what is fetched. */}
-                <div className="relative min-h-[3rem] min-w-0 flex-1">
+                <div className="relative min-h-[4.2rem] min-w-0 flex-1">
                   {view !== "grid" ? <input name="view" type="hidden" value={view} /> : null}
                   <button
                     aria-controls={viewPopoverId}
                     aria-expanded={openPopover === "view"}
                     aria-label="View"
-                    className={`flex min-h-[3rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-1.5 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+                    className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
                       openPopover === "view" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                     }`}
                     onClick={() => setOpenPopover((current) => (current === "view" ? null : "view"))}
                     type="button"
                   >
-                    <span className="flex items-center gap-1.5 text-xs font-semibold leading-4 text-navy dark:text-wheat">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
                       <LayoutGrid aria-hidden="true" className="size-3.5" />
                       View
                     </span>
-                    <span className="mt-0.5 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedViewLabel}</span>
+                    <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedViewLabel}</span>
                   </button>
                   {openPopover === "view" ? (
                     <div

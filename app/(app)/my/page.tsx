@@ -44,6 +44,7 @@ type PipelineRow = {
   hackathonName: string;
   slug: string;
   imageUrl: string | null;
+  websiteUrl: string | null;
   venue: string | null;
   format: "online" | "in_person";
   city: string | null;
@@ -88,6 +89,7 @@ function toCardData(
     slug: row.slug,
     source,
     startsAt: row.startsAt?.toISOString() ?? null,
+    websiteUrl: row.websiteUrl,
   };
 }
 
@@ -110,6 +112,7 @@ export default async function MyHackathonsPage() {
       hackathonName: hackathons.name,
       slug: hackathons.slug,
       imageUrl: hackathons.imageUrl,
+      websiteUrl: hackathons.websiteUrl,
       venue: hackathons.venue,
       format: hackathons.format,
       city: hackathonLocations.city,

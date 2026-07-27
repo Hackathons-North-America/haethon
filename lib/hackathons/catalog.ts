@@ -95,6 +95,10 @@ type PublicHackathonCard = {
   endsAt: string | null;
   tags: string[];
   travelReimbursement: boolean;
+  /* The organizer's own site, when the listing has one — powers the card's
+     "Visit website" footer link. Application URLs are deliberately not used as
+     a stand-in; the link promises the event's site. */
+  websiteUrl: string | null;
 };
 
 export type CatalogPage = {
@@ -139,6 +143,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       slug: hackathons.slug,
       source: hackathons.source,
       imageUrl: hackathons.imageUrl,
+      websiteUrl: hackathons.websiteUrl,
       venue: hackathons.venue,
       format: hackathons.format,
       beginnerFriendly: hackathons.beginnerFriendly,
@@ -282,6 +287,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         endsAt: row.endsAt?.toISOString() ?? null,
         tags: tagNamesByHackathonId.get(row.id) ?? [],
         travelReimbursement: row.travelReimbursement,
+        websiteUrl: row.websiteUrl,
       };
     }),
     hasMore,

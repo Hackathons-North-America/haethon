@@ -86,9 +86,9 @@ export function AppSidebar({
         transition={{ delay: 0.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
         <div
-          className={`lg:absolute lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[4.75rem] lg:flex-col lg:overflow-hidden lg:border-r lg:border-ink/15 lg:bg-paper lg:transition-[width,box-shadow] lg:duration-300 lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:group-hover:shadow-[10px_0_40px_-16px_rgba(27,25,23,0.35)] lg:group-focus-within:shadow-[10px_0_40px_-16px_rgba(27,25,23,0.35)] ${expand}`}
+          className={`lg:absolute lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-[4.75rem] lg:flex-col lg:overflow-hidden lg:border-r lg:border-ink/15 lg:bg-paper lg:transition-[width,box-shadow] lg:duration-300 lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:group-hover:shadow-[10px_0_40px_-16px_rgba(27,25,23,0.35)] lg:group-has-[:focus-visible]:shadow-[10px_0_40px_-16px_rgba(27,25,23,0.35)] ${expand}`}
         >
-          <div className="flex items-center gap-4 px-5 pb-0 pt-5 lg:block lg:shrink-0 lg:px-0 lg:pt-6 lg:text-center lg:transition-[padding] lg:duration-300 lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:group-hover:px-7 lg:group-hover:text-left lg:group-focus-within:px-7 lg:group-focus-within:text-left">
+          <div className="flex items-center gap-4 px-5 pb-0 pt-5 lg:block lg:shrink-0 lg:px-0 lg:pt-6 lg:text-center lg:transition-[padding] lg:duration-300 lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:group-hover:px-7 lg:group-hover:text-left lg:group-has-[:focus-visible]:px-7 lg:group-has-[:focus-visible]:text-left">
             <Link className="block" href={isSignedIn ? "/?home" : "/"}>
               <span className="whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-ink lg:text-xl">
                 HNA

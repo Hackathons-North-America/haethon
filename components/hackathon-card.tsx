@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BellPlus, Check, ChevronDown, Swords } from "lucide-react";
+import { ArrowUpRight, BellPlus, Check, ChevronDown, Swords } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
@@ -56,6 +56,9 @@ export type HackathonCardData = {
       when it isn't on their My Hackathons board). */
   trackedStatus?: string | null;
   travelReimbursement?: boolean;
+  /** The organizer's own site. Drives the footer's "Visit website" link; the
+      link is omitted entirely when the listing has no website of its own. */
+  websiteUrl?: string | null;
 };
 
 function handleUnauthenticated() {
@@ -649,11 +652,14 @@ function ReminderControl({ hackathonId, statusLabel, options: initialOptions }: 
   );
 }
 
-/* One entry in the cover-image action row. Bare text rather than a chip: the
-   row sits on the white gradient at the foot of the image, and buttons would
-   fight the card's border-and-rule styling. */
+/* One cell in the action row. `flex-1 basis-0` is what evens them out: every
+   button takes an equal share of the band whether the card offers two actions
+   or four. Each fills the band edge to edge — no padding around the strip — and
+   is divided from its neighbour by a black rule; `first:border-l-0` leaves that
+   job to the card's own left frame. Labels wrap rather than clip on the
+   narrowest cards, where "Add to calendar" won't fit on one line. */
 const cardActionClassName =
-  "relative inline-flex min-h-8 items-center gap-1 whitespace-nowrap text-[11px] font-medium leading-4 text-ink/80 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine @[26rem]:text-[12px]";
+  "group/action relative flex min-h-9 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-2 py-1.5 text-center text-[11px] font-medium leading-[1.2] text-ink transition-colors first:border-l-0 hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine";
 
 /* Dropdowns span the full width of the action row and open downward over the
    card body — the article clips overflow, so anchoring them to the row's edges
@@ -809,7 +815,7 @@ function CardReminderMenu({
   );
 }
 
-/* The row of actions laid over the foot of the cover image: calendar, the
+/* The band of actions between the cover image and the card body: calendar, the
    event's Discord channel, a Face Off matchup anchored on this hackathon, and
    reminders. Sits above the card-wide detail link, so each one is clickable
    without opening the hackathon. */
@@ -829,19 +835,12 @@ function CardActionBar({
 
   useDismissOnOutside(openMenu !== null, rootRef, () => setOpenMenu(null));
 
+  /* Its own band on the card's paper, ruled off the cover above and the body
+     below in the card's own black — no gradient wash, so the labels never sit
+     on the artwork. `relative` both anchors the dropdowns and lifts the row
+     over the card-wide detail link. */
   const rowClassName =
-    "absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-x-4 gap-y-0.5 px-4 pb-1.5 @[26rem]:px-5 @[26rem]:pb-2";
-
-  /* White wash rising off the foot of the cover so the labels stay legible over
-     any image. Sized off the row itself — near-solid behind the text, gone
-     2.5rem above it — so a row that wraps to two lines keeps its backing. */
-  const wash = (
-    <div
-      aria-hidden="true"
-      /* `bottom-px` keeps the cover's hairline rule visible under the wash. */
-      className="pointer-events-none absolute inset-x-0 bottom-px -top-10 bg-[linear-gradient(to_top,#fff_0,rgb(255_255_255/0.92)_calc(100%_-_2.5rem),transparent_100%)]"
-    />
-  );
+    "relative z-20 flex shrink-0 items-stretch border-b border-black bg-paper";
 
   /* Preview cards (the landing backdrop, admin approval previews) stand in for
      a real card, so the row still shows — but as labels, since there is no
@@ -849,16 +848,15 @@ function CardActionBar({
   if (preview) {
     return (
       <div aria-hidden="true" className={rowClassName}>
-        {wash}
         {hackathon.startsAt ? <span className={cardActionClassName}>Add to calendar</span> : null}
         {hackathon.discordUrl ? (
           <span className={cardActionClassName}>
-            <DiscordGlyph className="size-3.5 text-[#5865F2]" />
+            <DiscordGlyph className="hidden size-3 shrink-0 text-[#5865F2] @[30rem]:block" />
             Chat on Discord
           </span>
         ) : null}
         <span className={cardActionClassName}>
-          <Swords className="size-3.5" />
+          <Swords className="hidden size-3 shrink-0 @[30rem]:block" />
           Face Off
         </span>
         {showReminder ? <span className={cardActionClassName}>Add reminder</span> : null}
@@ -868,8 +866,6 @@ function CardActionBar({
 
   return (
     <div className={rowClassName} ref={rootRef}>
-      {wash}
-
       {hackathon.startsAt ? (
         <CardCalendarMenu
           hackathon={hackathon}
@@ -885,7 +881,9 @@ function CardActionBar({
           rel="noopener noreferrer"
           target="_blank"
         >
-          <DiscordGlyph className="size-3.5 text-[#5865F2]" />
+          {/* Blurple on paper, but inherits the label's color once the button
+              fills on hover, where the brand color would muddy against pine. */}
+          <DiscordGlyph className="hidden size-3 shrink-0 text-[#5865F2] group-hover/action:text-current @[30rem]:block" />
           Chat on Discord
         </a>
       ) : null}
@@ -894,7 +892,7 @@ function CardActionBar({
         className={cardActionClassName}
         href={hackathon.slug ? `/face-off?hackathon=${encodeURIComponent(hackathon.slug)}` : "/face-off"}
       >
-        <Swords aria-hidden="true" className="size-3.5" />
+        <Swords aria-hidden="true" className="hidden size-3 shrink-0 @[30rem]:block" />
         Face Off
       </Link>
 
@@ -906,6 +904,44 @@ function CardActionBar({
         />
       ) : null}
     </div>
+  );
+}
+
+/* Footer link out to the organizer's own site. The card body opens our detail
+   page, so this is the one way off the card to the real event site — hence the
+   corner placement and the outward arrow. Rendered as a small-caps mono label
+   so it reads as card metadata rather than competing with the pipeline
+   buttons, and lifted above the card-wide detail link with `z-20`. */
+function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
+  if (!hackathon.websiteUrl) {
+    return null;
+  }
+
+  const className =
+    "relative z-20 inline-flex min-h-8 items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine @[26rem]:text-[11px]";
+  const label = (
+    <>
+      Visit website
+      <ArrowUpRight aria-hidden="true" className="size-3" />
+    </>
+  );
+
+  /* Preview cards (landing backdrop, admin approval previews) stand in for a
+     real listing, so the label shows but never navigates. */
+  return preview ? (
+    <span aria-hidden="true" className={className}>
+      {label}
+    </span>
+  ) : (
+    <a
+      className={className}
+      href={hackathon.websiteUrl}
+      rel="noopener noreferrer"
+      target="_blank"
+      title={`Open the ${hackathon.name} website`}
+    >
+      {label}
+    </a>
   );
 }
 
@@ -1085,37 +1121,35 @@ export function HackathonCard({
         />
       ) : null}
 
-      {/* Not clipped, so the action row's menus can drop past the image's
-          bottom edge and open over the card body. */}
-      <div className="relative shrink-0">
-        <div
-          className={`relative w-full overflow-hidden border-b border-ink/35 ${
-            compact ? "aspect-[5/2]" : "aspect-[2/1]"
-          }`}
-        >
-          {hackathon.image ? (
-            <Image
-              alt={`${hackathon.name} cover`}
-              className="object-cover"
-              fill
-              sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-              src={hackathonLogoSrc(hackathon.id, hackathon.image)}
-              unoptimized
-            />
-          ) : (
-            <span className="grid size-full place-items-center bg-ink/5 px-2 text-center font-mono text-xl font-semibold uppercase tracking-[0.18em] text-ink/35">
-              {hackathon.name
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((word) => word[0]?.toUpperCase())
-                .join("") || "HN"}
-            </span>
-          )}
-        </div>
-
-        <CardActionBar hackathon={hackathon} preview={preview} showReminder={!reminder} />
+      <div
+        className={`relative w-full shrink-0 overflow-hidden border-b border-black ${
+          compact ? "aspect-[5/2]" : "aspect-[2/1]"
+        }`}
+      >
+        {hackathon.image ? (
+          <Image
+            alt={`${hackathon.name} cover`}
+            className="object-cover"
+            fill
+            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            src={hackathonLogoSrc(hackathon.id, hackathon.image)}
+            unoptimized
+          />
+        ) : (
+          <span className="grid size-full place-items-center bg-ink/5 px-2 text-center font-mono text-xl font-semibold uppercase tracking-[0.18em] text-ink/35">
+            {hackathon.name
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((word) => word[0]?.toUpperCase())
+              .join("") || "HN"}
+          </span>
+        )}
       </div>
+
+      {/* Ruled band of its own between the cover and the body. Not clipped, so
+          its menus can drop down and open over the card body below. */}
+      <CardActionBar hackathon={hackathon} preview={preview} showReminder={!reminder} />
 
       <div className="grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] @[26rem]:grid-cols-[8.5rem_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col border-r border-ink/35 px-4 py-6 @[26rem]:px-5 @[26rem]:py-7">
@@ -1169,21 +1203,23 @@ export function HackathonCard({
             {cardDescription(hackathon)}
           </p>
 
+          {/* `min-h-10` keeps every card's footer the same height whether or
+              not it carries a reminder picker or a website link, so a row of
+              cards still lines up. */}
           <div className="relative z-10 mt-5 border-t border-ink/25 pt-4">
-            {reminder ? (
-              <div className="flex items-start justify-between gap-2">
+            <div className="flex min-h-10 items-start justify-between gap-3">
+              {reminder ? (
                 <ReminderControl
                   hackathonId={reminder.hackathonId}
                   options={reminder.options}
                   statusLabel={reminder.statusLabel}
                 />
+              ) : null}
+              <div className="ml-auto flex shrink-0 items-center gap-3">
+                <CardWebsiteLink hackathon={hackathon} preview={preview} />
                 {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
               </div>
-            ) : (
-              /* Keeps every card's footer rule on the same line even when there
-                 is nothing under it — Discord moved to the cover action row. */
-              <div aria-hidden="true" className="min-h-10" />
-            )}
+            </div>
           </div>
         </div>
       </div>
