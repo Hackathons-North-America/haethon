@@ -197,6 +197,13 @@
       "when": 1785190892536,
       "tag": "0027_polite_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1785192440377,
+      "tag": "0028_lame_boomer",
+      "breakpoints": true
     }
   ]
 }

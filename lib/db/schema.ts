@@ -106,6 +106,15 @@ export const userProfiles = pgTable("user_profiles", {
   instagramUrl: text("instagram_url"),
   xUrl: text("x_url"),
   devpostUrl: text("devpost_url"),
+  /* Devpost profile-ownership proof. The user places the one-time code in
+     their Devpost bio; once we see it there, the handle it was checked
+     against is recorded with a timestamp. Imports require the verified
+     handle to still match devpostUrl, so relinking someone else's profile
+     silently invalidates the verification. */
+  devpostVerificationCode: varchar("devpost_verification_code", { length: 32 }),
+  devpostVerifiedHandle: varchar("devpost_verified_handle", { length: 60 }),
+  devpostVerifiedAt: timestamp("devpost_verified_at", { withTimezone: true }),
+  devpostImportedAt: timestamp("devpost_imported_at", { withTimezone: true }),
   portfolioUrl: text("portfolio_url"),
   skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   isPublic: boolean("is_public").notNull().default(true),

@@ -5,6 +5,7 @@ import { Pencil, Save, X } from "lucide-react";
 
 import { SkillsField } from "@/components/forms/skills-field";
 import { ShareProfileDialog } from "@/components/forms/share-profile-dialog";
+import { DevpostImportDialog, type DevpostImportState } from "@/components/forms/devpost-import-dialog";
 import { buildProfileLinks, ProfileSkillsSection, ProfileSocialsSection } from "@/components/profile/profile-sections";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { containsProfanity } from "@/lib/validations/profanity";
@@ -37,6 +38,7 @@ type ProfileFormProps = {
   lastName: string | null;
   profile: ProfileValues | null;
   shareToken: string | null;
+  devpostImport: DevpostImportState;
 };
 
 const inputClassName =
@@ -84,7 +86,7 @@ function draftsFromValues(values: ProfileValues) {
 
 type SocialDrafts = ReturnType<typeof draftsFromValues>;
 
-export function AccountProfileForm({ firstName, lastName, profile, shareToken }: ProfileFormProps) {
+export function AccountProfileForm({ firstName, lastName, profile, shareToken, devpostImport }: ProfileFormProps) {
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [isEditing, setIsEditing] = useState(false);
   const [values, setValues] = useState<ProfileValues>({
@@ -303,6 +305,7 @@ export function AccountProfileForm({ firstName, lastName, profile, shareToken }:
             Edit profile
           </button>
           <ShareProfileDialog initialShareToken={shareToken} />
+          <DevpostImportDialog initialState={devpostImport} />
         </div>
       </div>
 

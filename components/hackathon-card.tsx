@@ -131,6 +131,52 @@ const TIER_TEXT_STYLES: Record<TierLabel, string> = {
   D: "text-[#1D4ED8]",
 };
 
+/* Light companion tints to TIER_TEXT_STYLES, used for the body's airbrushed
+   streak. The label needs a darkened shade for contrast; the streak needs the
+   opposite — a pale wash that stays background against the beige paper. */
+const TIER_STREAK_RGB: Record<TierLabel, string> = {
+  S: "248 113 113",
+  A: "251 146 60",
+  B: "250 204 21",
+  C: "74 222 128",
+  D: "96 165 250",
+};
+
+/* Each variant is a pair of overlapping radial-gradient ellipses whose union
+   forms one irregular light swathe — top-right arc, left blob, bottom sweep,
+   and so on. Two lobes are enough to break the perfect-ellipse look while
+   keeping the streak a minority of the card. */
+const STREAK_VARIANTS: [string, string][] = [
+  ["46% 60% at 84% 16%", "30% 44% at 62% 48%"],
+  ["48% 58% at 10% 52%", "30% 40% at 32% 24%"],
+  ["52% 46% at 60% 94%", "34% 42% at 88% 66%"],
+  ["42% 52% at 44% 6%", "30% 44% at 70% 28%"],
+  ["36% 70% at 92% 55%", "26% 40% at 72% 80%"],
+];
+
+/* Tiling grayscale noise, desaturated feTurbulence. Masked to the streak's own
+   shape so the grain speckles the tinted area and fades out with it. */
+const STREAK_NOISE_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncG type='linear' slope='2.4' intercept='-0.7'/%3E%3CfeFuncB type='linear' slope='2.4' intercept='-0.7'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
+/* The tinted wash and the grain mask for one card. Which variant a card gets is
+   hashed off its name — same trick as getAccentStyle — so the streak reads as
+   random across a grid but never moves between renders. */
+function getTierStreak(name: string, tier: TierLabel) {
+  const hash = Array.from(name).reduce((total, character) => total + character.charCodeAt(0), 0);
+  const shapes = STREAK_VARIANTS[hash % STREAK_VARIANTS.length] ?? STREAK_VARIANTS[0];
+  const rgb = TIER_STREAK_RGB[tier];
+
+  return {
+    wash: shapes
+      .map((shape) => `radial-gradient(${shape}, rgb(${rgb} / 0.5) 0%, rgb(${rgb} / 0) 70%)`)
+      .join(", "),
+    mask: shapes
+      .map((shape) => `radial-gradient(${shape}, black 0%, transparent 74%)`)
+      .join(", "),
+  };
+}
+
 const cardStages: { value: TrackableStatus; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "applied", label: "Applied" },
@@ -867,15 +913,9 @@ function CardActionStack({
       <div aria-hidden="true" className={stackClassName}>
         {hackathon.startsAt ? <span className={cardActionClassName}>Add to calendar</span> : null}
         {hackathon.discordUrl ? (
-          <span className={cardActionClassName}>
-            <DiscordGlyph className="size-3 shrink-0 text-[#5865F2]" />
-            Chat on Discord
-          </span>
+          <span className={cardActionClassName}>Chat on Discord</span>
         ) : null}
-        <span className={cardActionClassName}>
-          <Swords className="size-3 shrink-0" />
-          Face Off
-        </span>
+        <span className={cardActionClassName}>Face Off</span>
         {showReminder ? <span className={cardActionClassName}>Add reminder</span> : null}
       </div>
     );
@@ -898,9 +938,6 @@ function CardActionStack({
           rel="noopener noreferrer"
           target="_blank"
         >
-          {/* Blurple on paper, but inherits the label's color on hover so the
-              glyph darkens along with the words instead of staying brand-bright. */}
-          <DiscordGlyph className="size-3 shrink-0 text-[#5865F2] group-hover/action:text-current" />
           Chat on Discord
           <CardActionUnderline />
         </a>
@@ -910,7 +947,6 @@ function CardActionStack({
         className={cardActionClassName}
         href={hackathon.slug ? `/face-off?hackathon=${encodeURIComponent(hackathon.slug)}` : "/face-off"}
       >
-        <Swords aria-hidden="true" className="size-3 shrink-0" />
         Face Off
         <CardActionUnderline />
       </Link>
@@ -1121,6 +1157,7 @@ export function HackathonCard({
   const weekday = getWeekday(hackathon.startsAt);
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
+  const streak = tier ? getTierStreak(hackathon.name, tier) : null;
 
   return (
     <article
@@ -1175,7 +1212,23 @@ export function HackathonCard({
         preview={preview}
       />
 
-      <div className="grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] @[26rem]:grid-cols-[8.5rem_minmax(0,1fr)]">
+      {/* The tinted wash is the grid's own background so it paints under the
+          columns' text; only the grain rides above as an overlay. */}
+      <div
+        className="relative grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] @[26rem]:grid-cols-[8.5rem_minmax(0,1fr)]"
+        style={streak ? { backgroundImage: streak.wash } : undefined}
+      >
+        {streak ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay"
+            style={{
+              backgroundImage: STREAK_NOISE_URI,
+              maskImage: streak.mask,
+              WebkitMaskImage: streak.mask,
+            }}
+          />
+        ) : null}
         <div className="flex min-w-0 flex-col border-r border-ink/35 px-4 py-6 @[26rem]:px-5 @[26rem]:py-7">
           <CardDate parsed={date} weekday={weekday} />
           {hackathon.isPast ? (

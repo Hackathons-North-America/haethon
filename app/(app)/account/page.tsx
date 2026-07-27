@@ -10,6 +10,7 @@ import { ProfilePinnedSection } from "@/components/profile/profile-sections";
 import { getCurrentUserContext, syncCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfiles } from "@/lib/db/schema";
+import { devpostVerificationState } from "@/lib/devpost/import-service";
 import { loadProfilePageData } from "@/lib/profile/profile-page-data";
 
 const sectionTitleClassName = "text-4xl font-semibold tracking-tight text-ink sm:text-5xl";
@@ -30,6 +31,15 @@ export default async function AccountPage() {
     loadProfilePageData(context.user.id),
   ]);
 
+  const devpostState = profile
+    ? devpostVerificationState(profile)
+    : { handle: null, verified: false, lastImportedAt: null };
+  const devpostImport = {
+    handle: devpostState.handle,
+    verified: devpostState.verified,
+    lastImportedAt: devpostState.lastImportedAt?.toISOString() ?? null,
+  };
+
   return (
     <main className="relative min-h-[calc(100vh-80px)] px-5 py-8 sm:px-8 lg:px-12">
       <div className="mx-auto w-full max-w-[840px]">
@@ -40,6 +50,7 @@ export default async function AccountPage() {
               lastName={context.user.lastName}
               profile={profile ?? null}
               shareToken={profile?.shareToken ?? null}
+              devpostImport={devpostImport}
             />
           </section>
 
