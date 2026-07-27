@@ -127,7 +127,7 @@ export function EmailTestForm({ hackathons }: { hackathons: HackathonOption[] })
         </button>
 
         {status.kind === "success" ? <span className="text-sm text-[#166534]">{status.message}</span> : null}
-        {status.kind === "error" ? <span className="text-sm text-[#B91C1C]">{status.message}</span> : null}
+        {status.kind === "error" ? <span className="text-sm text-[#166534]">{status.message}</span> : null}
       </div>
     </form>
   );

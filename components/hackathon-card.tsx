@@ -147,11 +147,11 @@ const cardStageOrder: Record<string, number> = {
   won: 4,
 };
 
-/* Vertical pipeline picker shown where the tag chips used to sit. Selecting a
-   stage tracks the hackathon on the My Hackathons board at that stage;
-   clicking the active stage again untracks it — this replaces the old
-   bookmark toggle as the way cards are saved to the dashboard. */
-function CardStatusPicker({
+/* Pipeline picker, rendered as the ruled band between the cover and the card
+   body. Selecting a stage tracks the hackathon on the My Hackathons board at
+   that stage; clicking the active stage again untracks it — this replaces the
+   old bookmark toggle as the way cards are saved to the dashboard. */
+function CardStatusBar({
   hackathonId,
   hackathonName,
   initialStatus,
@@ -206,11 +206,13 @@ function CardStatusPicker({
     }
   }
 
+  /* A finished pipeline has nothing left to pick, so the band collapses to a
+     single label spanning it. */
   if (isPastPipeline) {
     return (
-      <div className="mt-auto pt-8">
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium leading-4 text-pine">
-          <Check aria-hidden="true" className="size-3" strokeWidth={3} />
+      <div className={cardBandClassName}>
+        <span className={`${cardBandCellClassName} text-pine`}>
+          <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} />
           {status === "won" ? "Won" : "Attended"}
         </span>
       </div>
@@ -218,11 +220,7 @@ function CardStatusPicker({
   }
 
   return (
-    <div
-      aria-label={`Track ${hackathonName}`}
-      className="relative z-10 mt-auto flex min-w-0 flex-col items-start gap-2.5 pt-8"
-      role="group"
-    >
+    <div aria-label={`Track ${hackathonName}`} className={cardBandClassName} role="group">
       {cardStages.map((stage) => {
         const active = status === stage.value;
         const reached = currentOrder >= cardStageOrder[stage.value];
@@ -230,10 +228,10 @@ function CardStatusPicker({
         return (
           <button
             aria-pressed={active}
-            /* Named group (`group/stage`) so the underline only answers this
-               button's hover, not the card-level `group` hover. */
-            className={`group/stage relative inline-flex min-h-7 items-center gap-1 text-left text-[11px] font-medium leading-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine disabled:cursor-wait disabled:opacity-60 ${
-              reached ? "text-pine" : "text-ink/55 hover:text-ink"
+            /* Stages reached so far read in pine; the rest sit back in muted
+               ink until the pointer fills the cell. */
+            className={`${cardBandCellClassName} disabled:cursor-wait disabled:opacity-60 ${
+              reached ? "text-pine" : "text-ink/55"
             }`}
             disabled={pending}
             key={stage.value}
@@ -247,12 +245,6 @@ function CardStatusPicker({
           >
             {reached ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
             {stage.label}
-            {/* Same slide-in underline as HoverUnderline on the home page,
-                scoped to the named group above. */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-1 h-[1.5px] origin-left scale-x-0 bg-moss transition-transform! duration-300! ease-out! group-hover/stage:scale-x-100 motion-reduce:transition-none!"
-            />
           </button>
         );
       })}
@@ -584,7 +576,7 @@ function ReminderOptionsPanel({
         </p>
       )}
       {limitNotice ? (
-        <p className="mt-2 px-1 pb-1 text-xs font-medium text-cabernet">
+        <p className="mt-2 px-1 pb-1 text-xs font-medium text-pine dark:text-moss">
           For now, you&apos;re limited to five emails per week. Turn another reminder off to make room.
         </p>
       ) : null}
@@ -652,20 +644,44 @@ function ReminderControl({ hackathonId, statusLabel, options: initialOptions }: 
   );
 }
 
-/* One cell in the action row. `flex-1 basis-0` is what evens them out: every
-   button takes an equal share of the band whether the card offers two actions
-   or four. Each fills the band edge to edge — no padding around the strip — and
-   is divided from its neighbour by a black rule; `first:border-l-0` leaves that
-   job to the card's own left frame. Labels wrap rather than clip on the
-   narrowest cards, where "Add to calendar" won't fit on one line. */
-const cardActionClassName =
-  "group/action relative flex min-h-9 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-2 py-1.5 text-center text-[11px] font-medium leading-[1.2] text-ink transition-colors first:border-l-0 hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine";
+/* The band's own paper strip between the cover and the body, ruled off both in
+   the card's black. `relative` lifts it over the card-wide detail link so the
+   stages inside it are clickable without opening the hackathon. */
+const cardBandClassName = "relative z-20 flex shrink-0 items-stretch border-b border-black bg-paper";
 
-/* Dropdowns span the full width of the action row and open downward over the
-   card body — the article clips overflow, so anchoring them to the row's edges
-   is what keeps a wide panel inside the card. */
+/* One cell in the band. `flex-1 basis-0` is what evens them out: every button
+   takes an equal share whether the band offers one stage or four. Each fills
+   the band edge to edge — no padding around the strip — and is divided from its
+   neighbour by a black rule; `first:border-l-0` leaves that job to the card's
+   own left frame. Labels wrap rather than clip on the narrowest cards. The
+   colour is left to the caller so reached stages can read in pine. */
+const cardBandCellClassName =
+  "group/stage relative flex min-h-9 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-2 py-1.5 text-center text-[11px] font-medium leading-[1.2] transition-colors first:border-l-0 hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine";
+
+/* One entry in the action stack at the foot of the date column. Matches the
+   column's other metadata: small, left-aligned, muted until hovered. `relative
+   z-20` lifts each one over the card-wide detail link. */
+const cardActionClassName =
+  "group/action relative z-20 inline-flex min-h-7 min-w-0 items-center gap-1 text-left text-[11px] font-medium leading-4 text-ink/55 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
+
+/* Same slide-in underline as HoverUnderline on the home page, scoped to the
+   named `group/action` above so it only answers its own entry's hover. */
+function CardActionUnderline() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] origin-left scale-x-0 bg-moss transition-transform! duration-300! ease-out! group-hover/action:scale-x-100 motion-reduce:transition-none!"
+    />
+  );
+}
+
+/* The stack sits at the bottom of a ~7rem column, so its dropdowns anchor to
+   the card itself rather than to the entry that opened them: bottom-aligned and
+   inset from the card's frame, they get the full width and height of the card
+   to open into. The article clips overflow, so this is what keeps a wide panel
+   inside it. */
 const cardMenuClassName =
-  "absolute inset-x-0 top-full z-30 mt-1.5 border border-ink/15 bg-paper p-3 text-left shadow-lg";
+  "absolute inset-x-3 bottom-3 z-30 border border-ink/15 bg-paper p-3 text-left shadow-lg";
 
 /* "Add to calendar" for a card. The provider links are built only once the menu
    opens: they embed the absolute page URL, which is unavailable during SSR. */
@@ -707,6 +723,7 @@ function CardCalendarMenu({
         type="button"
       >
         Add to calendar
+        <CardActionUnderline />
       </button>
       {open ? (
         <div className={cardMenuClassName} role="menu">
@@ -791,11 +808,12 @@ function CardReminderMenu({
     <>
       <button aria-expanded={open} className={cardActionClassName} onClick={handleClick} type="button">
         {enabledCount ? `Reminders · ${enabledCount}` : "Add reminder"}
+        <CardActionUnderline />
       </button>
       {open ? (
         <div className={cardMenuClassName}>
           {loadFailed ? (
-            <p className="px-1 text-xs font-medium text-cabernet">
+            <p className="px-1 text-xs font-medium text-pine dark:text-moss">
               Could not load reminders. Close this and try again.
             </p>
           ) : options ? (

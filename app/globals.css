@@ -4,7 +4,9 @@
 
 @theme inline {
   /* Paper-and-ink palette: warm cream ground, near-black warm ink,
-     evergreen accents. Cabernet is reserved for destructive actions. */
+     evergreen accents. Cabernet is now only used by the faceoff game's
+     wrong-answer state and the logo fallback ramp — not by destructive
+     actions or errors, which use pine. */
   --color-paper: #fbf7f0;
   --color-ink: #1b1917;
   --color-pine: #007354;

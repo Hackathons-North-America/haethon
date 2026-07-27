@@ -45,7 +45,7 @@ export function EmailPreferencesToggle({ initialEnabled }: { initialEnabled: boo
             ? "Reminders and submission updates are sent to your email."
             : "All Haethon emails are turned off, including your saved reminders."}
         </p>
-        {error ? <p className="mt-1 text-sm font-semibold text-cabernet">{error}</p> : null}
+        {error ? <p className="mt-1 text-sm font-semibold text-pine dark:text-moss">{error}</p> : null}
       </div>
       <button
         aria-pressed={enabled}

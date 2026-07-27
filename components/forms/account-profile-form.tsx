@@ -56,8 +56,8 @@ const prefixInputClassName =
   "w-full min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink/40";
 const labelClassName = "mb-1.5 block text-sm font-semibold text-ink";
 const headingClassName = "text-sm font-semibold uppercase tracking-[0.2em] text-pine";
-const fieldErrorClassName = "mt-1.5 text-xs font-semibold text-cabernet";
-const errorBorderClassName = "border-cabernet";
+const fieldErrorClassName = "mt-1.5 text-xs font-semibold text-pine";
+const errorBorderClassName = "border-pine";
 const defaultBorderClassName = "border-ink/20";
 
 const PROFANITY_MESSAGE = "Please remove the inappropriate language.";

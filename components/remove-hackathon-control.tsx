@@ -83,7 +83,7 @@ export function RemoveHackathonControl({
         aria-label={`Remove ${hackathonName} from your ${listLabel} list`}
         className={
           className ??
-          "relative z-20 grid size-8 place-items-center rounded-full text-navy/55 dark:text-wheat/55 transition-colors hover:bg-cabernet/10 hover:text-cabernet dark:hover:text-[#e4a3ab] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cabernet/35 dark:focus-visible:outline-wheat/40"
+          "relative z-20 grid size-8 place-items-center rounded-full text-navy/55 dark:text-wheat/55 transition-colors hover:bg-pine/10 hover:text-pine dark:hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
         }
         draggable={false}
         onClick={(event) => {
@@ -132,7 +132,7 @@ export function RemoveHackathonControl({
                     No
                   </button>
                   <button
-                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-cabernet px-5 text-sm font-semibold text-wheat transition-colors hover:bg-cabernet/90 dark:bg-[#e4a3ab] dark:text-[#141414] dark:hover:bg-[#e9b3ba] disabled:cursor-wait disabled:opacity-70"
+                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-wheat transition-colors hover:bg-pine/90 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white disabled:cursor-wait disabled:opacity-70"
                     disabled={pending}
                     onClick={confirmRemove}
                     type="button"

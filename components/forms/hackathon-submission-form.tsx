@@ -348,7 +348,7 @@ export function HackathonSubmissionForm() {
             {status === "submitting" ? "Submitting" : "Submit for review"}
           </button>
           {message ? (
-            <p aria-live="polite" className={`text-sm ${status === "error" ? "text-cabernet dark:text-[#e4a3ab]" : "text-navy/70 dark:text-wheat/70"}`}>
+            <p aria-live="polite" className={`text-sm ${status === "error" ? "text-pine dark:text-moss" : "text-navy/70 dark:text-wheat/70"}`}>
               {message}
             </p>
           ) : null}

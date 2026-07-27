@@ -217,6 +217,13 @@ export function HackathonSearch({
   const countrySearchRef = useRef<HTMLInputElement>(null);
   const countryRowRef = useRef<HTMLDivElement>(null);
   const [countriesOverflow, setCountriesOverflow] = useState(false);
+  /* Infinite scroll: the sentinel below the grid reports when it enters the
+     viewport, and an effect fetches the next page while it stays visible.
+     autoLoadedOffsetRef remembers the last offset we auto-requested so a failed
+     or empty page can't retry itself forever. */
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const autoLoadedOffsetRef = useRef(-1);
+  const [loadMoreVisible, setLoadMoreVisible] = useState(false);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -394,6 +401,44 @@ export function HackathonSearch({
     replaceSearchUrl({ ...appliedFilters, view }, basePath, hasSearched);
   }, [appliedFilters, basePath, hasSearched, view]);
 
+  /* Watch the sentinel rather than the scroll position so nested scroll
+     containers and the page itself both work. The margin starts the fetch a
+     screen early, so the next rows are usually there before the visitor
+     reaches the end of the grid. */
+  useEffect(() => {
+    const node = loadMoreRef.current;
+
+    if (!node) {
+      setLoadMoreVisible(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setLoadMoreVisible(entry.isIntersecting),
+      { rootMargin: "600px 0px" }
+    );
+
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [hasSearched, hasMore]);
+
+  useEffect(() => {
+    if (!loadMoreVisible || !hasSearched || !hasMore || isSearching) {
+      return;
+    }
+
+    // The sentinel often stays visible after a page lands, which re-runs this
+    // effect and chains straight into the following page. Skip the offset we
+    // already asked for so a request that returns nothing can't spin.
+    if (autoLoadedOffsetRef.current === catalog.length) {
+      return;
+    }
+
+    autoLoadedOffsetRef.current = catalog.length;
+    void searchHackathons(appliedFilters, catalog.length, true);
+  }, [appliedFilters, catalog.length, hasMore, hasSearched, isSearching, loadMoreVisible]);
+
   const cardHelpers = useMemo<HackathonCardHelpers>(
     () => ({
       updateCard: (next) => setCatalog((current) => current.map((entry) => (entry.id === next.id ? next : entry))),
@@ -480,6 +525,11 @@ export function HackathonSearch({
     setSearchError(null);
     setOpenPopover(null);
 
+    if (!append) {
+      // New result set, so the auto-load guard starts over.
+      autoLoadedOffsetRef.current = -1;
+    }
+
     if (filters.distanceKm !== "any" && !origin && locationState !== "locating") {
       void locate();
     }
@@ -525,6 +575,11 @@ export function HackathonSearch({
       setHasSearched(true);
     } catch {
       setSearchError("Couldn’t load hackathons. Please try again.");
+      if (append) {
+        // Don't auto-retry a page that just failed; the Try again button
+        // clears the guard instead.
+        autoLoadedOffsetRef.current = offset;
+      }
     } finally {
       setIsSearching(false);
     }
@@ -1177,15 +1232,15 @@ export function HackathonSearch({
             </div>
           </form>
 
-          <div className="mt-4 min-h-6 px-2 text-sm text-navy/55 dark:text-wheat/55" role="status">
+          <div
+            className={`px-2 text-sm text-navy/55 dark:text-wheat/55 ${
+              searchError || !hasSearched ? "mt-4 min-h-6" : ""
+            }`}
+            role="status"
+          >
             {searchError ? (
-              <span className="font-semibold text-cabernet dark:text-[#e4a3ab]">{searchError}</span>
-            ) : hasSearched ? (
-              <span>
-                Showing {filteredHackathons.length} {filteredHackathons.length === 1 ? "hackathon" : "hackathons"}
-                {activeFilters ? " matching your filters." : " from the catalog."}
-              </span>
-            ) : (
+              <span className="font-semibold text-pine dark:text-moss">{searchError}</span>
+            ) : hasSearched ? null : (
               <span>Choose your filters, then press Search to load hackathons.</span>
             )}
           </div>
@@ -1264,15 +1319,27 @@ export function HackathonSearch({
           )}
 
           {hasSearched && hasMore ? (
-            <div className="mt-10 flex justify-center">
-              <button
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-navy/15 px-6 text-sm font-semibold text-navy transition-colors hover:border-navy disabled:cursor-wait disabled:opacity-50 dark:border-white/15 dark:text-wheat dark:hover:border-white/60"
-                disabled={isSearching}
-                onClick={() => void searchHackathons(appliedFilters, catalog.length, true)}
-                type="button"
-              >
-                {isSearching ? "Loading…" : "Load more"}
-              </button>
+            <div className="mt-10 flex justify-center" ref={loadMoreRef}>
+              {searchError ? (
+                <button
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-navy/15 px-6 text-sm font-semibold text-navy transition-colors hover:border-navy disabled:cursor-wait disabled:opacity-50 dark:border-white/15 dark:text-wheat dark:hover:border-white/60"
+                  disabled={isSearching}
+                  onClick={() => {
+                    autoLoadedOffsetRef.current = -1;
+                    void searchHackathons(appliedFilters, catalog.length, true);
+                  }}
+                  type="button"
+                >
+                  Try again
+                </button>
+              ) : (
+                <span
+                  aria-live="polite"
+                  className="min-h-11 text-sm font-semibold text-navy/55 dark:text-wheat/55"
+                >
+                  Loading more hackathons…
+                </span>
+              )}
             </div>
           ) : null}
         </div>

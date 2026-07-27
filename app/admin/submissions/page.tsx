@@ -16,7 +16,7 @@ const statusStyles: Record<string, string> = {
   pending: "bg-ink/10 text-ink/70",
   approved: "bg-pine/10 text-pine",
   merged: "bg-pine/10 text-pine",
-  rejected: "bg-cabernet/10 text-cabernet",
+  rejected: "bg-pine/10 text-pine",
   withdrawn: "bg-ink/10 text-ink/55",
 };
 
