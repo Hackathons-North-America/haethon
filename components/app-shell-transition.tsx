@@ -11,7 +11,8 @@ export function AppShellContent({ children }: { children: ReactNode }) {
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
-      className="relative z-10 min-w-0 flex-1"
+      // Clears the fixed phone tab bar (3.5rem + home-indicator inset).
+      className="relative z-10 min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0"
       initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
       transition={{ delay: 0.42, duration: 0.55, ease }}
     >

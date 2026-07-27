@@ -135,7 +135,7 @@ function BackdropApp() {
         </div>
         <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink">
           <PlusSquare aria-hidden="true" className="size-4" />
-          New entry
+          Submit a hackathon
         </span>
       </div>
 

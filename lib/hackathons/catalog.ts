@@ -13,7 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
-import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
+import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
 import { getLiveFaceoffRatings } from "@/lib/hackathons/faceoff-service";
 import type { TierLabel } from "@/lib/hackathons/ranking";
 import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
@@ -63,6 +63,9 @@ type PublicHackathonCard = {
   countryCode: string | null;
   date: string;
   description: string | null;
+  /* Deep link to the event's Discord channel, when one exists — powers the
+     card's "Chat on Discord" action without a per-card lookup. */
+  discordUrl: string | null;
   eloRating: number;
   faceoffLosses: number;
   faceoffWins: number;
@@ -87,6 +90,9 @@ type PublicHackathonCard = {
   isPast: boolean;
   source: HackathonSourceBadge | null;
   startsAt: string | null;
+  /* Paired with startsAt for the card's calendar link; null when only a start
+     date is known. */
+  endsAt: string | null;
   tags: string[];
   travelReimbursement: boolean;
 };
@@ -222,8 +228,8 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
   // Dropping rows after the LIMIT can shorten a paginated API page by at most
   // one row per recurring series; hasMore already reflects the underlying set.
   const pageRows = selectVisibleCatalogRows(fetchedRows, seriesWithCurrentEdition, now);
-  const [discordHackathonIds, tagRows] = await Promise.all([
-    getHackathonIdsWithDiscord(pageRows),
+  const [discordLinks, tagRows] = await Promise.all([
+    getDiscordLinksByHackathon(pageRows),
     pageRows.length
       ? db
           .select({
@@ -254,11 +260,12 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         countryCode: row.countryCode ?? null,
         date: formatDateRange(row.startsAt, row.endsAt),
         description: row.description,
+        discordUrl: discordLinks.get(row.id) ?? null,
         eloRating: 1500,
         faceoffWins: 0,
         faceoffLosses: 0,
         format: row.format,
-        hasDiscord: discordHackathonIds.has(row.id),
+        hasDiscord: discordLinks.has(row.id),
         highSchoolersOnly: row.highSchoolersOnly,
         id: row.id,
         image: row.imageUrl,
@@ -272,6 +279,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         slug: row.slug,
         source: row.source ? sourceBadge(row.source) : null,
         startsAt: row.startsAt?.toISOString() ?? null,
+        endsAt: row.endsAt?.toISOString() ?? null,
         tags: tagNamesByHackathonId.get(row.id) ?? [],
         travelReimbursement: row.travelReimbursement,
       };

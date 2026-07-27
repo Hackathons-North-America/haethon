@@ -29,6 +29,13 @@ describe("computeSelectableReminderPlan", () => {
     ]);
   });
 
+  it("offers attending hackers the same event-start reminders as accepted", () => {
+    expect(getSelectableReminderTypesForStatus("attending")).toEqual([
+      "hackathon_week_before",
+      "hackathon_day_before",
+    ]);
+  });
+
   it("offers interested hackers the application reminders", () => {
     expect(getSelectableReminderTypesForStatus("interested")).toEqual([
       "application_week_before",

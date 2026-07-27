@@ -3,51 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, CalendarDays } from "lucide-react";
 
-type Props = {
-  title: string;
-  startsAt: string; // ISO
-  endsAt: string; // ISO
-  location?: string | null;
-  description?: string | null;
-  url?: string | null;
-};
+import { calendarProviderLinks, type CalendarEvent } from "@/lib/hackathons/calendar-links";
 
-// Compact UTC form used by Google Calendar: YYYYMMDDTHHMMSSZ
-function toCompactUtc(iso: string) {
-  return new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-}
-
-function buildDetails({ description, url }: Pick<Props, "description" | "url">) {
-  return [description?.trim(), url ? `More info: ${url}` : null].filter(Boolean).join("\n\n");
-}
-
-function googleUrl({ title, startsAt, endsAt, location, description, url }: Props) {
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: title,
-    dates: `${toCompactUtc(startsAt)}/${toCompactUtc(endsAt)}`,
-    details: buildDetails({ description, url }),
-    location: location ?? "",
-  });
-
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
-}
-
-function outlookUrl({ title, startsAt, endsAt, location, description, url }: Props) {
-  const params = new URLSearchParams({
-    path: "/calendar/action/compose",
-    rru: "addevent",
-    subject: title,
-    startdt: new Date(startsAt).toISOString(),
-    enddt: new Date(endsAt).toISOString(),
-    body: buildDetails({ description, url }),
-    location: location ?? "",
-  });
-
-  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
-}
-
-export function AddToCalendarButton(props: Props) {
+export function AddToCalendarButton(props: CalendarEvent) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -77,10 +35,7 @@ export function AddToCalendarButton(props: Props) {
     };
   }, [open]);
 
-  const options = [
-    { label: "Google Calendar", href: googleUrl(props) },
-    { label: "Outlook", href: outlookUrl(props) },
-  ];
+  const options = calendarProviderLinks(props);
 
   return (
     <div className="relative" ref={containerRef}>

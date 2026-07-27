@@ -55,12 +55,17 @@ export type HackathonDatesInput = {
 /**
  * Notification choices follow the hacker's current stage. While they are only
  * interested, reminders count down to the application opening so they don't
- * miss it; once accepted, only the event-start reminders are relevant.
+ * miss it; once accepted or attending, only the event-start reminders are
+ * relevant.
  */
 export function getSelectableReminderTypesForStatus(
   applicationStatus: string | null
 ): SelectableReminderType[] {
-  if (applicationStatus === "applied" || applicationStatus === "accepted") {
+  if (
+    applicationStatus === "applied" ||
+    applicationStatus === "accepted" ||
+    applicationStatus === "attending"
+  ) {
     return ["hackathon_week_before", "hackathon_day_before"];
   }
 

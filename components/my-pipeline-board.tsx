@@ -15,7 +15,7 @@ function redirectToSignIn() {
   window.location.href = "/sign-in";
 }
 
-export type PipelineStage = "interested" | "applied" | "accepted";
+export type PipelineStage = "interested" | "applied" | "accepted" | "attending";
 
 type PipelineCard = {
   /* The userHackathons row id — stable React key across stage moves. */
@@ -34,7 +34,7 @@ export type PipelineColumn = {
 type DragState = { hackathonId: string; from: PipelineStage } | null;
 
 /* Notion-style pipeline board where each card can be dragged between the
-   interested / applied / accepted columns. Drops optimistically re-slot the
+   interested / applied / accepted / attending columns. Drops optimistically re-slot the
    card, PATCH the tracking status, then refresh so the server recomputes the
    reminders offered for the new stage. */
 export function MyPipelineBoard({ columns: initialColumns }: { columns: PipelineColumn[] }) {

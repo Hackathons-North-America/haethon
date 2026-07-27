@@ -9,8 +9,18 @@ export const metadata: Metadata = {
     "Guess which hackathon ranks higher or lower, chase your high score, and shift the live Elo leaderboard with every pick.",
 };
 
-export default async function FaceOffPage() {
-  const { cards } = await getPublicHackathonCatalogSnapshot();
+export default async function FaceOffPage({
+  searchParams,
+}: {
+  /* `?hackathon=<slug>` arrives from a card's Face Off action — the first
+     matchup is then dealt with that hackathon on the board. An unknown slug
+     just falls through to a random pairing. */
+  searchParams: Promise<{ hackathon?: string }>;
+}) {
+  const [{ cards }, params] = await Promise.all([getPublicHackathonCatalogSnapshot(), searchParams]);
+  const anchorId = params.hackathon
+    ? (cards.find((card) => card.slug === params.hackathon)?.id ?? null)
+    : null;
 
   const pool = cards.map((card) => ({
     id: card.id,
@@ -29,7 +39,7 @@ export default async function FaceOffPage() {
 
   return (
     <main className="min-h-screen w-full">
-      <FaceoffArena pool={pool} />
+      <FaceoffArena anchorId={anchorId} pool={pool} />
     </main>
   );
 }

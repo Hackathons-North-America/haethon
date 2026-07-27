@@ -19,7 +19,7 @@ import {
   userHackathons,
 } from "@/lib/db/schema";
 import { formatDateRange, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
-import { getHackathonIdsWithDiscord } from "@/lib/hackathons/discord-cards";
+import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
 import { getPrimarySourceByHackathon } from "@/lib/hackathons/source-badges";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { reminderTypeLabels } from "@/lib/hackathons/reminder-labels";
@@ -30,7 +30,7 @@ import {
 
 export const metadata: Metadata = {
   title: "My Hackathons | Hackathons North America",
-  description: "Track where you stand with every hackathon, from interested to accepted.",
+  description: "Track where you stand with every hackathon, from interested to attending.",
 };
 
 type PipelineRow = {
@@ -57,28 +57,37 @@ type PipelineRow = {
   acceptanceAt: Date | null;
 };
 
-const stageOrder = ["interested", "applied", "accepted"] as const;
+const stageOrder = ["interested", "applied", "accepted", "attending"] as const;
 
 const stageTitles: Record<(typeof stageOrder)[number], string> = {
   interested: "Interested",
   applied: "Applied",
   accepted: "Accepted",
+  attending: "Attending",
 };
 
-function toCardData(row: PipelineRow, hasDiscord: boolean, source: HackathonSourceBadge | null): HackathonCardData {
+function toCardData(
+  row: PipelineRow,
+  discordUrl: string | null,
+  source: HackathonSourceBadge | null
+): HackathonCardData {
   const location = formatLocationParts(row);
 
   return {
     country: location.country,
     date: formatDateRange(row.startsAt, row.endsAt),
     description: row.description,
-    hasDiscord,
+    discordUrl,
+    endsAt: row.endsAt?.toISOString() ?? null,
+    format: row.format,
+    hasDiscord: Boolean(discordUrl),
     id: row.hackathonId,
     image: row.imageUrl,
     location: location.locality ?? "Location TBA",
     name: row.hackathonName,
     slug: row.slug,
     source,
+    startsAt: row.startsAt?.toISOString() ?? null,
   };
 }
 
@@ -146,8 +155,8 @@ export default async function MyHackathonsPage() {
   pastRows.sort((a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0));
 
   const activeCount = stageOrder.reduce((total, stage) => total + (byStage.get(stage)?.length ?? 0), 0);
-  const [discordHackathonIds, sourceByHackathon, preferenceRows, countryAlertRows] = await Promise.all([
-    getHackathonIdsWithDiscord(rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))),
+  const [discordLinks, sourceByHackathon, preferenceRows, countryAlertRows] = await Promise.all([
+    getDiscordLinksByHackathon(rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))),
     getPrimarySourceByHackathon(rows.map((row) => row.hackathonId)),
     db
       .select({
@@ -213,7 +222,7 @@ export default async function MyHackathonsPage() {
     cards: (byStage.get(stage) ?? []).map((row) => ({
       userHackathonId: row.id,
       hackathonId: row.hackathonId,
-      card: toCardData(row, discordHackathonIds.has(row.hackathonId), sourceByHackathon.get(row.hackathonId) ?? null),
+      card: toCardData(row, discordLinks.get(row.hackathonId) ?? null, sourceByHackathon.get(row.hackathonId) ?? null),
       reminder: toReminder(row, stageTitles[stage]),
     })),
   }));

@@ -1,12 +1,69 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 import { DiscordIcon } from "@/components/discord-icon";
 import { HoverUnderline } from "@/components/hover-underline";
 
+// Near the top of the page the nav always stays put, and a direction flip has
+// to clear a few pixels before it counts — otherwise momentum and rubber-band
+// scrolling make the bar flicker.
+const REVEAL_ZONE = 72;
+const DIRECTION_THRESHOLD = 6;
+
+// Hides the nav while scrolling down, brings it back on the first scroll up.
+function useHiddenOnScrollDown() {
+  const [hidden, setHidden] = useState(false);
+  const lastY = useRef(0);
+  const frame = useRef<number | null>(null);
+
+  useEffect(() => {
+    lastY.current = Math.max(window.scrollY, 0);
+
+    const update = () => {
+      frame.current = null;
+      const y = Math.max(window.scrollY, 0);
+      const delta = y - lastY.current;
+
+      if (Math.abs(delta) >= DIRECTION_THRESHOLD) {
+        setHidden(delta > 0 && y > REVEAL_ZONE);
+        lastY.current = y;
+      } else if (y <= REVEAL_ZONE) {
+        setHidden(false);
+      }
+    };
+
+    const requestUpdate = () => {
+      if (frame.current !== null) return;
+      frame.current = window.requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", requestUpdate);
+      if (frame.current !== null) {
+        window.cancelAnimationFrame(frame.current);
+      }
+    };
+  }, []);
+
+  return hidden;
+}
+
 export function PrimaryNav() {
+  const hidden = useHiddenOnScrollDown();
+
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-0 z-40 px-4 pt-4 sm:px-6 sm:pt-5">
+    <header
+      // The `!` suffixes let the slide beat the global 160ms color transition
+      // that layout.tsx applies to every element.
+      className={`pointer-events-none fixed inset-x-0 top-0 z-40 px-4 pt-4 transition-transform! duration-300! ease-out! focus-within:translate-y-0 motion-reduce:transition-none! sm:px-6 sm:pt-5 ${
+        hidden ? "-translate-y-full" : "translate-y-0"
+      }`}
+    >
       <nav
         aria-label="Primary navigation"
         className="pointer-events-auto mx-auto flex w-full max-w-[1080px] items-center justify-between gap-3 bg-paper px-3 py-2 sm:gap-4 sm:px-4 sm:py-2.5"

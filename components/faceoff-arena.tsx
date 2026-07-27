@@ -422,7 +422,15 @@ function ArenaSide({
   );
 }
 
-export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
+export function FaceoffArena({
+  anchorId = null,
+  pool,
+}: {
+  /* Hackathon to deal into the opening matchup, set when a card's Face Off
+     action links here. Later matchups chain as usual. */
+  anchorId?: string | null;
+  pool: FaceoffHackathon[];
+}) {
   const reduceMotion = Boolean(useReducedMotion());
   const [livePool, setLivePool] = useState(pool);
   const livePoolRef = useRef(livePool);
@@ -690,9 +698,9 @@ export function FaceoffArena({ pool }: { pool: FaceoffHackathon[] }) {
   }, [advanceMatchup, issuedMatchup, matchup, phase]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => requestMatchup([]), 0);
+    const timer = window.setTimeout(() => requestMatchup([], anchorId ?? undefined), 0);
     return () => window.clearTimeout(timer);
-  }, [requestMatchup]);
+  }, [anchorId, requestMatchup]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {

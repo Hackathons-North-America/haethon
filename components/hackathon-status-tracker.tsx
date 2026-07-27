@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 
-export type TrackableStatus = "interested" | "applied" | "accepted";
+export type TrackableStatus = "interested" | "applied" | "accepted" | "attending";
 
 function handleUnauthenticated() {
   window.location.href = "/sign-in";
@@ -14,14 +14,16 @@ const stages: { value: TrackableStatus; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "applied", label: "Applied" },
   { value: "accepted", label: "Accepted" },
+  { value: "attending", label: "Attending" },
 ];
 
 const stageOrder: Record<string, number> = {
   interested: 0,
   applied: 1,
   accepted: 2,
-  attended: 3,
-  won: 3,
+  attending: 3,
+  attended: 4,
+  won: 4,
 };
 
 export function HackathonStatusTracker({
