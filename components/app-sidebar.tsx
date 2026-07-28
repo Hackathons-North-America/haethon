@@ -23,8 +23,8 @@ type SidebarLink = {
   icon: ElementType;
   label: string;
   external?: boolean;
-  // Featured entries render Airbnb-style: bold title over a small muted
-  // description, separated from the neighbouring sections by dividers.
+  // Featured entries render like the other rows but add a small muted
+  // description under the label, separated from neighbours by dividers.
   description?: string;
 };
 
@@ -165,60 +165,46 @@ export function AppSidebar({
                     <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
                     <Link
                       aria-current={active ? "page" : undefined}
-                      className={`inline-flex min-h-10 shrink-0 items-center gap-3 py-3 pl-3 pr-1 transition-colors lg:min-h-12 lg:w-64 lg:gap-4 lg:px-7 ${
-                        active ? "bg-pine" : "hover:bg-pine/5"
+                      className={`inline-flex min-h-10 shrink-0 flex-col justify-center py-3 pl-3 pr-1 text-sm font-medium transition-colors lg:min-h-12 lg:w-64 lg:px-7 ${
+                        active ? "bg-pine text-paper" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
                       }`}
                       href={href}
                     >
-                      {/* Collapsed, the icon is the card's only visible
-                          affordance; expanded, the title carries it, so the
-                          icon crossfades away as the label fades in. */}
-                      <motion.span
-                        animate={{ opacity: isExpanded ? 0 : 1 }}
-                        className="shrink-0"
-                        initial={false}
-                        transition={labelTransition}
-                      >
-                        <Icon
-                          aria-hidden="true"
-                          className={`size-4 lg:size-5 ${
-                            active ? "text-paper" : "text-ink/55"
-                          }`}
-                        />
-                      </motion.span>
-                      <motion.span
-                        animate={{
-                          opacity: isExpanded ? 1 : 0,
-                          x: isExpanded ? 0 : -6,
-                        }}
-                        className="flex flex-col"
-                        initial={false}
-                        transition={labelTransition}
-                      >
-                        <span
-                          className={`whitespace-nowrap text-sm font-semibold ${
-                            active ? "text-paper" : "text-ink"
-                          }`}
+                      <span className="inline-flex items-center gap-3 lg:gap-4">
+                        <Icon aria-hidden="true" className="size-4 shrink-0 lg:size-5" />
+                        <motion.span
+                          animate={{
+                            opacity: isExpanded ? 1 : 0,
+                            x: isExpanded ? 0 : -6,
+                          }}
+                          className="whitespace-nowrap"
+                          initial={false}
+                          transition={labelTransition}
                         >
                           {label}
-                        </span>
-                        {/* Collapsed, the description must give up its layout
-                            height too — opacity alone would leave the rail row
-                            as tall as the expanded card. */}
-                        <motion.span
-                          animate={{ height: isExpanded ? "auto" : 0 }}
-                          className="overflow-hidden"
-                          initial={false}
-                          transition={prefersReducedMotion ? { duration: 0 } : panelSpring}
-                        >
-                          <span
-                            className={`block w-40 pt-1 text-xs leading-snug ${
-                              active ? "text-paper/70" : "text-ink/50"
-                            }`}
-                          >
-                            {description}
-                          </span>
                         </motion.span>
+                      </span>
+                      {/* Collapsed, the description must give up its layout
+                          height too — opacity alone would leave the rail row
+                          as tall as the expanded card. */}
+                      <motion.span
+                        animate={{
+                          height: isExpanded ? "auto" : 0,
+                          opacity: isExpanded ? 1 : 0,
+                        }}
+                        className="overflow-hidden"
+                        initial={false}
+                        transition={prefersReducedMotion ? { duration: 0 } : panelSpring}
+                      >
+                        {/* pl matches icon width + gap so the description sits
+                            flush under the label rather than the icon. */}
+                        <span
+                          className={`block w-40 pl-7 pt-1 text-xs leading-snug lg:pl-9 ${
+                            active ? "text-paper/70" : "text-ink/50"
+                          }`}
+                        >
+                          {description}
+                        </span>
                       </motion.span>
                     </Link>
                     <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
