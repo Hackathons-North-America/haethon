@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { useState, type ElementType, type FocusEvent } from "react";
+import { Fragment, useState, type ElementType, type FocusEvent } from "react";
 
 import { DiscordIcon } from "@/components/discord-icon";
 import {
@@ -12,6 +12,7 @@ import {
   CircleUser,
   Compass,
   LogIn,
+  PlusSquare,
   Settings,
   ShieldCheck,
   Swords,
@@ -22,6 +23,9 @@ type SidebarLink = {
   icon: ElementType;
   label: string;
   external?: boolean;
+  // Featured entries render Airbnb-style: bold title over a small muted
+  // description, separated from the neighbouring sections by dividers.
+  description?: string;
 };
 
 const items: SidebarLink[] = [
@@ -72,10 +76,18 @@ export function AppSidebar({
   }
 
   const links: SidebarLink[] = [
+    ...(isAdmin ? [{ href: "/admin", icon: ShieldCheck, label: "Admin" }] : []),
     ...items,
     ...(isSignedIn
       ? [{ href: "/account/settings", icon: Settings, label: "Account Settings" }]
       : [{ href: "/sign-in", icon: LogIn, label: "Login" }]),
+    {
+      href: "/submit",
+      icon: PlusSquare,
+      label: "New hackathon",
+      description:
+        "Enter a new hackathon — one you just spotted or one you're organizing yourself.",
+    },
     {
       href: "/discord",
       icon: DiscordIcon,
@@ -83,7 +95,6 @@ export function AppSidebar({
       external: true,
     },
     ...(isOrganizer ? [{ href: "/organizer", icon: Building2, label: "Organizer" }] : []),
-    ...(isAdmin ? [{ href: "/admin", icon: ShieldCheck, label: "Admin" }] : []),
   ];
 
   // The active link is the one whose href is the longest matching prefix of the
@@ -138,8 +149,82 @@ export function AppSidebar({
             aria-label="App navigation"
             className="flex gap-1 overflow-x-auto px-3 py-3 lg:mt-6 lg:flex-col lg:overflow-visible lg:px-0 lg:py-0"
           >
-            {links.map(({ href, icon: Icon, label, external }) => {
+            {links.map(({ href, icon: Icon, label, external, description }) => {
               const active = href === activeHref;
+              const labelTransition = prefersReducedMotion
+                ? { duration: 0 }
+                : {
+                    delay: isExpanded ? 0.065 : 0,
+                    duration: isExpanded ? 0.2 : 0.12,
+                    ease: isExpanded ? ([0.16, 1, 0.3, 1] as const) : ("easeOut" as const),
+                  };
+
+              if (description) {
+                return (
+                  <Fragment key={href}>
+                    <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
+                    <Link
+                      aria-current={active ? "page" : undefined}
+                      className={`inline-flex min-h-10 shrink-0 items-center gap-3 py-3 pl-3 pr-1 transition-colors lg:min-h-12 lg:w-64 lg:gap-4 lg:px-7 ${
+                        active ? "bg-pine" : "hover:bg-pine/5"
+                      }`}
+                      href={href}
+                    >
+                      {/* Collapsed, the icon is the card's only visible
+                          affordance; expanded, the title carries it, so the
+                          icon crossfades away as the label fades in. */}
+                      <motion.span
+                        animate={{ opacity: isExpanded ? 0 : 1 }}
+                        className="shrink-0"
+                        initial={false}
+                        transition={labelTransition}
+                      >
+                        <Icon
+                          aria-hidden="true"
+                          className={`size-4 lg:size-5 ${
+                            active ? "text-paper" : "text-ink/55"
+                          }`}
+                        />
+                      </motion.span>
+                      <motion.span
+                        animate={{
+                          opacity: isExpanded ? 1 : 0,
+                          x: isExpanded ? 0 : -6,
+                        }}
+                        className="flex flex-col"
+                        initial={false}
+                        transition={labelTransition}
+                      >
+                        <span
+                          className={`whitespace-nowrap text-sm font-semibold ${
+                            active ? "text-paper" : "text-ink"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                        {/* Collapsed, the description must give up its layout
+                            height too — opacity alone would leave the rail row
+                            as tall as the expanded card. */}
+                        <motion.span
+                          animate={{ height: isExpanded ? "auto" : 0 }}
+                          className="overflow-hidden"
+                          initial={false}
+                          transition={prefersReducedMotion ? { duration: 0 } : panelSpring}
+                        >
+                          <span
+                            className={`block w-40 pt-1 text-xs leading-snug ${
+                              active ? "text-paper/70" : "text-ink/50"
+                            }`}
+                          >
+                            {description}
+                          </span>
+                        </motion.span>
+                      </motion.span>
+                    </Link>
+                    <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
+                  </Fragment>
+                );
+              }
 
               return (
                 <Link
@@ -160,15 +245,7 @@ export function AppSidebar({
                     }}
                     className="whitespace-nowrap"
                     initial={false}
-                    transition={
-                      prefersReducedMotion
-                        ? { duration: 0 }
-                        : {
-                            delay: isExpanded ? 0.065 : 0,
-                            duration: isExpanded ? 0.2 : 0.12,
-                            ease: isExpanded ? [0.16, 1, 0.3, 1] : "easeOut",
-                          }
-                    }
+                    transition={labelTransition}
                   >
                     {label}
                   </motion.span>
