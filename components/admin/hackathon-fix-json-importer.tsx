@@ -11,15 +11,18 @@ type FixImportResult = {
   duplicateScore: number;
   index: number;
   matchedHackathonId?: string;
+  matchedName?: string | null;
   name: string;
   reason: string;
   source: string;
   sourceUrl: string;
+  status: "queued" | "auto_merged";
   submissionId: string;
 };
 
 type FixImportResponse = {
   data?: {
+    mergedCount: number;
     queuedCount: number;
     results: FixImportResult[];
     submissions: SubmissionReviewItem[];
@@ -146,9 +149,19 @@ export function HackathonFixJsonImporter({
     }
 
     setStatus("success");
-    setMessage(`${body.data.queuedCount} imported into the fix queue.`);
+    setMessage(
+      body.data.mergedCount
+        ? `${body.data.queuedCount} imported into the fix queue. ${body.data.mergedCount} matched an existing hackathon and merged automatically.`
+        : `${body.data.queuedCount} imported into the fix queue.`
+    );
     setResults(body.data.results);
-    onImported?.(body.data.submissions);
+
+    // Auto-merged items are already resolved; only open the review workspace when
+    // something actually needs a decision.
+    if (body.data.submissions.length) {
+      onImported?.(body.data.submissions);
+    }
+
     router.refresh();
   }
 
@@ -159,7 +172,7 @@ export function HackathonFixJsonImporter({
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">Fix queue import</p>
           <h2 className="mt-2 text-2xl font-semibold text-navy dark:text-wheat">Broken scraped JSON</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-navy/55 dark:text-wheat/55">
-            Import records with `source`, `reason`, `sourceUrl`, and `raw`. Each item becomes a pending review card with editable fields and the fix reason attached.
+            Import records with `source`, `reason`, `sourceUrl`, and `raw`. Each item becomes a pending review card with editable fields and the fix reason attached. Items that clearly match an existing hackathon merge into it automatically instead of queueing.
           </p>
         </div>
         <button
@@ -229,10 +242,17 @@ export function HackathonFixJsonImporter({
               <div className="grid grid-cols-[1fr_auto_1fr] gap-3 px-4 py-3 text-sm" key={result.submissionId}>
                 <span className="font-semibold text-navy dark:text-wheat">{result.name}</span>
                 <span className="text-navy/55 dark:text-wheat/55">{result.duplicateScore.toFixed(2)}</span>
-                <span className="inline-flex items-start gap-2 text-[#B54708]">
-                  <FileWarning aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                  {result.reason}
-                </span>
+                {result.status === "auto_merged" ? (
+                  <span className="inline-flex items-start gap-2 text-[#027A48]">
+                    <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    Merged into {result.matchedName ?? "an existing hackathon"}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-start gap-2 text-[#B54708]">
+                    <FileWarning aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    {result.reason}
+                  </span>
+                )}
               </div>
             ))}
           </div>

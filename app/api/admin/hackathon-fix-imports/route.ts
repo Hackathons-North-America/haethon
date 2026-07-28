@@ -30,7 +30,8 @@ export async function POST(request: Request) {
       items: parsed.data.items,
       reviewerUserId: gate.user.id,
     });
-    const submissionIds = result.results.map((item) => item.submissionId);
+    // Auto-merged items are already resolved; only queued ones belong in the review workspace.
+    const submissionIds = result.results.filter((item) => item.status === "queued").map((item) => item.submissionId);
     const importedSubmissions = await listHackathonSubmissions({
       limit: submissionIds.length,
       submissionIds,

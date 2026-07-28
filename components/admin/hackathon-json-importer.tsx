@@ -29,7 +29,7 @@ type ImportResult = {
   matchedHackathonId?: string;
   matchedName?: string | null;
   name: string;
-  status: "imported" | "duplicate_flagged";
+  status: "imported" | "duplicate_flagged" | "auto_merged";
   submissionId?: string;
 };
 
@@ -46,6 +46,7 @@ type ImportResponse = {
   data?: {
     duplicateCount: number;
     importedCount: number;
+    mergedCount: number;
     results: ImportResult[];
     total: number;
   };
@@ -161,12 +162,22 @@ export function HackathonJsonImporter() {
     }
 
     const data = body.data;
-    // Only genuinely imported cards count toward the approved tally; a flagged duplicate is
-    // resolved inline and never lands in the results list.
-    setResults((current) => [...current, ...data.results.filter((result) => result.status === "imported")]);
+    // Imported and auto-merged cards land in the results list; a flagged duplicate is
+    // resolved inline and never does.
+    setResults((current) => [...current, ...data.results.filter((result) => result.status !== "duplicate_flagged")]);
     router.refresh();
 
     const first = data.results[0];
+
+    // A clear match was merged server-side into the existing hackathon — nothing to decide.
+    if (first?.status === "auto_merged") {
+      setStatus("success");
+      setMessage(
+        `Merged into the existing hackathon ${first.matchedName ? `"${first.matchedName}"` : ""} (match ${first.duplicateScore.toFixed(2)}). Missing details were filled in from this card.`
+      );
+      setCurrentIndex((current) => current + 1);
+      return;
+    }
 
     // A likely duplicate pauses here so the admin can decide right away instead of hunting
     // for it in the Submissions queue later.
@@ -268,6 +279,8 @@ export function HackathonJsonImporter() {
 
   if (queue.length) {
     const complete = !activePayload;
+    const importedCount = results.filter((result) => result.status === "imported").length;
+    const mergedCount = results.length - importedCount;
 
     return (
       <div className="space-y-4">
@@ -277,8 +290,8 @@ export function HackathonJsonImporter() {
             <h2 className="mt-1 text-2xl font-semibold text-navy dark:text-wheat">{complete ? "Import review complete" : "Approve imported card"}</h2>
             <p className="mt-1 text-sm text-navy/55 dark:text-wheat/55">
               {complete
-                ? `${results.length} approved, ${skippedCount} skipped.`
-                : `${remainingCount} remaining · ${results.length} approved · ${skippedCount} skipped`}
+                ? `${importedCount} approved, ${mergedCount} merged, ${skippedCount} skipped.`
+                : `${remainingCount} remaining · ${importedCount} approved · ${mergedCount} merged · ${skippedCount} skipped`}
             </p>
           </div>
           <button
@@ -521,8 +534,8 @@ export function HackathonJsonImporter() {
             {results.map((result) => (
               <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3 text-sm" key={`${result.status}-${result.submissionId}`}>
                 <span className="font-semibold text-navy dark:text-wheat">{result.name}</span>
-                <span className={result.status === "imported" ? "text-[#027A48]" : "text-[#B54708]"}>
-                  {result.status === "imported" ? "Imported" : "Flagged"}
+                <span className={result.status === "duplicate_flagged" ? "text-[#B54708]" : "text-[#027A48]"}>
+                  {result.status === "imported" ? "Imported" : result.status === "auto_merged" ? "Merged" : "Flagged"}
                 </span>
                 <span className="text-navy/55 dark:text-wheat/55">{result.duplicateScore.toFixed(2)}</span>
               </div>

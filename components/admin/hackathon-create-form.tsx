@@ -35,6 +35,55 @@ function emptyPreviewPayload(): Record<string, unknown> {
 
 type Published = Pick<AdminHackathonListItem, "id" | "name" | "status" | "isRecurring">;
 
+// Payload keys mapped to the labels shown on the form, so a validation error
+// names the field the admin actually sees.
+const fieldLabels: Record<string, string> = {
+  name: "Event name",
+  websiteUrl: "Website",
+  imageUrl: "Image URL",
+  applicationUrl: "Application",
+  city: "City",
+  region: "Region",
+  country: "Country",
+  venue: "Venue",
+  startDate: "Start",
+  endDate: "End",
+  shortDescription: "Description",
+  applicationOpensAt: "Applications open",
+  applicationClosesAt: "Applications close",
+  acceptanceAt: "Acceptance",
+  prizeAmountUsd: "Prize USD",
+  discordChannelId: "Existing Discord channel ID",
+};
+
+/* The API returns either a plain string (Discord/creation failures) or a
+   flattened Zod error for invalid payloads. Turn the latter into a per-field
+   list so the admin sees exactly which inputs to fix. */
+function messageFromError(error: unknown) {
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error && typeof error === "object" && "fieldErrors" in error) {
+    const { fieldErrors, formErrors } = error as {
+      fieldErrors: Record<string, string[] | undefined>;
+      formErrors?: string[];
+    };
+    const details = [
+      ...(formErrors ?? []),
+      ...Object.entries(fieldErrors)
+        .filter(([, issues]) => issues?.length)
+        .map(([field, issues]) => `${fieldLabels[field] ?? field}: ${issues?.[0]}`),
+    ];
+
+    if (details.length) {
+      return `Could not publish. ${details.join(" — ")}`;
+    }
+  }
+
+  return "Could not publish. Check the required fields.";
+}
+
 function publishedNote(published: Published) {
   if (published.status !== "completed") {
     return `Published "${published.name}" — it is live on the public hackathons page.`;
@@ -176,7 +225,7 @@ export function HackathonCreateForm() {
 
     if (!response.ok || !result.data) {
       setStatus("error");
-      setMessage(typeof result.error === "string" ? result.error : "Could not publish. Check the required fields.");
+      setMessage(messageFromError(result.error));
       return;
     }
 

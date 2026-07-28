@@ -33,6 +33,7 @@ import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import {
   adminHackathonFixImportItemSchema,
   adminHackathonImportPayloadSchema,
+  normalizedHackathonPayloadSchema,
   reviewActionSchema,
 } from "@/lib/validations/hackathon";
 
@@ -151,9 +152,8 @@ async function isVerifiedOrganizerForOrganization(userId: string, role: string, 
 type DuplicateCandidate = { id: string; name: string; websiteUrl: string | null; startsAt: Date | null };
 
 async function listDuplicateCandidates(): Promise<DuplicateCandidate[]> {
-  // A single left-joined query (still capped at 100 rows) keeps this as cheap as the
-  // previous candidate lookup while making each hackathon's start date available for
-  // same-day duplicate matching.
+  // Deliberately unbounded: an import can duplicate a hackathon of any age, and the
+  // in-memory scoring over one narrow left-joined projection stays cheap at this scale.
   return db
     .select({
       id: hackathons.id,
@@ -163,8 +163,7 @@ async function listDuplicateCandidates(): Promise<DuplicateCandidate[]> {
     })
     .from(hackathons)
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
-    .orderBy(desc(hackathons.createdAt))
-    .limit(100);
+    .orderBy(desc(hackathons.createdAt));
 }
 
 function findBestDuplicateInCandidates(
@@ -192,6 +191,11 @@ function findBestDuplicateInCandidates(
 
   return best && best.score >= 0.55 ? best : null;
 }
+
+// At 0.95+ the match carries same start day, real name overlap, and (usually) the same
+// website domain — treated as certain enough to merge without an admin decision. Scores
+// between 0.55 and 0.95 still go through the manual duplicate flows.
+const AUTO_MERGE_SCORE = 0.95;
 
 async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
   return findBestDuplicateInCandidates(payload, await listDuplicateCandidates());
@@ -539,10 +543,12 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
     duplicateScore: number;
     index: number;
     matchedHackathonId?: string;
+    matchedName?: string | null;
     name: string;
     reason: string;
     source: string;
     sourceUrl: string;
+    status: "queued" | "auto_merged";
     submissionId: string;
   }> = [];
   const duplicateCandidates = await listDuplicateCandidates();
@@ -551,6 +557,54 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
     const payload = deriveFixPayload(item, index);
     const duplicate = findBestDuplicateInCandidates(payload, duplicateCandidates);
     const duplicateScore = Number((duplicate?.score ?? 0).toFixed(2));
+
+    if (duplicate && duplicate.score >= AUTO_MERGE_SCORE) {
+      // The event already exists, so there is nothing for an admin to fix — merge it
+      // straight away instead of parking a pending card in the queue. Broken payloads
+      // rarely validate as publishable data; when this one does, use it to fill fields
+      // the existing hackathon is missing (existing values always win), and when it
+      // doesn't (or it carries only the synthetic fallback URL), just record the merge.
+      const mergeParse =
+        payload.sourceUrl === importedFallbackUrl(index) ? null : normalizedHackathonPayloadSchema.safeParse(payload);
+
+      if (mergeParse?.success) {
+        await mergeIntoHackathon(duplicate.id, mergeParse.data);
+      }
+
+      const matchedName = duplicateCandidates.find((candidate) => candidate.id === duplicate.id)?.name ?? null;
+      const [submission] = await db
+        .insert(hackathonSubmissions)
+        .values({
+          submittedByUserId: input.reviewerUserId,
+          submitterType: "community",
+          matchedHackathonId: duplicate.id,
+          approvedHackathonId: duplicate.id,
+          status: "merged",
+          payload,
+          normalizedName: payload.name,
+          websiteUrl: payload.websiteUrl,
+          sourceUrl: payload.sourceUrl,
+          duplicateScore: duplicateScore.toFixed(2),
+          reviewerNotes: `Auto-merged into existing hackathon (match ${duplicateScore.toFixed(2)}). Import reason: ${item.reason}`,
+          reviewedByUserId: input.reviewerUserId,
+          reviewedAt: new Date(),
+        })
+        .returning({ id: hackathonSubmissions.id });
+
+      results.push({
+        duplicateScore,
+        index,
+        matchedHackathonId: duplicate.id,
+        matchedName,
+        name: payload.name,
+        reason: item.reason,
+        source: item.source ?? "unknown",
+        sourceUrl: payload.sourceUrl,
+        status: "auto_merged",
+        submissionId: submission.id,
+      });
+      continue;
+    }
 
     const [submission] = await db
       .insert(hackathonSubmissions)
@@ -576,12 +630,16 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
       reason: item.reason,
       source: item.source ?? "unknown",
       sourceUrl: payload.sourceUrl,
+      status: "queued",
       submissionId: submission.id,
     });
   }
 
+  const queuedCount = results.filter((result) => result.status === "queued").length;
+
   return {
-    queuedCount: results.length,
+    mergedCount: results.length - queuedCount,
+    queuedCount,
     results,
     total: results.length,
   };
@@ -601,7 +659,7 @@ export async function importAdminHackathons(input: {
     matchedHackathonId?: string;
     matchedName?: string | null;
     name: string;
-    status: "imported" | "duplicate_flagged";
+    status: "imported" | "duplicate_flagged" | "auto_merged";
     submissionId?: string;
   }> = [];
   const duplicateCandidates = await listDuplicateCandidates();
@@ -614,10 +672,49 @@ export async function importAdminHackathons(input: {
     const duplicateScore = Number((duplicate?.score ?? 0).toFixed(2));
 
     if (duplicate) {
-      // Surface the match to the importer immediately instead of parking a pending
-      // submission in the review queue — nothing is written until the admin decides.
       const matchedName = duplicateCandidates.find((candidate) => candidate.id === duplicate.id)?.name ?? null;
 
+      if (duplicate.score >= AUTO_MERGE_SCORE) {
+        // A near-certain match needs no decision: merge the import into the existing
+        // hackathon, using its data only to fill fields the existing record is missing.
+        await mergeIntoHackathon(duplicate.id, payload);
+
+        const [submission] = await db
+          .insert(hackathonSubmissions)
+          .values({
+            submittedByUserId: input.reviewerUserId,
+            submitterType: "community",
+            organizationId: payload.organizationId ?? null,
+            matchedHackathonId: duplicate.id,
+            approvedHackathonId: duplicate.id,
+            status: "merged",
+            payload: payloadForJson({ ...payload, submitterType: "community", origin: "admin_import" }),
+            normalizedName: payload.name,
+            websiteUrl: payload.websiteUrl,
+            sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
+            duplicateScore: duplicateScore.toFixed(2),
+            reviewerNotes: `Auto-merged into existing hackathon (match ${duplicateScore.toFixed(2)}).`,
+            reviewedByUserId: input.reviewerUserId,
+            reviewedAt: new Date(),
+          })
+          .returning({ id: hackathonSubmissions.id });
+
+        results.push({
+          duplicateScore,
+          externalId: rawPayload.externalId,
+          hackathonId: duplicate.id,
+          index,
+          matchedHackathonId: duplicate.id,
+          matchedName,
+          name: payload.name,
+          status: "auto_merged",
+          submissionId: submission.id,
+        });
+        continue;
+      }
+
+      // A weaker match is surfaced to the importer immediately instead of parking a
+      // pending submission in the review queue — nothing is written until the admin decides.
       results.push({
         duplicateScore,
         externalId: rawPayload.externalId,
@@ -691,6 +788,7 @@ export async function importAdminHackathons(input: {
   return {
     duplicateCount: results.filter((result) => result.status === "duplicate_flagged").length,
     importedCount: results.filter((result) => result.status === "imported").length,
+    mergedCount: results.filter((result) => result.status === "auto_merged").length,
     results,
     total: results.length,
   };
