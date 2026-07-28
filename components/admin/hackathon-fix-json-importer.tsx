@@ -1,8 +1,11 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileWarning, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileWarning, RotateCcw, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
+
+import { SubmissionReviewQueue } from "@/components/admin/submission-review-queue";
+import type { SubmissionReviewItem } from "@/components/admin/submission-review-card";
 
 type FixImportResult = {
   duplicateScore: number;
@@ -19,6 +22,7 @@ type FixImportResponse = {
   data?: {
     queuedCount: number;
     results: FixImportResult[];
+    submissions: SubmissionReviewItem[];
     total: number;
   };
   error?: unknown;
@@ -89,7 +93,11 @@ function previewItems(value: unknown): PreviewItem[] {
   });
 }
 
-export function HackathonFixJsonImporter() {
+export function HackathonFixJsonImporter({
+  onImported,
+}: {
+  onImported?: (submissions: SubmissionReviewItem[]) => void;
+}) {
   const router = useRouter();
   const [jsonText, setJsonText] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -140,6 +148,7 @@ export function HackathonFixJsonImporter() {
     setStatus("success");
     setMessage(`${body.data.queuedCount} imported into the fix queue.`);
     setResults(body.data.results);
+    onImported?.(body.data.submissions);
     router.refresh();
   }
 
@@ -230,5 +239,73 @@ export function HackathonFixJsonImporter() {
         </div>
       ) : null}
     </form>
+  );
+}
+
+export function HackathonFixWorkspace({
+  pendingSubmissions,
+}: {
+  pendingSubmissions: SubmissionReviewItem[];
+}) {
+  const router = useRouter();
+  const [importedSubmissions, setImportedSubmissions] = useState<SubmissionReviewItem[] | null>(null);
+
+  function startNewImport() {
+    setImportedSubmissions(null);
+    router.refresh();
+  }
+
+  if (importedSubmissions) {
+    return (
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">Fix queue review</p>
+            <h2 className="mt-2 text-2xl font-medium tracking-tight text-ink">Review broken imports</h2>
+            <p className="mt-2 text-sm leading-6 text-ink/55">
+              Review the {importedSubmissions.length} imported{" "}
+              {importedSubmissions.length === 1 ? "haethon" : "haethons"} one by one. Approve, reject, or merge each
+              card before moving to the next.
+            </p>
+          </div>
+          <button
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink hover:bg-ink/5"
+            onClick={startNewImport}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" className="size-4" />
+            New import
+          </button>
+        </div>
+
+        <SubmissionReviewQueue
+          allowDeleteExisting
+          emptyMessage="Import review complete. No items from this batch remain."
+          endpointBase="/api/admin/hackathon-submissions"
+          submissions={importedSubmissions}
+        />
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="border border-ink/15 bg-paper p-6">
+        <HackathonFixJsonImporter onImported={setImportedSubmissions} />
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-2xl font-medium tracking-tight text-ink">Fix queue</h2>
+          <p className="text-sm text-ink/55">One broken item at a time</p>
+        </div>
+        <SubmissionReviewQueue
+          allowDeleteExisting
+          emptyMessage="No imported JSON records need fixes."
+          endpointBase="/api/admin/hackathon-submissions"
+          submissions={pendingSubmissions}
+        />
+      </section>
+    </>
   );
 }

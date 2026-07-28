@@ -88,13 +88,15 @@ export function previewPayloadToCard(payload: PreviewPayload, id = "admin-previe
 }
 
 export function HackathonCardPreview({
+  compact = false,
   payload,
   previewId,
 }: {
+  compact?: boolean;
   payload: PreviewPayload;
   previewId?: string;
 }) {
-  return <HackathonCard hackathon={previewPayloadToCard(payload, previewId)} preview />;
+  return <HackathonCard compact={compact} hackathon={previewPayloadToCard(payload, previewId)} preview />;
 }
 
 const knownFieldLabels: Record<string, string> = {

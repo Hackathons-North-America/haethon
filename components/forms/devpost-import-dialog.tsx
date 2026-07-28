@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, Download, Loader2, ScanSearch, Trophy, X } from "lucide-react";
+
+import { parseSocialInput } from "@/lib/validations/social";
 
 export type DevpostImportState = {
   handle: string | null;
@@ -77,17 +79,41 @@ function formatItemDate(value: string | null) {
     : new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
 }
 
-export function DevpostImportDialog({ initialState }: { initialState: DevpostImportState }) {
+function handlesMatch(first: string | null | undefined, second: string | null | undefined) {
+  return Boolean(first && second && first.toLowerCase() === second.toLowerCase());
+}
+
+export function DevpostImportDialog({
+  initialState,
+  onProfileSaved,
+}: {
+  initialState: DevpostImportState;
+  onProfileSaved: (devpostUrl: string) => void;
+}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [verified, setVerified] = useState(initialState.verified);
-  const [code, setCode] = useState<string | null>(initialState.code);
+  const [pendingHandle, setPendingHandle] = useState<string | null>(null);
+  const [handleDraft, setHandleDraft] = useState(initialState.handle ?? "");
+  const [verifiedHandle, setVerifiedHandle] = useState<string | null>(
+    initialState.verified ? initialState.handle : null
+  );
+  const [generatedCode, setGeneratedCode] = useState<{ handle: string; value: string } | null>(
+    initialState.handle && initialState.code ? { handle: initialState.handle, value: initialState.code } : null
+  );
   const [copied, setCopied] = useState(false);
-  const [working, setWorking] = useState<"code" | "confirm" | "scan" | "import" | null>(null);
+  const [working, setWorking] = useState<"profile" | "code" | "confirm" | "scan" | "import" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const handle = pendingHandle ?? initialState.handle;
+  const verified =
+    handlesMatch(verifiedHandle, handle) || (initialState.verified && handlesMatch(initialState.handle, handle));
+  const code = handlesMatch(generatedCode?.handle, handle)
+    ? generatedCode?.value ?? null
+    : handlesMatch(initialState.handle, handle)
+      ? initialState.code
+      : null;
 
   useEffect(() => {
     if (!isOpen) {
@@ -97,6 +123,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsOpen(false);
+        setPendingHandle(null);
       }
     }
 
@@ -119,7 +146,12 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  async function requestCode() {
+  async function requestCode(forHandle = handle) {
+    if (!forHandle) {
+      setError("Enter your Devpost username first.");
+      return;
+    }
+
     setWorking("code");
     setError(null);
     const result = await postJson<{ code: string }>("/api/account/devpost/verification", { intent: "start" });
@@ -130,7 +162,39 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
       return;
     }
 
-    setCode(result.data.code);
+    setGeneratedCode({ handle: forHandle, value: result.data.code });
+  }
+
+  async function saveDevpostProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    const parsed = parseSocialInput("devpostUrl", handleDraft);
+
+    if (!parsed.ok) {
+      setError(parsed.error);
+      return;
+    }
+
+    setWorking("profile");
+    const response = await fetch("/api/account/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ devpostUrl: parsed.url }),
+    }).catch(() => null);
+
+    if (!response?.ok) {
+      setWorking(null);
+      setError(response ? "Could not save your Devpost profile. Please try again." : "Network error. Please try again.");
+      return;
+    }
+
+    setPendingHandle(parsed.handle);
+    setHandleDraft(parsed.handle);
+    setVerifiedHandle(null);
+    setGeneratedCode(null);
+    onProfileSaved(parsed.url);
+    await requestCode(parsed.handle);
   }
 
   async function confirmVerification() {
@@ -144,7 +208,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
       return;
     }
 
-    setVerified(true);
+    setVerifiedHandle(handle);
   }
 
   async function runScan() {
@@ -215,7 +279,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
     }
   }
 
-  const hasHandle = Boolean(initialState.handle);
+  const hasHandle = Boolean(handle);
 
   function openDialog() {
     setError(null);
@@ -253,6 +317,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 setIsOpen(false);
+                setPendingHandle(null);
               }
             }}
           >
@@ -261,7 +326,10 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
                 <h2 className={headingClassName}>Import from Devpost</h2>
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    setIsOpen(false);
+                    setPendingHandle(null);
+                  }}
                   aria-label="Close"
                   className="inline-flex size-8 items-center justify-center rounded-xl text-navy/55 transition hover:bg-navy/5 hover:text-navy dark:text-wheat/55 dark:hover:bg-white/10 dark:hover:text-wheat"
                 >
@@ -271,10 +339,52 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
 
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
                 {!hasHandle ? (
-                  <p className={mutedTextClassName}>
-                    Add your Devpost profile first — open <span className="font-semibold">Edit profile</span> and fill in
-                    the Devpost field. Then come back here to import your hackathons and wins.
-                  </p>
+                  <>
+                    <p className={mutedTextClassName}>
+                      Enter your Devpost username to get the verification code. We&apos;ll also save it to your profile.
+                    </p>
+                    <form className="mt-4" onSubmit={saveDevpostProfile}>
+                      <label className="mb-1.5 block text-sm font-semibold text-ink" htmlFor="devpost-import-handle">
+                        Devpost profile
+                      </label>
+                      <div className="flex items-stretch overflow-hidden rounded-xl border border-navy/15 bg-ivory transition focus-within:border-pine dark:border-white/15 dark:bg-white/5">
+                        <span
+                          aria-hidden="true"
+                          className="flex select-none items-center border-r border-navy/10 px-3 text-sm text-navy/55 dark:border-white/10 dark:text-wheat/55"
+                        >
+                          devpost.com/
+                        </span>
+                        <input
+                          id="devpost-import-handle"
+                          value={handleDraft}
+                          onChange={(event) => {
+                            setHandleDraft(event.target.value);
+                            setError(null);
+                          }}
+                          placeholder="your-username"
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          autoFocus
+                          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-ink outline-none"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={working !== null || !handleDraft.trim()}
+                        className={`${primaryButtonClassName} mt-5`}
+                      >
+                        {working === "profile" || working === "code" ? (
+                          <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                        ) : null}
+                        {working === "profile"
+                          ? "Saving profile"
+                          : working === "code"
+                            ? "Creating your code"
+                            : "Get verification code"}
+                      </button>
+                    </form>
+                  </>
                 ) : summary ? (
                   <>
                     <p className={mutedTextClassName}>
@@ -300,7 +410,14 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
                       up new projects.
                     </p>
                     <div className="mt-5">
-                      <button type="button" onClick={() => setIsOpen(false)} className={primaryButtonClassName}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsOpen(false);
+                          setPendingHandle(null);
+                        }}
+                        className={primaryButtonClassName}
+                      >
                         Done
                       </button>
                     </div>
@@ -308,7 +425,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
                 ) : !verified ? (
                   <>
                     <p className={mutedTextClassName}>
-                      First, prove that <span className="font-semibold">devpost.com/{initialState.handle}</span> is your
+                      First, prove that <span className="font-semibold">devpost.com/{handle}</span> is your
                       profile so nobody can import someone else&apos;s wins:
                     </p>
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-navy/65 dark:text-wheat/65">
@@ -358,7 +475,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
                       ) : (
                         <button
                           type="button"
-                          onClick={requestCode}
+                          onClick={() => void requestCode()}
                           disabled={working !== null}
                           className={primaryButtonClassName}
                         >
@@ -372,7 +489,7 @@ export function DevpostImportDialog({ initialState }: { initialState: DevpostImp
                   <>
                     <p className={mutedTextClassName}>
                       We&apos;ll read the public projects on{" "}
-                      <span className="font-semibold">devpost.com/{initialState.handle}</span> and find the hackathons you
+                      <span className="font-semibold">devpost.com/{handle}</span> and find the hackathons you
                       submitted to — including the ones you won. You choose exactly what gets added before anything is
                       saved.
                     </p>

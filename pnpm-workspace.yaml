@@ -4,7 +4,11 @@ packages:
   - 'packages/*'  # Add this if you have a packages folder
 
 overrides:
+  '@posthog/browser-common': 0.2.1
+  'brace-expansion@5.0.7': 5.0.8
   effect: 3.22.0
+  fast-uri: 3.1.4
+  sharp: 0.35.3
   postcss: 8.5.19
 
 allowBuilds:

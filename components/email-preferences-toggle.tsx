@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 /**
- * Global email on/off switch shown on the account page. Mirrors the state a
+ * Global email on/off switch shown in account settings. Mirrors the state a
  * user can also reach through the unsubscribe link in any email footer.
  */
 export function EmailPreferencesToggle({ initialEnabled }: { initialEnabled: boolean }) {

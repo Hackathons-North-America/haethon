@@ -1,5 +1,4 @@
-import { HackathonFixJsonImporter } from "@/components/admin/hackathon-fix-json-importer";
-import { SubmissionReviewQueue } from "@/components/admin/submission-review-queue";
+import { HackathonFixWorkspace } from "@/components/admin/hackathon-fix-json-importer";
 import { listHackathonSubmissions } from "@/lib/hackathons/review-service";
 
 function needsFix(payload: Record<string, unknown>) {
@@ -18,7 +17,8 @@ export default async function AdminBrokenPage() {
           <div>
             <h1 className="text-4xl font-medium tracking-tight text-ink">Fix broken JSON</h1>
             <p className="mt-2 max-w-3xl text-base leading-7 text-ink/55">
-              Upload broken scraped records, edit the generated fields, compare them against the final card preview, then approve or reject each one.
+              Upload broken scraped records, edit the generated fields, compare them against the final card preview, then
+              approve, reject, or merge each one.
             </p>
           </div>
           <div className="border border-ink/15 bg-paper px-4 py-3 text-sm font-semibold text-ink">
@@ -27,22 +27,7 @@ export default async function AdminBrokenPage() {
         </div>
       </section>
 
-      <section className="border border-ink/15 bg-paper p-6">
-        <HackathonFixJsonImporter />
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-medium tracking-tight text-ink">Fix queue</h2>
-          <p className="text-sm text-ink/55">One broken item at a time</p>
-        </div>
-        <SubmissionReviewQueue
-          allowDeleteExisting
-          emptyMessage="No imported JSON records need fixes."
-          endpointBase="/api/admin/hackathon-submissions"
-          submissions={fixQueue}
-        />
-      </section>
+      <HackathonFixWorkspace pendingSubmissions={fixQueue} />
     </div>
   );
 }

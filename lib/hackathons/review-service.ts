@@ -826,8 +826,16 @@ export async function reviewHackathonSubmission(input: {
   }
 }
 
-export async function listHackathonSubmissions(options?: { allowedOrganizationIds?: string[]; limit?: number }) {
+export async function listHackathonSubmissions(options?: {
+  allowedOrganizationIds?: string[];
+  limit?: number;
+  submissionIds?: string[];
+}) {
   if (options?.allowedOrganizationIds && options.allowedOrganizationIds.length === 0) {
+    return [];
+  }
+
+  if (options?.submissionIds && options.submissionIds.length === 0) {
     return [];
   }
 
@@ -858,9 +866,12 @@ export async function listHackathonSubmissions(options?: { allowedOrganizationId
     .leftJoin(organizations, eq(organizations.id, hackathonSubmissions.organizationId))
     .leftJoin(hackathons, eq(hackathons.id, hackathonSubmissions.matchedHackathonId))
     .where(
-      options?.allowedOrganizationIds
-        ? inArray(hackathonSubmissions.organizationId, options.allowedOrganizationIds)
-        : undefined
+      and(
+        options?.allowedOrganizationIds
+          ? inArray(hackathonSubmissions.organizationId, options.allowedOrganizationIds)
+          : undefined,
+        options?.submissionIds ? inArray(hackathonSubmissions.id, options.submissionIds) : undefined
+      )
     )
     .orderBy(desc(hackathonSubmissions.createdAt))
     .limit(options?.limit ?? 100);

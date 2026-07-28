@@ -160,12 +160,9 @@ function seededRandom(seed: number) {
   };
 }
 
-/* The tinted wash and the grain mask for one card. The reference tickets use
-   one broad, off-canvas airbrushed ellipse: its edge crosses the ticket as a
-   soft crescent instead of reading as a collection of circular glows. A
-   name-seeded edge and vertical anchor keep the cards varied while retaining
-   that single sweeping silhouette. The narrow second gradient brightens the
-   curved shoulder, and the grain mask falls off just beyond it. */
+/* The tinted wash and grain mask for one card. Each card uses a broad,
+   off-canvas circular bloom whose seeded position and proportions vary between
+   cards while remaining stable between renders. */
 function getTierStreak(name: string, tier: TierLabel) {
   const seed = Array.from(name).reduce(
     (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
@@ -1317,10 +1314,12 @@ export function HackathonCard({
                   statusLabel={reminder.statusLabel}
                 />
               ) : null}
-              <div className="ml-auto flex shrink-0 items-center gap-3">
+              <div className="ml-auto flex min-w-0 flex-1 items-center justify-between gap-3">
                 <CardMoreInfoLink hackathon={hackathon} preview={preview} />
-                <CardWebsiteLink hackathon={hackathon} preview={preview} />
-                {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
+                <div className="ml-auto flex shrink-0 items-center gap-3">
+                  <CardWebsiteLink hackathon={hackathon} preview={preview} />
+                  {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
+                </div>
               </div>
             </div>
           </div>

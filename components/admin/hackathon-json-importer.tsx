@@ -270,12 +270,12 @@ export function HackathonJsonImporter() {
     const complete = !activePayload;
 
     return (
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rust">Bulk import</p>
-            <h2 className="mt-2 text-2xl font-semibold text-navy dark:text-wheat">{complete ? "Import review complete" : "Approve imported card"}</h2>
-            <p className="mt-2 text-sm text-navy/55 dark:text-wheat/55">
+            <h2 className="mt-1 text-2xl font-semibold text-navy dark:text-wheat">{complete ? "Import review complete" : "Approve imported card"}</h2>
+            <p className="mt-1 text-sm text-navy/55 dark:text-wheat/55">
               {complete
                 ? `${results.length} approved, ${skippedCount} skipped.`
                 : `${remainingCount} remaining · ${results.length} approved · ${skippedCount} skipped`}
@@ -292,13 +292,13 @@ export function HackathonJsonImporter() {
         </div>
 
         {activePayload ? (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
-            <div className="space-y-5">
-              <HackathonCardPreview payload={activePayload} previewId={`import-preview-${currentIndex}`} />
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,42rem)_18rem] xl:items-start xl:justify-between">
+            <div className="space-y-4">
+              <HackathonCardPreview compact payload={activePayload} previewId={`import-preview-${currentIndex}`} />
               <HackathonPayloadDetails payload={activePayload} />
             </div>
             {pendingDuplicate ? (
-              <div className="flex flex-col justify-between rounded-xl border border-[#B54708]/30 bg-[#FFFAEB] dark:border-[#f5b678]/40 dark:bg-[#f5b678]/10 p-4">
+              <div className="order-first flex flex-col rounded-xl border border-[#B54708]/30 bg-[#FFFAEB] p-4 dark:border-[#f5b678]/40 dark:bg-[#f5b678]/10 xl:order-none xl:sticky xl:top-4">
                 <div>
                   <p className="text-sm font-semibold text-navy dark:text-wheat">Possible duplicate</p>
                   <p className="mt-2 text-sm leading-6 text-navy/55 dark:text-wheat/55">
@@ -332,7 +332,7 @@ export function HackathonJsonImporter() {
                 </div>
               </div>
             ) : pendingDiscord && pendingDiscord.discord.action !== "create" ? (
-              <div className="flex flex-col justify-between rounded-xl border border-pine/20 dark:border-moss/40 bg-pine/5 dark:bg-moss/10 p-4">
+              <div className="order-first flex flex-col rounded-xl border border-pine/20 bg-pine/5 p-4 dark:border-moss/40 dark:bg-moss/10 xl:order-none xl:sticky xl:top-4">
                 <div>
                   <p className="text-sm font-semibold text-navy dark:text-wheat">Create a Discord channel?</p>
                   <p className="mt-2 text-sm leading-6 text-navy/55 dark:text-wheat/55">
@@ -366,7 +366,7 @@ export function HackathonJsonImporter() {
                 </div>
               </div>
             ) : pendingDiscord ? null : (
-              <div className="flex flex-col justify-between rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-4">
+              <div className="order-first flex flex-col rounded-xl border border-navy/10 bg-ivory p-4 dark:border-white/10 dark:bg-white/5 xl:order-none xl:sticky xl:top-4">
                 <div>
                   <p className="text-sm font-semibold text-navy dark:text-wheat">Does this card look right?</p>
                   <p className="mt-2 text-sm leading-6 text-navy/55 dark:text-wheat/55">

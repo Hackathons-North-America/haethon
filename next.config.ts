@@ -4,10 +4,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
-    /* Only write-time-verified HTTPS URLs enter the catalog. Logo components
-       render them unoptimized, but the broad pattern keeps preview/detail
-       rendering compatible without a read-time proxy. */
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    /* Local marketing assets are content-hashed at build time. Keep optimized
+       variants warm for a month so traffic does not repeatedly pay to resize
+       the same files; remote catalog logos remain explicitly unoptimized. */
+    minimumCacheTTL: 60 * 60 * 24 * 31,
   },
   async redirects() {
     return [
@@ -23,6 +23,9 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-DNS-Prefetch-Control", value: "off" },
+          { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+          { key: "Origin-Agent-Cluster", value: "?1" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           {

@@ -40,5 +40,10 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)", "/(api|trpc)(.*)"],
+  /* The health response is static and does not inspect auth, so keep it out of
+     Clerk's proxy entirely; uptime checks can then stay on the CDN fast path. */
+  matcher: [
+    "/((?!api/health(?:/|$)|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api(?!/health(?:/|$))|trpc)(.*)",
+  ],
 };

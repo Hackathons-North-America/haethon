@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { AttendedHackathonsTable } from "@/components/attended-hackathons-table";
 import { PrimaryNav } from "@/components/primary-nav";
@@ -25,7 +26,7 @@ type PageProps = { params: Promise<{ username: string }> };
  * Columns are listed explicitly — email, Clerk id, and notification state are
  * deliberately absent so they cannot leak into the page or its RSC payload.
  */
-async function loadSharedProfile(username: string) {
+const loadSharedProfile = cache(async (username: string) => {
   if (!isProfileUsername(username)) {
     return null;
   }
@@ -46,12 +47,15 @@ async function loadSharedProfile(username: string) {
       portfolioUrl: userProfiles.portfolioUrl,
     })
     .from(users)
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .innerJoin(
+      userProfiles,
+      and(eq(userProfiles.userId, users.id), eq(userProfiles.isPublic, true))
+    )
     .where(eq(users.username, username))
     .limit(1);
 
   return row ?? null;
-}
+});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params;

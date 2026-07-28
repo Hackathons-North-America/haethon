@@ -317,8 +317,14 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
           </button>
           <ShareProfileDialog username={username} />
           <DevpostImportDialog
-            key={currentDevpostHandle?.toLowerCase() ?? "no-devpost-profile"}
             initialState={currentDevpostImport}
+            onProfileSaved={(devpostUrl) => {
+              setValues((current) => ({ ...current, devpostUrl }));
+              setSocialDrafts((current) => ({
+                ...current,
+                devpostUrl: handleFromStored("devpostUrl", devpostUrl),
+              }));
+            }}
           />
         </div>
       </div>

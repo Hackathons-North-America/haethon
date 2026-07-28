@@ -332,7 +332,9 @@ export function getPublicHackathonCatalog(input: {
   offset?: number;
 }): Promise<CatalogPage> {
   return withLiveFaceoffRatings(getCachedCatalogPage({
-    name: (input.name ?? "").trim(),
+    /* ILIKE is case-insensitive, so normalize equivalent searches onto one
+       cache entry instead of paying for "Toronto" and "toronto" separately. */
+    name: (input.name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US"),
     countries: [...(input.countries ?? [])].sort(),
     format: input.format ?? null,
     beginnerFriendly: input.beginnerFriendly ?? null,

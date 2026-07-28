@@ -4,7 +4,6 @@ import { eq } from "drizzle-orm";
 
 import { AttendedHackathonsTable } from "@/components/attended-hackathons-table";
 import { AccountProfileForm } from "@/components/forms/account-profile-form";
-import { EmailPreferencesToggle } from "@/components/email-preferences-toggle";
 import { ProfileActivity } from "@/components/profile-activity";
 import { ProfilePinnedSection } from "@/components/profile/profile-sections";
 import { getCurrentUserContext, syncCurrentUser } from "@/lib/auth";
@@ -53,10 +52,6 @@ export default async function AccountPage() {
               profile={profile ?? null}
               devpostImport={devpostImport}
             />
-          </section>
-
-          <section id="email-preferences">
-            <EmailPreferencesToggle initialEnabled={!context.user.emailUnsubscribedAt} />
           </section>
 
           <div className="min-w-0 space-y-10">

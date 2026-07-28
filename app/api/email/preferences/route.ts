@@ -8,8 +8,8 @@ import { users } from "@/lib/db/schema";
 
 const emailPreferencesSchema = z.object({ enabled: z.boolean() });
 
-/* Session-authed counterpart to the signed-link unsubscribe: the account page
-   toggle for turning all Haethon emails off or back on. */
+/* Session-authed counterpart to the signed-link unsubscribe: the account
+   settings toggle for turning all Haethon emails off or back on. */
 export async function PATCH(request: Request) {
   const user = await getCurrentUserRecord();
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
-import { importAdminHackathonFixItems } from "@/lib/hackathons/review-service";
+import { importAdminHackathonFixItems, listHackathonSubmissions } from "@/lib/hackathons/review-service";
 import { adminHackathonFixImportSchema } from "@/lib/validations/hackathon";
 
 export async function POST(request: Request) {
@@ -30,8 +30,19 @@ export async function POST(request: Request) {
       items: parsed.data.items,
       reviewerUserId: gate.user.id,
     });
+    const submissionIds = result.results.map((item) => item.submissionId);
+    const importedSubmissions = await listHackathonSubmissions({
+      limit: submissionIds.length,
+      submissionIds,
+    });
+    const submissionsById = new Map(importedSubmissions.map((submission) => [submission.id, submission]));
+    const submissions = submissionIds.flatMap((id) => {
+      const submission = submissionsById.get(id);
 
-    return NextResponse.json({ data: result }, { status: 201 });
+      return submission ? [submission] : [];
+    });
+
+    return NextResponse.json({ data: { ...result, submissions } }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to import fix queue." },

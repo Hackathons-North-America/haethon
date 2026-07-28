@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { AlertTriangle, Check, GitMerge, Repeat, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { HackathonCardPreview } from "@/components/admin/hackathon-card-preview";
 
@@ -126,6 +127,7 @@ export function SubmissionReviewCard({
   onReviewed?: (submissionId: string) => void;
   submission: SubmissionReviewItem;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [previewPayload, setPreviewPayload] = useState<Record<string, unknown>>(() => initialPreviewPayload(submission));
@@ -233,6 +235,7 @@ export function SubmissionReviewCard({
     setStatus("done");
     setMessage("Review action saved.");
     onReviewed?.(submission.id);
+    router.refresh();
   }
 
   return (

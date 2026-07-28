@@ -31,7 +31,7 @@ export type ProfileSocialValues = {
 };
 
 export const profileSectionTitleClassName =
-  "font-serif text-4xl font-semibold tracking-[-0.035em] text-navy dark:text-wheat sm:text-5xl";
+  "font-serif text-4xl font-semibold tracking-[-0.035em] text-ink dark:text-wheat sm:text-5xl";
 
 function labelFromUrl(url: string) {
   try {
@@ -100,7 +100,7 @@ export function ProfileSocialsSection({ links, emptyText }: { links: ProfileLink
           ))}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-navy/55 dark:text-wheat/55">{emptyText}</p>
+        <p className="mt-4 text-sm text-ink/55 dark:text-wheat/55">{emptyText}</p>
       )}
     </div>
   );
@@ -124,7 +124,7 @@ export function ProfileSkillsSection({ skills, emptyText }: { skills: string[]; 
           ))}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-navy/55 dark:text-wheat/55">{emptyText}</p>
+        <p className="mt-4 text-sm text-ink/55 dark:text-wheat/55">{emptyText}</p>
       )}
     </div>
   );
