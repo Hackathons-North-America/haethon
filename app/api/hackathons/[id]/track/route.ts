@@ -5,6 +5,7 @@ import { getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathons, userHackathons } from "@/lib/db/schema";
 import { syncRemindersForUserHackathon } from "@/lib/hackathons/reminders";
+import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { hackathonTrackSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -59,6 +60,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     isSaved: true,
   });
 
+  revalidatePublicProfiles();
+
   return NextResponse.json({ data: tracked });
 }
 
@@ -83,6 +86,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
     hackathonId: id,
     isSaved: false,
   });
+
+  revalidatePublicProfiles();
 
   return NextResponse.json({ data: { hackathonId: id } });
 }

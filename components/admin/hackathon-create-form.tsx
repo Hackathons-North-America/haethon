@@ -59,7 +59,7 @@ const fieldLabels: Record<string, string> = {
 /* The API returns either a plain string (Discord/creation failures) or a
    flattened Zod error for invalid payloads. Turn the latter into a per-field
    list so the admin sees exactly which inputs to fix. */
-function messageFromError(error: unknown) {
+function messageFromError(error: unknown, status: number) {
   if (typeof error === "string") {
     return error;
   }
@@ -81,7 +81,9 @@ function messageFromError(error: unknown) {
     }
   }
 
-  return "Could not publish. Check the required fields.";
+  // No parseable error came back (HTML error page, empty body, proxy limit…);
+  // the status code is the only clue worth surfacing.
+  return `Could not publish (HTTP ${status}). The server sent no details.`;
 }
 
 function publishedNote(published: Published) {
@@ -225,7 +227,7 @@ export function HackathonCreateForm() {
 
     if (!response.ok || !result.data) {
       setStatus("error");
-      setMessage(messageFromError(result.error));
+      setMessage(messageFromError(result.error, response.status));
       return;
     }
 

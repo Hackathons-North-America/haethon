@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["iad1"],
   "crons": [
     {
       "path": "/api/cron/send-reminders",
@@ -7,15 +8,15 @@
     },
     {
       "path": "/api/cron/send-weekly-digest",
-      "schedule": "30 12 * * 1"
+      "schedule": "4 12 * * 1"
     },
     {
       "path": "/api/cron/sync-discord",
-      "schedule": "0 13 * * *"
+      "schedule": "8 12 * * *"
     },
     {
       "path": "/api/cron/cleanup-hackathons",
-      "schedule": "0 14 * * *"
+      "schedule": "12 12 * * *"
     }
   ]
 }

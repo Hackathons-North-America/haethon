@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
+import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { profileUpdateSchema } from "@/lib/validations/hackathon";
 
 function stripUndefined<T extends Record<string, unknown>>(value: T) {
@@ -65,6 +66,8 @@ export async function PATCH(request: Request) {
       },
     })
     .returning();
+
+  revalidatePublicProfiles();
 
   return NextResponse.json({ data: profile });
 }

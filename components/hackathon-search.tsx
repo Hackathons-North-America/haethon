@@ -8,40 +8,29 @@ import {
   CalendarDays,
   Check,
   Globe2,
-  LayoutGrid,
-  ListOrdered,
   LocateFixed,
   MapPin,
   Navigation,
   Search,
   Settings2,
-  Trophy,
   X,
 } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
-import { HackathonRankingList } from "@/components/hackathon-ranking-list";
-import { HackathonTierList } from "@/components/hackathon-tier-list";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
-import { assignTiers, sortByEloDescending, sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
+import { assignTiers, sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
-import {
-  datePeriodOptions,
-  dateRangeForPeriod,
-  distanceOptions,
-  viewModeOptions,
-} from "@/lib/hackathons/search-filters";
+import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
 import type {
   DatePeriod,
   DistanceFilter,
   FeatureFilter,
   HackathonFormatFilter,
   HackathonSearchFilters,
-  HackathonViewMode,
 } from "@/lib/hackathons/search-filters";
 
 const countryListboxId = "hackathon-country-options";
@@ -49,25 +38,18 @@ const locationPopoverId = "hackathon-location-popover";
 const datePopoverId = "hackathon-date-popover";
 const formatPopoverId = "hackathon-format-popover";
 const featurePopoverId = "hackathon-feature-popover";
-const viewPopoverId = "hackathon-view-popover";
 const moreFiltersId = "hackathon-more-filters";
 const SEARCH_PAGE_SIZE = 30;
 
-type OpenPopover = "location" | "date" | "format" | "features" | "view" | null;
+type OpenPopover = "location" | "date" | "format" | "features" | null;
 type LocationMode = "country" | "near_me";
 
 /* The user's position for the distance filter (and, via countryCode, the
-   Browse/Ranking views' "push local hackathons to the top" boost). IP-based
-   (free Vercel geo headers, no permission prompt) by default; "precise" comes
-   from the browser geolocation API when the user asks for it — that path has
-   no country of its own, so countryCode stays null and the boost no-ops. */
+   grid's "push local hackathons to the top" boost). IP-based (free Vercel geo
+   headers, no permission prompt) by default; "precise" comes from the browser
+   geolocation API when the user asks for it — that path has no country of its
+   own, so countryCode stays null and the boost no-ops. */
 type UserOrigin = GeoPoint & { label: string | null; precise: boolean; countryCode?: string | null };
-
-const viewModeIcons: Record<HackathonViewMode, typeof LayoutGrid> = {
-  grid: LayoutGrid,
-  tier: Trophy,
-  ranking: ListOrdered,
-};
 
 const formatOptions: { label: string; value: HackathonFormatFilter; detail: string }[] = [
   { label: "Any format", value: "any", detail: "Show online and in person events" },
@@ -107,7 +89,6 @@ function replaceSearchUrl(
     highSchoolersOnly,
     name,
     travelReimbursement,
-    view,
   }: HackathonSearchFilters,
   basePath: string,
   searched: boolean
@@ -142,10 +123,6 @@ function replaceSearchUrl(
 
   if (highSchoolersOnly !== "any") {
     params.set("highSchoolersOnly", highSchoolersOnly);
-  }
-
-  if (view !== "grid") {
-    params.set("view", view);
   }
 
   if (searched) {
@@ -193,7 +170,6 @@ export function HackathonSearch({
   const [beginnerFriendly, setBeginnerFriendly] = useState<FeatureFilter>(initialFilters.beginnerFriendly);
   const [travelReimbursement, setTravelReimbursement] = useState<FeatureFilter>(initialFilters.travelReimbursement);
   const [highSchoolersOnly, setHighSchoolersOnly] = useState<FeatureFilter>(initialFilters.highSchoolersOnly);
-  const [view, setView] = useState<HackathonViewMode>(initialFilters.view);
   const [catalog, setCatalog] = useState(initialHackathons);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -204,14 +180,11 @@ export function HackathonSearch({
   /* Which sub-panel the merged Location popover shows. Resets to "country" every
      time the popover opens (see the Location button's onClick). */
   const [locationMode, setLocationMode] = useState<LocationMode>("country");
-  /* Name, Format and View live in a secondary row that stays hidden until the
-     visitor opens it. Start expanded when any of them arrives pre-set (from the
+  /* Name and Format live in a secondary row that stays hidden until the
+     visitor opens it. Start expanded when either arrives pre-set (from the
      URL) so the active filter is never invisible. */
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(
-    () =>
-      Boolean(initialFilters.name.trim()) ||
-      initialFilters.format !== "any" ||
-      initialFilters.view !== "grid"
+    () => Boolean(initialFilters.name.trim()) || initialFilters.format !== "any"
   );
   const filterFormRef = useRef<HTMLFormElement>(null);
   const countrySearchRef = useRef<HTMLInputElement>(null);
@@ -223,6 +196,7 @@ export function HackathonSearch({
      or empty page can't retry itself forever. */
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const autoLoadedOffsetRef = useRef(-1);
+  const searchGenerationRef = useRef(0);
   const [loadMoreVisible, setLoadMoreVisible] = useState(false);
 
   useEffect(() => {
@@ -354,9 +328,8 @@ export function HackathonSearch({
       highSchoolersOnly,
       name,
       travelReimbursement,
-      view,
     }),
-    [beginnerFriendly, countries, datePeriod, distanceKm, format, highSchoolersOnly, name, travelReimbursement, view]
+    [beginnerFriendly, countries, datePeriod, distanceKm, format, highSchoolersOnly, name, travelReimbursement]
   );
   const activeFilters = useMemo(() => hasActiveFilters(currentFilters), [currentFilters]);
   const filteredHackathons = useMemo(
@@ -365,7 +338,7 @@ export function HackathonSearch({
   );
   /* eloRating/countryCode are optional on HackathonCardData (some call sites,
      like the admin preview card, don't have them) but always present on the
-     real catalog snapshot these views render — normalized here once so the
+     real catalog snapshot the grid renders — normalized here once so the
      ranking helpers below can rely on a definite number. */
   const rankableHackathons = useMemo(
     () => filteredHackathons.map((hackathon) => ({ ...hackathon, eloRating: hackathon.eloRating ?? 1500 })),
@@ -376,12 +349,11 @@ export function HackathonSearch({
     () => sortByEloWithLocalBoost(rankableHackathons, originCountryCode),
     [rankableHackathons, originCountryCode]
   );
-  const pureEloRankedHackathons = useMemo(() => sortByEloDescending(rankableHackathons), [rankableHackathons]);
   /* The catalog arrives with past (recurring) editions already ordered after
      everything upcoming; splitting on isPast keeps that order while letting the
-     grid draw an explicit archive divider between the two groups. Grid view is
-     Elo-ranked like the other views, so the split reads off eloRankedHackathons
-     rather than the raw filtered list. */
+     grid draw an explicit archive divider between the two groups. The grid is
+     Elo-ranked, so the split reads off eloRankedHackathons rather than the raw
+     filtered list. */
   const upcomingHackathons = useMemo(
     () => eloRankedHackathons.filter((hackathon) => !hackathon.isPast),
     [eloRankedHackathons]
@@ -394,8 +366,8 @@ export function HackathonSearch({
   const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
 
   useEffect(() => {
-    replaceSearchUrl({ ...appliedFilters, view }, basePath, hasSearched);
-  }, [appliedFilters, basePath, hasSearched, view]);
+    replaceSearchUrl(appliedFilters, basePath, hasSearched);
+  }, [appliedFilters, basePath, hasSearched]);
 
   /* Watch the sentinel rather than the scroll position so nested scroll
      containers and the page itself both work. The margin starts the fetch a
@@ -459,7 +431,6 @@ export function HackathonSearch({
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
   const selectedFormatLabel = formatOptions.find((option) => option.value === format)?.label ?? "Any format";
-  const selectedViewLabel = viewModeOptions.find((option) => option.value === view)?.label ?? "Browse";
   const selectedDistanceLabel =
     distanceKm === "any"
       ? "Any distance"
@@ -510,13 +481,24 @@ export function HackathonSearch({
     // A second click on the active preset clears it back to "all".
     const nextCountries = selectedPreset === presetId ? [] : [...preset.filters.countries];
     const nextFormat = selectedPreset === presetId ? "any" : preset.filters.format;
+    const nextFilters = {
+      ...currentFilters,
+      countries: nextCountries,
+      format: nextFormat,
+    };
 
     setCountries(nextCountries);
     setCountryQuery("");
     setFormat(nextFormat);
+    void searchHackathons(nextFilters);
   }
 
   async function searchHackathons(filters: HackathonSearchFilters, offset = 0, append = false) {
+    /* A new filter search supersedes any in-flight infinite-scroll request (or
+       an earlier rapid preset click). Only responses from the current
+       generation may update the catalog and URL. */
+    const searchGeneration = append ? searchGenerationRef.current : ++searchGenerationRef.current;
+
     setIsSearching(true);
     setSearchError(null);
     setOpenPopover(null);
@@ -565,11 +547,19 @@ export function HackathonSearch({
         hasMore: boolean;
       };
 
+      if (searchGeneration !== searchGenerationRef.current) {
+        return;
+      }
+
       setCatalog((current) => (append ? [...current, ...body.data] : body.data));
       setHasMore(body.hasMore);
       setAppliedFilters(filters);
       setHasSearched(true);
     } catch {
+      if (searchGeneration !== searchGenerationRef.current) {
+        return;
+      }
+
       setSearchError("Couldn’t load hackathons. Please try again.");
       if (append) {
         // Don't auto-retry a page that just failed; the Try again button
@@ -577,7 +567,9 @@ export function HackathonSearch({
         autoLoadedOffsetRef.current = offset;
       }
     } finally {
-      setIsSearching(false);
+      if (searchGeneration === searchGenerationRef.current) {
+        setIsSearching(false);
+      }
     }
   }
 
@@ -591,7 +583,6 @@ export function HackathonSearch({
       highSchoolersOnly: "any",
       name: "",
       travelReimbursement: "any",
-      view,
     };
 
     setName("");
@@ -625,10 +616,10 @@ export function HackathonSearch({
                 return (
                   <button
                     aria-pressed={active}
-                    className={`group inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-all sm:gap-2 sm:px-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/40 ${
+                    className={`group inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors sm:gap-2 sm:px-5 focus-visible:outline-none focus-visible:text-pine focus-visible:underline focus-visible:underline-offset-4 ${
                       active
-                        ? "bg-pine text-paper shadow-[0_8px_20px_-8px_rgba(0,115,84,0.45)]"
-                        : "text-ink/55 hover:text-ink hover:ring-1 hover:ring-inset hover:ring-pine"
+                        ? "text-pine"
+                        : "text-ink/55 hover:text-pine"
                     }`}
                     key={preset.id}
                     onClick={() => applyRegionPreset(preset.id)}
@@ -1073,8 +1064,8 @@ export function HackathonSearch({
             </div>
             </div>
 
-            {/* Secondary row: search by name + format + view, revealed by the
-                More toggle and separated by a hairline instead of a second card. */}
+            {/* Secondary row: search by name + format, revealed by the More
+                toggle and separated by a hairline instead of a second card. */}
             {moreFiltersOpen ? (
               <>
                 <span aria-hidden="true" className="mx-6 my-1 h-px bg-navy/10 dark:bg-white/10" />
@@ -1156,72 +1147,6 @@ export function HackathonSearch({
                     </div>
                   ) : null}
                 </div>
-
-                <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-navy/10 dark:bg-white/10 md:block" />
-
-                {/* View picker — Browse / Tier List / Ranking. Changes how the
-                    results below are laid out rather than what is fetched. */}
-                <div className="relative min-h-[4.2rem] min-w-0 flex-1">
-                  {view !== "grid" ? <input name="view" type="hidden" value={view} /> : null}
-                  <button
-                    aria-controls={viewPopoverId}
-                    aria-expanded={openPopover === "view"}
-                    aria-label="View"
-                    className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-ivory dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
-                      openPopover === "view" ? "bg-ivory dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
-                    }`}
-                    onClick={() => setOpenPopover((current) => (current === "view" ? null : "view"))}
-                    type="button"
-                  >
-                    <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
-                      <LayoutGrid aria-hidden="true" className="size-3.5" />
-                      View
-                    </span>
-                    <span className="mt-1 block truncate text-sm leading-5 text-navy/55 dark:text-wheat/55">{selectedViewLabel}</span>
-                  </button>
-                  {openPopover === "view" ? (
-                    <div
-                      className="absolute right-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[19rem] rounded-[1.75rem] border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
-                      id={viewPopoverId}
-                    >
-                      <div className="grid gap-2">
-                        {viewModeOptions.map((option) => {
-                          const Icon = viewModeIcons[option.value];
-                          const selected = view === option.value;
-
-                          return (
-                            <button
-                              aria-pressed={selected}
-                              className={`flex min-h-[3.5rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
-                                selected
-                                  ? "border-pine/35 dark:border-moss/40 bg-pine/5 dark:bg-moss/10"
-                                  : "border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] hover:border-navy/20 hover:bg-ivory dark:hover:bg-white/10"
-                              }`}
-                              key={option.value}
-                              onClick={() => {
-                                setView(option.value);
-                                setOpenPopover(null);
-                              }}
-                              type="button"
-                            >
-                              <span className="flex min-w-0 items-center gap-2.5">
-                                <Icon aria-hidden="true" className="size-4 shrink-0 text-navy/55 dark:text-wheat/55" />
-                                <span className="truncate text-sm font-semibold text-navy dark:text-wheat">{option.label}</span>
-                              </span>
-                              <span
-                                className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                                  selected ? "border-pine dark:border-moss/50 bg-pine text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white" : "border-navy/15 dark:border-white/15 text-transparent"
-                                }`}
-                              >
-                                <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
                 </div>
               </>
             ) : null}
@@ -1247,11 +1172,11 @@ export function HackathonSearch({
         <div className="mx-auto max-w-[1800px]">
           <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
             <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em] text-navy dark:text-wheat sm:text-4xl">
-              {view === "tier" ? "Tier list" : view === "ranking" ? "Confidence-adjusted ranking" : "Upcoming hackathons"}
+              Upcoming hackathons
             </h1>
           </div>
 
-          {view === "grid" && !activeFilters && originCountryCode ? (
+          {!activeFilters && originCountryCode ? (
             <p className="mb-6 -mt-3 text-sm leading-5 text-navy/50 dark:text-wheat/50">
               Hackathons near you first.
             </p>
@@ -1266,45 +1191,39 @@ export function HackathonSearch({
               </p>
             </div>
           ) : filteredHackathons.length ? (
-            view === "tier" ? (
-              <HackathonTierList hackathons={rankableHackathons} />
-            ) : view === "ranking" ? (
-              <HackathonRankingList hackathons={pureEloRankedHackathons} localCountryCode={originCountryCode} />
-            ) : (
-              <>
-                {upcomingHackathons.length ? (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
-                    {upcomingHackathons.map((hackathon) => (
+            <>
+              {upcomingHackathons.length ? (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
+                  {upcomingHackathons.map((hackathon) => (
+                    <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Past recurring editions sit below a labeled rule so the cutoff
+                  between live events and the archive is unmistakable. */}
+              {pastHackathons.length ? (
+                <>
+                  <div
+                    aria-label="Archived hackathons"
+                    className={`flex items-center gap-4 ${upcomingHackathons.length ? "mt-14" : "mt-2"}`}
+                    role="separator"
+                  >
+                    <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
+                    <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-navy/55 dark:text-wheat/55">
+                      <Archive aria-hidden="true" className="size-3.5" />
+                      Archived · awaiting next edition
+                    </span>
+                    <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
+                  </div>
+                  <div className="mt-10 grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
+                    {pastHackathons.map((hackathon) => (
                       <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                     ))}
                   </div>
-                ) : null}
-
-                {/* Past recurring editions sit below a labeled rule so the cutoff
-                    between live events and the archive is unmistakable. */}
-                {pastHackathons.length ? (
-                  <>
-                    <div
-                      aria-label="Archived hackathons"
-                      className={`flex items-center gap-4 ${upcomingHackathons.length ? "mt-14" : "mt-2"}`}
-                      role="separator"
-                    >
-                      <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
-                      <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-navy/55 dark:text-wheat/55">
-                        <Archive aria-hidden="true" className="size-3.5" />
-                        Archived · awaiting next edition
-                      </span>
-                      <span aria-hidden="true" className="h-px flex-1 bg-navy/15 dark:bg-white/15" />
-                    </div>
-                    <div className="mt-10 grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
-                      {pastHackathons.map((hackathon) => (
-                        <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </>
-            )
+                </>
+              ) : null}
+            </>
           ) : (
             <div className="rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-8 text-center">
               <h2 className="text-xl font-semibold text-navy dark:text-wheat">No hackathons match your search</h2>

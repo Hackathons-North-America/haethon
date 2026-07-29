@@ -7,7 +7,9 @@ import Link from "next/link";
 import { ArrowUpRight, BellPlus, Check, ChevronDown, Swords } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
+import { FriendAvatarRow } from "@/components/hackathon-friends";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
+import type { HackathonFriend } from "@/lib/follows/activity";
 import { calendarProviderLinks } from "@/lib/hackathons/calendar-links";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
@@ -33,6 +35,9 @@ export type HackathonCardData = {
   faceoffLosses?: number;
   faceoffWins?: number;
   format?: "online" | "in_person";
+  /** Approved followees of the signed-in viewer with this hackathon on their
+      board — the card's "James is going" social nudge. */
+  friends?: HackathonFriend[];
   hasDiscord?: boolean;
   highSchoolersOnly?: boolean;
   id: string;
@@ -663,7 +668,7 @@ function ReminderControl({ hackathonId, statusLabel, options: initialOptions }: 
       <button
         aria-expanded={open}
         className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
-          open ? "bg-pine text-paper" : "text-ink hover:bg-pine hover:text-paper"
+          open ? "text-pine" : "text-ink hover:text-pine"
         }`}
         onClick={() => setOpen((current) => !current)}
         type="button"
@@ -1294,6 +1299,8 @@ export function HackathonCard({
               {hackathon.location}
             </p>
           ) : null}
+
+          <FriendAvatarRow friends={hackathon.friends} />
 
           {/* `mt-auto` bottom-anchors the blurb so descriptions of different
               lengths all end on the same line above the footer rule, rather

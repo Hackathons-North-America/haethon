@@ -10,6 +10,7 @@ import {
   syncInferredAttendanceDays,
 } from "@/lib/hackathons/attendance";
 import { applyPassiveAttendanceVerification } from "@/lib/hackathons/passive-verification";
+import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { syncRemindersForUserHackathon } from "@/lib/hackathons/reminders";
 import { statusShouldInferAttendance } from "@/lib/hackathons/utils";
 import { userHackathonUpdateSchema } from "@/lib/validations/hackathon";
@@ -105,6 +106,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     }
   }
+
+  // Status, pin, and award changes all feed the shared profile page.
+  revalidatePublicProfiles();
 
   return NextResponse.json({ data: updated });
 }

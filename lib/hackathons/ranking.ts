@@ -1,7 +1,7 @@
 /**
  * Client- and server-safe sorting/grouping helpers for the Elo-ranked catalog
- * views (Browse, Ranking, Tier List). Pure functions over already-fetched
- * catalog cards — no DB access.
+ * grid and the Face Off arena. Pure functions over already-fetched catalog
+ * cards — no DB access.
  */
 
 export type EloRankable = {
@@ -52,8 +52,7 @@ export function sortByEloDescending<T extends EloRankable>(cards: readonly T[]):
 
 /**
  * Elo-descending, but with the visitor's home country's hackathons pulled to
- * the very top first. Used by the Browse and Ranking views; the Tier List
- * view deliberately skips this (tiers are Elo-only).
+ * the very top first. Used by the catalog grid.
  */
 export function sortByEloWithLocalBoost<T extends EloRankable>(
   cards: readonly T[],

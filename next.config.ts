@@ -3,6 +3,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  /* Tags every client bundle with the deploy it came from so the router
+     detects version skew after a new deploy and falls back to a full-page
+     navigation, upgrading stale tabs. Undefined outside Vercel (no-op). */
+  deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
   images: {
     /* Local marketing assets are content-hashed at build time. Keep optimized
        variants warm for a month so traffic does not repeatedly pay to resize

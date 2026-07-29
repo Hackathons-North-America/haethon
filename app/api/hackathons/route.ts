@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUserRecord } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/auth";
 import { applyUserCardState, getPublicHackathonCatalog } from "@/lib/hackathons/catalog";
 import { hackathonSearchSchema } from "@/lib/validations/hackathon";
 
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   // The heavy catalog query is served from the shared cross-request cache;
   // only the tiny saved/vote overlay depends on who is asking.
-  const [{ cards, hasMore }, user] = await Promise.all([
+  const [{ cards, hasMore }, userId] = await Promise.all([
     getPublicHackathonCatalog({
       name: q ?? "",
       countries,
@@ -52,10 +52,10 @@ export async function GET(request: Request) {
       limit,
       offset,
     }),
-    getCurrentUserRecord(),
+    getCurrentUserId(),
   ]);
 
-  const data = await applyUserCardState(cards, user?.id);
+  const data = await applyUserCardState(cards, userId);
 
   return NextResponse.json({ data, hasMore });
 }

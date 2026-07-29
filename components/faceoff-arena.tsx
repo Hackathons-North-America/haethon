@@ -20,9 +20,7 @@ export type FaceoffHackathon = {
   faceoffLosses: number;
   location: string;
   date: string;
-  country: string | null;
   description: string | null;
-  prizeAmountUsd: number | null;
 };
 
 type IssuedMatchup = {

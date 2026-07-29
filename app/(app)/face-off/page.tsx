@@ -22,6 +22,10 @@ export default async function FaceOffPage({
     ? (cards.find((card) => card.slug === params.hackathon)?.id ?? null)
     : null;
 
+  /* Only what the arena renders crosses into the RSC payload — this pool is
+     the whole catalog, so every extra field ships to every visitor. The
+     description feeds a two-line clamp, so anything past a couple of lines is
+     dead weight. */
   const pool = cards.map((card) => ({
     id: card.id,
     name: card.name,
@@ -32,9 +36,9 @@ export default async function FaceOffPage({
     faceoffLosses: card.faceoffLosses,
     location: card.location,
     date: card.date,
-    country: card.country,
-    description: card.description,
-    prizeAmountUsd: card.prizeAmountUsd,
+    description: card.description && card.description.length > 180
+      ? `${card.description.slice(0, 179).trimEnd()}…`
+      : card.description,
   }));
 
   return (

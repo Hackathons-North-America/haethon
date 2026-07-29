@@ -16,6 +16,7 @@ import {
   Settings,
   ShieldCheck,
   Swords,
+  Users,
 } from "lucide-react";
 
 type SidebarLink = {
@@ -32,6 +33,7 @@ const items: SidebarLink[] = [
   { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
   { href: "/face-off", icon: Swords, label: "Face Off" },
   { href: "/my", icon: CalendarDays, label: "My Hackathons" },
+  { href: "/friends", icon: Users, label: "Friends" },
   { href: "/account", icon: CircleUser, label: "Hacker Profile" },
 ];
 
@@ -166,7 +168,7 @@ export function AppSidebar({
                     <Link
                       aria-current={active ? "page" : undefined}
                       className={`inline-flex min-h-10 shrink-0 flex-col justify-center py-3 pl-3 pr-1 text-sm font-medium transition-colors lg:min-h-12 lg:w-64 lg:px-7 ${
-                        active ? "bg-pine text-paper" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
+                        active ? "text-pine" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
                       }`}
                       href={href}
                     >
@@ -200,7 +202,7 @@ export function AppSidebar({
                             flush under the label rather than the icon. */}
                         <span
                           className={`block w-40 pl-7 pt-1 text-xs leading-snug lg:pl-9 ${
-                            active ? "text-paper/70" : "text-ink/50"
+                            active ? "text-pine/70" : "text-ink/50"
                           }`}
                         >
                           {description}
@@ -216,7 +218,7 @@ export function AppSidebar({
                 <Link
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex min-h-10 shrink-0 items-center gap-3 pl-3 pr-1 text-sm font-medium transition-colors lg:min-h-12 lg:w-64 lg:gap-4 lg:px-7 ${
-                    active ? "bg-pine text-paper" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
+                    active ? "text-pine" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
                   }`}
                   href={href}
                   key={href}

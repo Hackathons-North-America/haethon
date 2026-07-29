@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { HackathonSearch } from "@/components/hackathon-search";
-import { getCurrentUserRecord } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/auth";
 import { applyUserCardState, getPublicHackathonCatalog } from "@/lib/hackathons/catalog";
 import { dateRangeForPeriod, normalizeSearchFilters } from "@/lib/hackathons/search-filters";
 
@@ -21,7 +21,7 @@ export default async function HackathonsPage({
 
   /* First visits receive one bounded catalog page immediately. Search URLs use
      the same query with their filters applied, so reloads remain shareable. */
-  const [{ cards, hasMore }, user] = await Promise.all([
+  const [{ cards, hasMore }, userId] = await Promise.all([
     getPublicHackathonCatalog({
       name: filters.name,
       countries: filters.countries,
@@ -34,10 +34,10 @@ export default async function HackathonsPage({
       startsBefore: dateRange?.startsBefore,
       limit: 30,
     }),
-    getCurrentUserRecord(),
+    getCurrentUserId(),
   ]);
 
-  const hackathonCards = await applyUserCardState(cards, user?.id);
+  const hackathonCards = await applyUserCardState(cards, userId);
 
   return (
     <main className="min-h-screen">

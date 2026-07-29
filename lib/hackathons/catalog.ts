@@ -1,9 +1,10 @@
 import { revalidateTag, unstable_cache } from "next/cache";
-import { and, asc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
   hackathonDates,
+  hackathonFaceoffRatings,
   hackathonLocations,
   hackathonTags,
   hackathons,
@@ -11,9 +12,11 @@ import {
   tags as hackathonTagDefinitions,
   userHackathons,
 } from "@/lib/db/schema";
+import { getFriendActivityByHackathon, type HackathonFriend } from "@/lib/follows/queries";
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
 import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
+import { DISPLAY_PRIOR_GAMES } from "@/lib/hackathons/elo";
 import { getLiveFaceoffRatings } from "@/lib/hackathons/faceoff-service";
 import type { TierLabel } from "@/lib/hackathons/ranking";
 import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
@@ -134,6 +137,13 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
   // stale — fine at whole-day event granularity.
   const now = new Date();
 
+  // SQL mirror of displayEloRating(): ratings backed by few games are pulled
+  // toward the neutral 1500 before ordering, so page boundaries fall where the
+  // client's own Elo sort would put them. Hackathons without a ratings row
+  // order at exactly 1500.
+  const faceoffGames = sql`(coalesce(${hackathonFaceoffRatings.faceoffWins}, 0) + coalesce(${hackathonFaceoffRatings.faceoffLosses}, 0))`;
+  const displayElo = sql`round(1500 + ${faceoffGames}::float / (${faceoffGames} + ${DISPLAY_PRIOR_GAMES}) * (coalesce(${hackathonFaceoffRatings.eloRating}, 1500) - 1500))`;
+
   const rowsQuery = db
     .select({
       id: hackathons.id,
@@ -164,6 +174,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
+    .leftJoin(hackathonFaceoffRatings, eq(hackathonFaceoffRatings.hackathonId, hackathons.id))
     .where(
       and(
         isNotNull(hackathons.publishedAt),
@@ -185,12 +196,16 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         startsBefore ? lte(hackathonDates.startsAt, startsBefore) : undefined
       )
     )
-    // Keep every catalog view chronological, including name searches, so the
-    // first card is always the hackathon that starts soonest — with past
-    // (recurring) editions grouped after everything upcoming.
+    // The catalog grid presents cards Elo-ranked, so pagination must hand out
+    // pages in that same order — the client re-sorts only what it has loaded
+    // and cannot pull the true #1 out of a page it hasn't fetched yet. The id
+    // tiebreak matches the client's
+    // (eloRating desc, id asc), and past (recurring) editions group after
+    // everything upcoming, mirroring the archive split below the grid.
     .orderBy(
       sql`case when coalesce(${hackathonDates.endsAt}, ${hackathonDates.startsAt}) < ${now} then 1 else 0 end`,
-      asc(hackathonDates.startsAt)
+      desc(displayElo),
+      asc(hackathons.id)
     )
     .$dynamic();
 
@@ -299,6 +314,16 @@ const getCachedCatalogPage = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG
   tags: [CATALOG_CACHE_TAG],
 });
 
+/* The unbounded Face Off pool is the most expensive catalog query (every row
+   plus the tag and Discord fan-outs), and its freshness barely matters — live
+   Elo is overlaid separately every 60s, and ingest/admin changes revalidate
+   the shared tag. So it re-runs hourly instead of riding the 10-minute page
+   window. */
+const getCachedCatalogSnapshot = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG, "snapshot"], {
+  revalidate: 3600,
+  tags: [CATALOG_CACHE_TAG],
+});
+
 async function withLiveFaceoffRatings(pagePromise: Promise<CatalogPage>) {
   const [page, ratings] = await Promise.all([pagePromise, getLiveFaceoffRatings()]);
   const ratingsById = new Map(ratings.map((rating) => [rating.id, rating]));
@@ -351,7 +376,7 @@ export function getPublicHackathonCatalog(input: {
  * Returns the complete public catalog as one shared, cached Face Off pool.
  */
 export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
-  return withLiveFaceoffRatings(getCachedCatalogPage({
+  return withLiveFaceoffRatings(getCachedCatalogSnapshot({
     name: "",
     countries: [],
     format: null,
@@ -366,19 +391,20 @@ export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
 }
 
 /**
- * Overlays the signed-in user's pipeline stage onto cached public cards.
- * This is the only per-request query the catalog surfaces need, and it
- * hits the unique index on (user_id, hackathon_id).
+ * Overlays the signed-in user's pipeline stage — and their approved friends'
+ * activity — onto cached public cards. These are the only per-request queries
+ * the catalog surfaces need; the tracked lookup hits the unique index on
+ * (user_id, hackathon_id).
  */
 export async function applyUserCardState<Card extends { id: string }>(
   cards: Card[],
   userId: string | null | undefined
-): Promise<(Card & { trackedStatus: string | null })[]> {
+): Promise<(Card & { trackedStatus: string | null; friends: HackathonFriend[] })[]> {
   const hackathonIds = cards.map((card) => card.id);
 
-  const trackedRows =
+  const [trackedRows, friendsByHackathon] = await Promise.all([
     userId && hackathonIds.length
-      ? await db
+      ? db
           .select({
             hackathonId: userHackathons.hackathonId,
             applicationStatus: userHackathons.applicationStatus,
@@ -386,7 +412,11 @@ export async function applyUserCardState<Card extends { id: string }>(
           })
           .from(userHackathons)
           .where(and(eq(userHackathons.userId, userId), inArray(userHackathons.hackathonId, hackathonIds)))
-      : [];
+      : Promise.resolve([]),
+    userId
+      ? getFriendActivityByHackathon(userId, hackathonIds)
+      : Promise.resolve(new Map<string, HackathonFriend[]>()),
+  ]);
 
   // Mirrors the My Hackathons visibility rule: an unsaved row still at the
   // default "interested" stage is not on the board, so its card shows no
@@ -400,5 +430,6 @@ export async function applyUserCardState<Card extends { id: string }>(
   return cards.map((card) => ({
     ...card,
     trackedStatus: statusByHackathon.get(card.id) ?? null,
+    friends: friendsByHackathon.get(card.id) ?? [],
   }));
 }

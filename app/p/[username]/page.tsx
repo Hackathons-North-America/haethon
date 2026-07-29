@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { cache } from "react";
 
 import { AttendedHackathonsTable } from "@/components/attended-hackathons-table";
+import { FollowButton } from "@/components/follow-button";
 import { PrimaryNav } from "@/components/primary-nav";
 import { ProfileActivity } from "@/components/profile-activity";
 import {
@@ -12,9 +14,12 @@ import {
   ProfileSkillsSection,
   ProfileSocialsSection,
 } from "@/components/profile/profile-sections";
+import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
-import { loadProfilePageData } from "@/lib/profile/profile-page-data";
+import { getFollowState } from "@/lib/follows/queries";
+import { loadProfilePageData, type ProfilePageData } from "@/lib/profile/profile-page-data";
+import { PUBLIC_PROFILE_CACHE_TAG } from "@/lib/profile/public-profile-cache";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { isProfileUsername } from "@/lib/profile/username";
 
@@ -26,7 +31,7 @@ type PageProps = { params: Promise<{ username: string }> };
  * Columns are listed explicitly — email, Clerk id, and notification state are
  * deliberately absent so they cannot leak into the page or its RSC payload.
  */
-const loadSharedProfile = cache(async (username: string) => {
+async function loadSharedProfile(username: string) {
   if (!isProfileUsername(username)) {
     return null;
   }
@@ -47,19 +52,59 @@ const loadSharedProfile = cache(async (username: string) => {
       portfolioUrl: userProfiles.portfolioUrl,
     })
     .from(users)
-    .innerJoin(
-      userProfiles,
-      and(eq(userProfiles.userId, users.id), eq(userProfiles.isPublic, true))
-    )
+    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(eq(users.username, username))
     .limit(1);
 
   return row ?? null;
+}
+
+/* Everything on this page that isn't viewer-specific — the profile row plus
+   the whole hackathon-history fan-out — cached across requests per username,
+   so a shared profile link stops re-running four join-heavy queries on every
+   view. Only the follow state and the viewer lookup stay per-request. */
+const getCachedPublicProfile = unstable_cache(
+  async (username: string) => {
+    const profile = await loadSharedProfile(username);
+
+    if (!profile) {
+      return null;
+    }
+
+    return { profile, profileData: await loadProfilePageData(profile.userId) };
+  },
+  [PUBLIC_PROFILE_CACHE_TAG],
+  { revalidate: 600, tags: [PUBLIC_PROFILE_CACHE_TAG] }
+);
+
+/* unstable_cache round-trips through JSON, so pinned items' Date columns come
+   back as ISO strings on a cache hit; revive them for the components. */
+function revivePinnedDates(profileData: ProfilePageData): ProfilePageData {
+  return {
+    ...profileData,
+    pinnedItems: profileData.pinnedItems.map((item) => ({
+      ...item,
+      startsAt: item.startsAt ? new Date(item.startsAt) : null,
+      endsAt: item.endsAt ? new Date(item.endsAt) : null,
+    })),
+  };
+}
+
+/* React cache() dedupes within a request: generateMetadata and the page body
+   share one cached lookup. */
+const getPublicProfile = cache(async (username: string) => {
+  const data = await getCachedPublicProfile(username);
+
+  if (!data) {
+    return null;
+  }
+
+  return { profile: data.profile, profileData: revivePinnedDates(data.profileData) };
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username } = await params;
-  const profile = await loadSharedProfile(username);
+  const profile = (await getPublicProfile(username))?.profile ?? null;
   const displayName = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
 
   return {
@@ -71,13 +116,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function SharedProfilePage({ params }: PageProps) {
   const { username } = await params;
-  const profile = await loadSharedProfile(username);
+  const [data, viewerId] = await Promise.all([getPublicProfile(username), getCurrentUserId()]);
 
-  if (!profile) {
+  if (!data) {
     notFound();
   }
 
-  const profileData = await loadProfilePageData(profile.userId);
+  const { profile, profileData } = data;
+  // Signed-out visitors still get the button; their follow attempt 401s into
+  // the sign-in flow. Only the profile's owner has nothing to follow here.
+  const isOwnProfile = viewerId === profile.userId;
+  const followState = viewerId && !isOwnProfile ? await getFollowState(viewerId, profile.userId) : null;
   const displayName = [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim();
   const links = buildProfileLinks(profile);
   const skills = sanitizeSkills(profile.skills ?? []);
@@ -97,6 +146,12 @@ export default async function SharedProfilePage({ params }: PageProps) {
             ) : null}
             {profile.bio ? (
               <p className="mt-8 max-w-xl text-base leading-7 text-ink/55 sm:text-lg">{profile.bio}</p>
+            ) : null}
+
+            {!isOwnProfile ? (
+              <div className="mt-8">
+                <FollowButton initialFollow={followState} username={username} />
+              </div>
             ) : null}
 
             <ProfileSocialsSection emptyText="No social profiles yet." links={links} />

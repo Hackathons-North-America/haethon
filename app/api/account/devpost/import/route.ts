@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentUserContext } from "@/lib/auth";
 import { DevpostImportError, importDevpostItems } from "@/lib/devpost/import-service";
+import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 // Importing can create hackathon records (with coordinate lookups) per item.
@@ -50,6 +51,9 @@ export async function POST(request: Request) {
       batchId: parsed.data.batchId,
       itemIds: parsed.data.itemIds,
     });
+
+    // Imports create wins and attendance shown on the shared profile page.
+    revalidatePublicProfiles();
 
     return NextResponse.json({ data: summary });
   } catch (error) {

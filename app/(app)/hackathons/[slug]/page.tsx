@@ -24,9 +24,10 @@ import {
 
 import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { DiscordGlyph } from "@/components/discord-glyph";
+import { HackathonFriendsSection } from "@/components/hackathon-friends";
 import { HackathonNotificationPreferences } from "@/components/hackathon-notification-preferences";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
-import { getCurrentUserRecord } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   discordChannels,
@@ -40,6 +41,7 @@ import {
   userHackathonNotificationPreferences,
   userHackathons,
 } from "@/lib/db/schema";
+import { getFriendActivityByHackathon, type HackathonFriend } from "@/lib/follows/queries";
 import { formatDateRange, formatDuration, formatLocation } from "@/lib/hackathons/card-format";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import {
@@ -235,7 +237,7 @@ function Property({ children, icon: Icon, label }: { children: ReactNode; icon: 
 
 export default async function HackathonDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const [pageData, user] = await Promise.all([getHackathonPageData(slug), getCurrentUserRecord()]);
+  const [pageData, userId] = await Promise.all([getHackathonPageData(slug), getCurrentUserId()]);
 
   if (!pageData) {
     notFound();
@@ -243,15 +245,17 @@ export default async function HackathonDetailPage({ params }: PageProps) {
 
   const { hackathon, tagRows, discordChannelLink } = pageData;
 
-  const [[tracked], notificationPreferenceRows] = await Promise.all([
-    user
+  // Per-user lookups (the friends overlay included) run outside the shared
+  // unstable_cache above — one viewer's data must never serve another's hit.
+  const [[tracked], notificationPreferenceRows, friendActivity] = await Promise.all([
+    userId
       ? db
           .select({ applicationStatus: userHackathons.applicationStatus })
           .from(userHackathons)
-          .where(and(eq(userHackathons.userId, user.id), eq(userHackathons.hackathonId, hackathon.id)))
+          .where(and(eq(userHackathons.userId, userId), eq(userHackathons.hackathonId, hackathon.id)))
           .limit(1)
       : Promise.resolve([] as { applicationStatus: string }[]),
-    user
+    userId
       ? db
           .select({
             type: userHackathonNotificationPreferences.type,
@@ -260,14 +264,18 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           .from(userHackathonNotificationPreferences)
           .where(
             and(
-              eq(userHackathonNotificationPreferences.userId, user.id),
+              eq(userHackathonNotificationPreferences.userId, userId),
               eq(userHackathonNotificationPreferences.hackathonId, hackathon.id),
               eq(userHackathonNotificationPreferences.channel, "email")
             )
           )
       : Promise.resolve([]),
+    userId
+      ? getFriendActivityByHackathon(userId, [hackathon.id])
+      : Promise.resolve(new Map<string, HackathonFriend[]>()),
   ]);
 
+  const friends = friendActivity.get(hackathon.id) ?? [];
   const applyUrl = hackathon.applicationUrl ?? hackathon.websiteUrl;
   const statusPill = getStatusPill(hackathon.status);
   const propertyTags = [
@@ -482,6 +490,8 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           </div>
         </section>
 
+        <HackathonFriendsSection friends={friends} />
+
         <section className="mt-8 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Your status</h2>
           <p className="mt-2 text-sm text-ink/55">
@@ -489,7 +499,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
             acceptance, and check in.
           </p>
           <div className="mt-4">
-            {user ? (
+            {userId ? (
               <HackathonStatusTracker
                 hackathonId={hackathon.id}
                 initialStatus={tracked?.applicationStatus ?? null}
@@ -503,7 +513,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
               </Link>
             )}
           </div>
-          {user && notificationPreferences.length ? (
+          {userId && notificationPreferences.length ? (
             <HackathonNotificationPreferences
               hackathonId={hackathon.id}
               initialPreferences={notificationPreferences}

@@ -8,7 +8,7 @@ import type { HackathonCardData, HackathonCardReminder } from "@/components/hack
 import { MyPipelineBoard } from "@/components/my-pipeline-board";
 import type { PipelineColumn } from "@/components/my-pipeline-board";
 import { PastHackathonCard } from "@/components/past-hackathon-card";
-import { getCurrentUserRecord } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   countryAlertSubscriptions,
@@ -94,9 +94,9 @@ function toCardData(
 }
 
 export default async function MyHackathonsPage() {
-  const user = await getCurrentUserRecord();
+  const userId = await getCurrentUserId();
 
-  if (!user) {
+  if (!userId) {
     redirect("/sign-in");
   }
 
@@ -131,7 +131,7 @@ export default async function MyHackathonsPage() {
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .where(
       and(
-        eq(userHackathons.userId, user.id),
+        eq(userHackathons.userId, userId),
         or(eq(userHackathons.isSaved, true), ne(userHackathons.applicationStatus, "interested"))
       )
     )
@@ -170,7 +170,7 @@ export default async function MyHackathonsPage() {
       .from(userHackathonNotificationPreferences)
       .where(
         and(
-          eq(userHackathonNotificationPreferences.userId, user.id),
+          eq(userHackathonNotificationPreferences.userId, userId),
           eq(userHackathonNotificationPreferences.channel, "email")
         )
       ),
@@ -179,7 +179,7 @@ export default async function MyHackathonsPage() {
         country: countryAlertSubscriptions.country,
       })
       .from(countryAlertSubscriptions)
-      .where(eq(countryAlertSubscriptions.userId, user.id))
+      .where(eq(countryAlertSubscriptions.userId, userId))
       .limit(1),
   ]);
 

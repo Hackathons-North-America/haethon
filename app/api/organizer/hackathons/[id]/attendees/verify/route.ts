@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUserContext, isOrganizerRole } from "@/lib/auth";
 import { canManageHackathon, upgradeAttendanceDaysToOrganizerVerified } from "@/lib/hackathons/checkin-service";
+import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { attendeeVerifySchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -36,6 +37,9 @@ export async function POST(request: Request, context: RouteContext) {
       userIds: parsed.data.userIds,
       hackathonId: id,
     });
+
+    // Trust-tier upgrades surface on the shared profile page.
+    revalidatePublicProfiles();
 
     return NextResponse.json({
       data: {

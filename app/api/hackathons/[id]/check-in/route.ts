@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { hackathonDates, hackathons, userHackathons } from "@/lib/db/schema";
 import { evaluateCheckinWindow, normalizeCheckinCode } from "@/lib/hackathons/checkin";
 import { getActiveCheckinCode, writeOrganizerVerifiedAttendanceDays } from "@/lib/hackathons/checkin-service";
+import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { hackathonCheckinRedeemSchema } from "@/lib/validations/hackathon";
 
@@ -112,6 +113,9 @@ export async function POST(request: Request, context: RouteContext) {
     userIds: [userContext.user.id],
     hackathonId: id,
   });
+
+  // New attendance days surface on the shared profile page.
+  revalidatePublicProfiles();
 
   return NextResponse.json({
     data: {

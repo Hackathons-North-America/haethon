@@ -194,7 +194,9 @@ function findBestDuplicateInCandidates(
 
 // At 0.95+ the match carries same start day, real name overlap, and (usually) the same
 // website domain — treated as certain enough to merge without an admin decision. Scores
-// between 0.55 and 0.95 still go through the manual duplicate flows.
+// between 0.55 and 0.95 still go through the manual duplicate flows. The same-day signal
+// only counts when the import actually carried a date: fix items that fell back to a
+// stand-in "now" are excluded from auto-merge entirely (see importAdminHackathonFixItems).
 const AUTO_MERGE_SCORE = 0.95;
 
 async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
@@ -499,6 +501,11 @@ function deriveFixPayload(item: AdminHackathonFixImportItem, index: number) {
   const primaryHost = hosts[0] ?? {};
   const fallbackStart = new Date();
   const fallbackEnd = new Date(fallbackStart.getTime() + 24 * 60 * 60 * 1000);
+  // "Now" is only a stand-in so the fix queue has an editable date — a
+  // stand-in is not evidence, so callers must not let it satisfy the
+  // same-start-day requirement in duplicate scoring.
+  const startRaw = stringField(event.start_at ?? raw.start_at);
+  const hasRealStartDate = Boolean(startRaw) && !Number.isNaN(new Date(startRaw).getTime());
   const sourceUrl = firstString(item.sourceUrl, lumaUrl(event.url), event.sourceUrl, raw.sourceUrl, raw.url, importedFallbackUrl(index));
   const name = firstString(event.name, raw.name, raw.title, `Imported hackathon ${index + 1}`).slice(0, 180);
   const country = firstString(geoAddress.country, englishAddress.country, calendar.geo_country);
@@ -512,29 +519,32 @@ function deriveFixPayload(item: AdminHackathonFixImportItem, index: number) {
   );
 
   return {
-    name,
-    organizationName,
-    websiteUrl: sourceUrl,
-    imageUrl: firstString(event.cover_url, event.social_image_url, calendar.cover_image_url),
-    sourceUrl,
-    applicationUrl: sourceUrl,
-    city,
-    region,
-    country,
-    venue,
-    startDate: dateString(event.start_at ?? raw.start_at, fallbackStart),
-    endDate: dateString(event.end_at ?? raw.end_at, fallbackEnd),
-    format: event.location_type === "online" ? "online" : "in_person",
-    shortDescription: firstString(raw.description, event.description),
-    beginnerFriendly: false,
-    travelReimbursement: false,
-    highSchoolersOnly: false,
-    importReason: item.reason,
-    importSource: item.source ?? "unknown",
-    importSourceUrl: sourceUrl,
-    externalId: firstString(raw.api_id, event.api_id),
-    rawImport: item.raw,
-    needsFix: true,
+    hasRealStartDate,
+    payload: {
+      name,
+      organizationName,
+      websiteUrl: sourceUrl,
+      imageUrl: firstString(event.cover_url, event.social_image_url, calendar.cover_image_url),
+      sourceUrl,
+      applicationUrl: sourceUrl,
+      city,
+      region,
+      country,
+      venue,
+      startDate: dateString(event.start_at ?? raw.start_at, fallbackStart),
+      endDate: dateString(event.end_at ?? raw.end_at, fallbackEnd),
+      format: event.location_type === "online" ? "online" : "in_person",
+      shortDescription: firstString(raw.description, event.description),
+      beginnerFriendly: false,
+      travelReimbursement: false,
+      highSchoolersOnly: false,
+      importReason: item.reason,
+      importSource: item.source ?? "unknown",
+      importSourceUrl: sourceUrl,
+      externalId: firstString(raw.api_id, event.api_id),
+      rawImport: item.raw,
+      needsFix: true,
+    },
   };
 }
 
@@ -554,11 +564,17 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
   const duplicateCandidates = await listDuplicateCandidates();
 
   for (const [index, item] of input.items.entries()) {
-    const payload = deriveFixPayload(item, index);
-    const duplicate = findBestDuplicateInCandidates(payload, duplicateCandidates);
+    const { hasRealStartDate, payload } = deriveFixPayload(item, index);
+    // A fabricated stand-in start date must not masquerade as a same-day
+    // match, so date-less items are scored on the legacy name+domain path —
+    // enough to surface a candidate to the reviewer, never to auto-merge.
+    const duplicate = findBestDuplicateInCandidates(
+      hasRealStartDate ? payload : { ...payload, startDate: null },
+      duplicateCandidates
+    );
     const duplicateScore = Number((duplicate?.score ?? 0).toFixed(2));
 
-    if (duplicate && duplicate.score >= AUTO_MERGE_SCORE) {
+    if (duplicate && hasRealStartDate && duplicate.score >= AUTO_MERGE_SCORE) {
       // The event already exists, so there is nothing for an admin to fix — merge it
       // straight away instead of parking a pending card in the queue. Broken payloads
       // rarely validate as publishable data; when this one does, use it to fill fields

@@ -38,7 +38,6 @@ const defaults: HackathonSearchFilters = {
   highSchoolersOnly: "any",
   name: "",
   travelReimbursement: "any",
-  view: "grid",
 };
 
 // Toronto — about 94 km from the Waterloo entry above.
