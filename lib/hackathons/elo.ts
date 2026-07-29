@@ -19,7 +19,6 @@ export type EloMatchResult = {
 
 export const PROVISIONAL_GAMES = 10;
 export const DISPLAY_PRIOR_GAMES = 10;
-export const ELO_ALGORITHM_VERSION = 2;
 
 /* A newer hackathon's rating should move fast on its first few matchups and
    settle down once it has enough votes to mean something — the same

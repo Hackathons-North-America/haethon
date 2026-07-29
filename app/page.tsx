@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import { HeroHeadline } from "@/components/hero-headline";
-import { HeroDemo } from "@/components/hero-demo";
+import { HeroSplit } from "@/components/hero-split";
 import { AudienceCards } from "@/components/audience-cards";
 import { ShieldCheck, Rss, Users } from "lucide-react";
 
@@ -10,10 +9,10 @@ import {
   LazyPipelineSpotlight,
   LazySearchSpotlight,
 } from "@/components/landing-lazy-visuals";
-import { LandingReveal } from "@/components/landing-reveal";
 import { LandingWash } from "@/components/landing-wash";
 import { PrimaryNav } from "@/components/primary-nav";
 import { HoverUnderline } from "@/components/hover-underline";
+import { SiteFooter } from "@/components/site-footer";
 
 const coveragePillars = [
   {
@@ -51,50 +50,14 @@ export default function Home() {
   // this page fully static.
   return (
     <main className="min-h-screen overflow-x-clip bg-paper text-ink">
-      <PrimaryNav />
+      <PrimaryNav tone="pine" />
 
-      <section className="relative isolate overflow-hidden pb-16 pt-32 sm:pb-28 sm:pt-44">
-        <LandingWash seed="hero-bloom" />
-        <LandingWash seed="hero-bloom-right" />
-
-        {/* Split hero: copy on the left half, the live product demo on the
-            right — stacking to copy-then-demo on small screens. */}
-        <div className="relative z-10 mx-auto grid max-w-[76rem] items-center gap-14 px-5 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
-          <div className="flex max-w-[36rem] flex-col items-start">
-            <HeroHeadline />
-
-            <LandingReveal delay={0.55}>
-              <p className="mt-6 max-w-[30rem] text-pretty text-base leading-relaxed text-ink/60 sm:text-lg">
-                Search hundreds of upcoming hackathons, build your profile, and
-                never miss another application deadline.
-              </p>
-            </LandingReveal>
-
-            <LandingReveal delay={0.7}>
-              {/* Framed like a card's pipeline cell: black outline on paper,
-                  small-caps mono, filling pine on hover. */}
-              <Link
-                href="/hackathons"
-                className="mt-10 inline-flex min-h-12 items-center justify-center gap-2 border border-black bg-paper px-8 font-mono text-xs font-medium uppercase tracking-[0.14em] text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:min-h-14 sm:px-10 sm:text-sm"
-              >
-                Open App
-                <span aria-hidden="true">→</span>
-              </Link>
-            </LandingReveal>
-          </div>
-
-          <LandingReveal className="w-full" delay={0.45}>
-            <div className="mx-auto w-full max-w-[27rem] lg:max-w-[29rem]">
-              <HeroDemo />
-            </div>
-          </LandingReveal>
-        </div>
-      </section>
+      <HeroSplit />
 
       {/* Everything below the hero is one ruled sheet, framed in the card's
           black. Sections inside share single rules the way the card's band,
           cover, and body do — no gaps, panels glued edge to edge. */}
-      <div className="pb-16 sm:pb-24">
+      <div>
         <div className="border-y border-black bg-paper">
 
           <section
@@ -103,7 +66,6 @@ export default function Home() {
             className="scroll-mt-24"
           >
             <div className="relative overflow-hidden">
-              <LandingWash seed="coverage-header" />
               <div className={`relative max-w-[36rem] ${panelPaddingClassName}`}>
                 <h2 id="coverage-heading" className={sectionHeadingClassName}>
                   Hackathons across the globe
@@ -118,16 +80,14 @@ export default function Home() {
             {/* The map sits like the card's cover image, running straight out
                 of the header with no rule between them. */}
             <div className="relative overflow-hidden">
-              <LandingWash seed="coverage-map" />
               <div className="relative">
                 <LazyLandingWorldMap />
               </div>
             </div>
 
             {/* Ruled off like the card's pipeline band: one black rule between
-                cells, the wash-and-grain bloom painting under all three. */}
+                cells, with the paper ground continuing under all three. */}
             <div className="relative grid overflow-hidden border-t border-black sm:grid-cols-3">
-              <LandingWash seed="coverage-pillars" />
               {coveragePillars.map(({ Icon, title, body }, index) => (
                 <div
                   key={title}
@@ -156,7 +116,6 @@ export default function Home() {
             className="border-t border-black"
           >
             <div className="relative overflow-hidden">
-              <LandingWash seed="search-header" />
               <div
                 className={`relative grid gap-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20 ${panelPaddingClassName}`}
               >
@@ -188,7 +147,6 @@ export default function Home() {
             </div>
 
             <div className="relative overflow-hidden">
-              <LandingWash seed="search-visual" />
               <div className="relative px-6 py-10 sm:px-10 sm:py-14">
                 <LazySearchSpotlight />
               </div>
@@ -263,6 +221,7 @@ export default function Home() {
         </div>
       </div>
 
+      <SiteFooter />
     </main>
   );
 }

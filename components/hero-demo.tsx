@@ -7,11 +7,13 @@ import { Check, Search } from "lucide-react";
 
 const easeOut = [0.22, 1, 0.36, 1] as const;
 
-/* The hero's product demo: a miniature browser window on the hackathon db
-   page, focused on a single card, with a scripted cursor acting out the core
-   flow — mark the hackathon Applied, open Add reminder, and switch on the
-   week-before email. Purely decorative: inert, hidden from assistive tech,
-   and pixel-styled after the real HackathonCard so the mock stays honest. */
+/* The hero's product demo: a corner of the app itself — a browser window on
+   the hackathon db page, cropped by the hero's right and bottom edges (only
+   its left and top borders render), focused on one giant card. A scripted
+   cursor acts out the core flow — mark the hackathon Applied, open Add
+   reminder, and switch on the week-before email. Purely decorative: inert,
+   hidden from assistive tech, and pixel-styled after the real HackathonCard
+   so the mock stays honest. */
 
 /* Where the cursor is headed during a step. "rest" is an off-card parking
    spot; the rest resolve to live DOM nodes measured at step entry. */
@@ -124,7 +126,7 @@ export function HeroDemo() {
       const key = STEPS[step].target;
 
       if (key === "rest") {
-        setCursor({ x: containerRect.width * 0.82, y: containerRect.height * 0.9 });
+        setCursor({ x: containerRect.width * 0.72, y: containerRect.height * 0.82 });
         return;
       }
 
@@ -159,188 +161,194 @@ export function HeroDemo() {
     <div
       aria-hidden="true"
       inert
-      className="pointer-events-none relative select-none"
+      className="pointer-events-none relative flex h-full w-full select-none"
       ref={containerRef}
     >
-      {/* The miniature browser window, framed in the card's black. */}
-      <div className="overflow-hidden border border-black bg-paper shadow-[0_36px_80px_-36px_rgba(27,25,23,0.4)]">
+      {/* The browser window, framed in the card's black on its two visible
+          sides only — the right and bottom run off the hero's edges. */}
+      <div className="flex w-full flex-col overflow-hidden border-l border-t border-black bg-paper shadow-[-28px_-20px_70px_-45px_rgba(27,25,23,0.45)]">
         {/* Title bar: traffic dots and the address of the page being demoed. */}
-        <div className="flex items-center gap-2 border-b border-black bg-ink/[0.04] px-4 py-2.5">
-          <span className="size-2 rounded-full bg-ink/20" />
-          <span className="size-2 rounded-full bg-ink/20" />
-          <span className="size-2 rounded-full bg-ink/20" />
-          <span className="mx-auto flex min-w-0 items-center gap-1.5 rounded-full bg-paper px-4 py-1 font-mono text-[10px] font-medium tracking-[0.08em] text-ink/55 ring-1 ring-ink/10">
+        <div className="flex items-center gap-2 border-b border-black bg-ink/[0.04] px-5 py-3">
+          <span className="size-2.5 rounded-full bg-ink/20" />
+          <span className="size-2.5 rounded-full bg-ink/20" />
+          <span className="size-2.5 rounded-full bg-ink/20" />
+          <span className="mx-auto flex min-w-0 items-center gap-1.5 rounded-full bg-paper px-5 py-1.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink/55 ring-1 ring-ink/10">
             haethon.dev/hackathons
           </span>
-          <span className="w-10" />
+          <span className="w-12" />
         </div>
 
-        <div className="p-4 sm:p-5">
-          {/* Search bar stub, so the window reads as the hackathon db page. */}
-          <div className="flex items-center gap-2.5 border border-ink/20 bg-paper px-3.5 py-2.5">
-            <Search aria-hidden="true" className="size-3.5 shrink-0 text-ink/45" />
-            <span className="truncate text-[13px] text-ink/45">
-              Search hackathons…
-            </span>
-            <span className="ml-auto hidden shrink-0 bg-pine/10 px-2 py-0.5 text-[10px] font-medium text-pine sm:inline-flex">
-              Canada
-            </span>
-          </div>
-
-          {/* One hackathon card, styled after HackathonCard's cover layout. */}
-          <article className="relative mt-4 flex flex-col overflow-hidden border border-black bg-paper">
-            <div className="relative aspect-[5/2] w-full shrink-0 overflow-hidden border-b border-black">
-              <Image
-                alt=""
-                className="object-cover"
-                fill
-                sizes="(min-width: 1024px) 40vw, 90vw"
-                src="/photos/atrium.webp"
-              />
+        {/* The page itself, running to the cropped edges — paper continuing
+            past the card reads as the rest of the site. */}
+        <div className="flex-1 px-6 py-7 sm:px-10 sm:py-9">
+          <div className="mx-auto w-full max-w-[32rem]">
+            {/* Search bar stub, so the window reads as the hackathon db page. */}
+            <div className="flex items-center gap-2.5 border border-ink/20 bg-paper px-4 py-3">
+              <Search aria-hidden="true" className="size-4 shrink-0 text-ink/45" />
+              <span className="truncate text-sm text-ink/45">
+                Search hackathons…
+              </span>
+              <span className="ml-auto hidden shrink-0 bg-pine/10 px-2.5 py-1 text-[11px] font-medium text-pine sm:inline-flex">
+                Canada
+              </span>
             </div>
 
-            {/* Pipeline band — the demo's first click lands on "Applied". */}
-            <div className="flex shrink-0 items-stretch border-b border-black bg-paper">
-              {stages.map((stage, index) => {
-                const isApplied = stage === "Applied";
-                const reached = applied && index <= 1;
+            {/* The giant hackathon card, styled after HackathonCard's cover
+                layout. */}
+            <article className="relative mt-5 flex flex-col overflow-hidden border border-black bg-paper">
+              <div className="relative aspect-[5/2] w-full shrink-0 overflow-hidden border-b border-black">
+                <Image
+                  alt=""
+                  className="object-cover"
+                  fill
+                  sizes="(min-width: 1024px) 40vw, 90vw"
+                  src="/photos/atrium.webp"
+                />
+              </div>
 
-                return (
-                  <span
-                    className={`flex min-h-8 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-1.5 py-1 text-center text-[10px] font-medium leading-[1.2] transition-colors duration-300 first:border-l-0 ${
-                      applied && isApplied
-                        ? "bg-pine text-paper"
-                        : reached
-                          ? "text-pine"
-                          : "text-ink/55"
-                    }`}
-                    key={stage}
-                    ref={isApplied ? appliedRef : undefined}
-                  >
-                    {reached ? (
-                      <Check aria-hidden="true" className="size-2.5 shrink-0" strokeWidth={3} />
-                    ) : null}
-                    {stage}
-                  </span>
-                );
-              })}
-            </div>
+              {/* Pipeline band — the demo's first click lands on "Applied". */}
+              <div className="flex shrink-0 items-stretch border-b border-black bg-paper">
+                {stages.map((stage, index) => {
+                  const isApplied = stage === "Applied";
+                  const reached = applied && index <= 1;
 
-            <div className="grid min-w-0 flex-1 grid-cols-[5.5rem_minmax(0,1fr)] sm:grid-cols-[6.5rem_minmax(0,1fr)]">
-              {/* Date column with the action stack at its foot. */}
-              <div className="flex min-w-0 flex-col border-r border-ink/35 px-3 py-4 sm:px-4 sm:py-5">
-                <div>
-                  <span className="block font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-ink/60">
-                    Friday
-                  </span>
-                  <div className="mt-2 font-sans font-bold text-ink">
-                    <span className="block text-[1.25rem] leading-[1.05] tracking-[-0.05em]">
-                      Sep 18
-                    </span>
-                    <span className="mt-0.5 block whitespace-nowrap text-[1.25rem] leading-[1.05] tracking-[-0.05em]">
-                      – 20
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-auto flex min-w-0 flex-col items-start gap-2 pt-6">
-                  <span className="text-[10px] font-medium leading-4 text-ink/55">
-                    Add to calendar
-                  </span>
-                  <span className="text-[10px] font-medium leading-4 text-ink/55">
-                    Face Off
-                  </span>
-                  <span
-                    className={`relative text-[10px] font-medium leading-4 transition-colors duration-300 ${
-                      weekOn && !panelOpen ? "text-pine" : "text-ink/55"
-                    }`}
-                    ref={reminderRef}
-                  >
-                    {weekOn ? "Reminders · 1" : "Add reminder"}
-                    {/* The action's slide-in underline, driven by the scripted
-                        cursor instead of a real hover. */}
+                  return (
                     <span
-                      className={`absolute inset-x-0 bottom-0 h-px origin-left bg-moss transition-transform duration-300 ease-out ${
-                        STEPS[step].target === "reminder" && !still
-                          ? "scale-x-100"
-                          : "scale-x-0"
+                      className={`flex min-h-10 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-2 py-1.5 text-center text-[11px] font-medium leading-[1.2] transition-colors duration-300 first:border-l-0 ${
+                        applied && isApplied
+                          ? "bg-pine text-paper"
+                          : reached
+                            ? "text-pine"
+                            : "text-ink/55"
                       }`}
-                    />
-                  </span>
-                </div>
+                      key={stage}
+                      ref={isApplied ? appliedRef : undefined}
+                    >
+                      {reached ? (
+                        <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} />
+                      ) : null}
+                      {stage}
+                    </span>
+                  );
+                })}
               </div>
 
-              {/* Card body. */}
-              <div className="flex min-w-0 flex-col px-4 pb-4 pt-4 sm:px-5 sm:pt-5">
-                <h3 className="text-[1.3rem] font-medium leading-[1.05] tracking-[-0.045em] text-ink sm:text-[1.45rem]">
-                  Hack the North
-                </h3>
-                <p className="mt-1.5 truncate text-[13px] leading-5 text-ink/60">
-                  <span className="text-[#D9043D]">Canada</span>, Waterloo, ON
-                </p>
+              <div className="grid min-w-0 flex-1 grid-cols-[6rem_minmax(0,1fr)] sm:grid-cols-[7rem_minmax(0,1fr)]">
+                {/* Date column with the action stack at its foot. */}
+                <div className="flex min-w-0 flex-col border-r border-ink/35 px-3.5 py-5 sm:px-4 sm:py-6">
+                  <div>
+                    <span className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink/60">
+                      Friday
+                    </span>
+                    <div className="mt-2 font-sans font-bold text-ink">
+                      <span className="block text-[1.5rem] leading-[1.05] tracking-[-0.05em]">
+                        Sep 18
+                      </span>
+                      <span className="mt-0.5 block whitespace-nowrap text-[1.5rem] leading-[1.05] tracking-[-0.05em]">
+                        – 20
+                      </span>
+                    </div>
+                  </div>
 
-                <p className="mt-auto line-clamp-2 pt-5 text-[11px] leading-4 text-ink/70">
-                  Canada&apos;s biggest hackathon brings 1,000+ hackers to
-                  Waterloo for 36 hours of building.
-                </p>
+                  <div className="mt-auto flex min-w-0 flex-col items-start gap-2.5 pt-7">
+                    <span className="text-[11px] font-medium leading-4 text-ink/55">
+                      Add to calendar
+                    </span>
+                    <span className="text-[11px] font-medium leading-4 text-ink/55">
+                      Face Off
+                    </span>
+                    <span
+                      className={`relative text-[11px] font-medium leading-4 transition-colors duration-300 ${
+                        weekOn && !panelOpen ? "text-pine" : "text-ink/55"
+                      }`}
+                      ref={reminderRef}
+                    >
+                      {weekOn ? "Reminders · 1" : "Add reminder"}
+                      {/* The action's slide-in underline, driven by the
+                          scripted cursor instead of a real hover. */}
+                      <span
+                        className={`absolute inset-x-0 bottom-0 h-px origin-left bg-moss transition-transform duration-300 ease-out ${
+                          STEPS[step].target === "reminder" && !still
+                            ? "scale-x-100"
+                            : "scale-x-0"
+                        }`}
+                      />
+                    </span>
+                  </div>
+                </div>
 
-                <div className="mt-3.5 border-t border-ink/25 pt-3">
-                  <div className="flex items-center justify-between gap-3 font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-ink/70">
-                    <span>More info</span>
-                    <span>Visit website</span>
+                {/* Card body. */}
+                <div className="flex min-w-0 flex-col px-5 pb-5 pt-5 sm:px-6 sm:pt-6">
+                  <h3 className="text-[1.55rem] font-medium leading-[1.05] tracking-[-0.045em] text-ink sm:text-[1.7rem]">
+                    Hack the North
+                  </h3>
+                  <p className="mt-2 truncate text-[15px] leading-5 text-ink/60">
+                    <span className="text-[#D9043D]">Canada</span>, Waterloo, ON
+                  </p>
+
+                  <p className="mt-auto line-clamp-2 pt-6 text-[12px] leading-[18px] text-ink/70">
+                    Canada&apos;s biggest hackathon brings 1,000+ hackers to
+                    Waterloo for 36 hours of building.
+                  </p>
+
+                  <div className="mt-4 border-t border-ink/25 pt-3.5">
+                    <div className="flex items-center justify-between gap-3 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70">
+                      <span>More info</span>
+                      <span>Visit website</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Reminder panel, anchored over the card foot exactly like the
-                real card's dropdown menus. */}
-            {panelOpen ? (
-              <motion.div
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute inset-x-3 bottom-3 z-30 border border-ink/15 bg-paper p-3 text-left shadow-lg"
-                initial={still ? false : { opacity: 0, y: 10 }}
-                transition={{ duration: 0.35, ease: easeOut }}
-              >
-                <p className="px-1 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-pine">
-                  Applied
-                </p>
-                <div className="mt-2 space-y-1.5">
-                  {reminderRows.map((row) => {
-                    const enabled = row.key === "week" && weekOn;
+              {/* Reminder panel, anchored over the card foot exactly like the
+                  real card's dropdown menus. */}
+              {panelOpen ? (
+                <motion.div
+                  animate={{ opacity: 1, y: 0 }}
+                  className="absolute inset-x-3 bottom-3 z-30 border border-ink/15 bg-paper p-3.5 text-left shadow-lg"
+                  initial={still ? false : { opacity: 0, y: 10 }}
+                  transition={{ duration: 0.35, ease: easeOut }}
+                >
+                  <p className="px-1 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-pine">
+                    Applied
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {reminderRows.map((row) => {
+                      const enabled = row.key === "week" && weekOn;
 
-                    return (
-                      <div
-                        className={`flex items-center justify-between gap-3 border px-3 py-2 transition-colors duration-300 ${
-                          enabled ? "border-pine/35 bg-pine/5" : "border-ink/15 bg-paper"
-                        }`}
-                        key={row.key}
-                        ref={row.key === "week" ? weekRef : undefined}
-                      >
-                        <span className="min-w-0">
-                          <span className="block text-[12px] font-medium leading-4 text-ink">
-                            {row.label}
-                          </span>
-                          <span className="mt-0.5 block text-[10px] text-ink/55">
-                            {row.date}
-                          </span>
-                        </span>
-                        <span
-                          className={`grid size-5 shrink-0 place-items-center rounded-full border transition-colors duration-300 ${
-                            enabled
-                              ? "border-pine bg-pine text-paper"
-                              : "border-ink/15 text-transparent"
+                      return (
+                        <div
+                          className={`flex items-center justify-between gap-3 border px-3 py-2.5 transition-colors duration-300 ${
+                            enabled ? "border-pine/35 bg-pine/5" : "border-ink/15 bg-paper"
                           }`}
+                          key={row.key}
+                          ref={row.key === "week" ? weekRef : undefined}
                         >
-                          <Check className="size-3" strokeWidth={3} />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            ) : null}
-          </article>
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-medium leading-4 text-ink">
+                              {row.label}
+                            </span>
+                            <span className="mt-0.5 block text-[11px] text-ink/55">
+                              {row.date}
+                            </span>
+                          </span>
+                          <span
+                            className={`grid size-6 shrink-0 place-items-center rounded-full border transition-colors duration-300 ${
+                              enabled
+                                ? "border-pine bg-pine text-paper"
+                                : "border-ink/15 text-transparent"
+                            }`}
+                          >
+                            <Check className="size-3.5" strokeWidth={3} />
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              ) : null}
+            </article>
+          </div>
         </div>
       </div>
 

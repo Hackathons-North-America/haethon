@@ -26,4 +26,6 @@
   --font-sans: var(--font-geist);
   --font-serif: var(--font-geist);
   --font-mono: var(--font-geist-mono);
+  /* Editorial display serif, reserved for the landing hero's headline. */
+  --font-display: var(--font-instrument-serif);
 }

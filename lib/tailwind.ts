@@ -1,2 +1,0 @@
-export const filmGrainClassName =
-  "bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20256%20256%22%3E%3Cfilter%20id=%22n%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.72%22%20numOctaves=%223%22%20stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect%20width=%22256%22%20height=%22256%22%20filter=%22url(%23n)%22/%3E%3C/svg%3E')] bg-[length:180px_180px]";

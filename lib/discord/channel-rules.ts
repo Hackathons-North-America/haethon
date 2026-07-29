@@ -11,10 +11,6 @@ export function pastCategoryKey({ half, year }: HalfYear): PastDiscordCategoryKe
   return `past-h${half}-${year}`;
 }
 
-export function isPastCategoryKey(key: DiscordCategoryKey): key is PastDiscordCategoryKey {
-  return key !== "canada" && key !== "us";
-}
-
 /* Discord category name for a past bucket, e.g. "past-hackathons-h1-2026". */
 export function pastCategoryDiscordName(key: PastDiscordCategoryKey) {
   return `past-hackathons-${key.slice("past-".length)}`;

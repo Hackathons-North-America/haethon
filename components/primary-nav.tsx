@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -53,8 +52,14 @@ function useHiddenOnScrollDown() {
   return hidden;
 }
 
-export function PrimaryNav() {
+export function PrimaryNav({ tone = "paper" }: { tone?: "paper" | "pine" }) {
   const hidden = useHiddenOnScrollDown();
+
+  // On the split hero the bar sits seamlessly on the grained pine panel; once
+  // scrolled over the paper sheet it reads as a green pill, still legible.
+  const dark = tone === "pine";
+  const barClassName = dark ? "bg-pine" : "bg-paper";
+  const linkColorClassName = dark ? "text-paper" : "text-ink";
 
   return (
     <header
@@ -66,22 +71,16 @@ export function PrimaryNav() {
     >
       <nav
         aria-label="Primary navigation"
-        className="pointer-events-auto mx-auto flex w-full max-w-[1080px] items-center justify-between gap-3 bg-paper px-3 py-2 sm:gap-4 sm:px-4 sm:py-2.5"
+        className={`pointer-events-auto mx-auto flex w-full max-w-[1080px] items-center justify-between gap-3 px-3 py-2 sm:gap-4 sm:px-4 sm:py-2.5 ${barClassName}`}
       >
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <Link
             href="/?home"
-            className="flex items-center gap-2.5 rounded-[9999px] py-1 pl-1 pr-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+            className="flex items-center rounded-[9999px] px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
           >
-            <Image
-              src="/logo-beaver.png"
-              alt="Hackathons North America"
-              width={36}
-              height={32}
-              className="h-8 w-auto"
-              priority
-            />
-            <span className="hidden text-[0.95rem] font-semibold tracking-tight text-ink sm:inline">
+            <span
+              className={`text-[0.95rem] font-semibold tracking-tight ${linkColorClassName}`}
+            >
               HNA
             </span>
           </Link>
@@ -90,7 +89,7 @@ export function PrimaryNav() {
 
         <div className="flex shrink-0 items-center gap-2">
           <Link
-            className="group relative inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[0.8rem] font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-5"
+            className={`group relative inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[0.8rem] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-5 ${linkColorClassName}`}
             href="/discord"
             rel="noreferrer"
             target="_blank"
@@ -101,14 +100,16 @@ export function PrimaryNav() {
             <HoverUnderline className="inset-x-3.5 bottom-1 sm:inset-x-5" />
           </Link>
           <Link
-            className="group relative rounded-full px-3 py-2 text-[0.8rem] font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-4"
+            className={`group relative rounded-full px-3 py-2 text-[0.8rem] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-4 ${linkColorClassName}`}
             href="/about"
           >
             About
             <HoverUnderline className="inset-x-3 bottom-1 sm:inset-x-4" />
           </Link>
+          {/* No filled pill: the CTA reads like the other nav links, with the
+              shared slide-in underline. */}
           <Link
-            className="group relative rounded-full px-4 py-2 text-[0.8rem] font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-5"
+            className={`group relative rounded-full px-4 py-2 text-[0.8rem] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:px-5 ${linkColorClassName}`}
             href="/hackathons"
           >
             Open App

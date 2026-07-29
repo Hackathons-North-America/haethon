@@ -136,23 +136,54 @@ function seededNumber(seed: string, index: number) {
   return (hash >>> 0) / 4294967295;
 }
 
-function ArenaBackdrop({ id }: { id: string }) {
-  const gradient = useMemo(
-    () => ({
-      bloomX: Math.round(15 + seededNumber(id, 1) * 70),
-      bloomY: Math.round(15 + seededNumber(id, 2) * 70),
-    }),
-    [id]
-  );
+/* Same tiling grayscale noise as the hackathon cards' tier streak: desaturated
+   feTurbulence pushed to high contrast so the speckle survives overlay-blending
+   onto a pale tint. Masked to the bloom's own shape so the grain rides the
+   tinted area and dissolves with it. */
+const STREAK_NOISE_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
+/* The arena's take on the hackathon cards' airbrushed streak: a broad circular
+   bloom entering from the side's outer edge, with a soft shoulder ring and a
+   grain overlay masked to the same shape. Geometry is seeded per hackathon so
+   each event keeps a stable bloom across renders and hydration; the tint rides
+   the side's accent variable, so it recolors with the matchup. */
+function ArenaBackdrop({ id, side }: { id: string; side: "left" | "right" }) {
+  const streak = useMemo(() => {
+    const centerX =
+      side === "left"
+        ? Math.round(-18 + seededNumber(id, 1) * 24)
+        : Math.round(94 + seededNumber(id, 1) * 24);
+    const centerY = Math.round(14 + seededNumber(id, 2) * 72);
+    const radiusX = Math.round(48 + seededNumber(id, 3) * 16);
+    const radiusY = Math.round(56 + seededNumber(id, 4) * 30);
+    const shoulderRadiusX = radiusX + Math.round(2 + seededNumber(id, 5) * 4);
+    const shoulderRadiusY = radiusY + Math.round(2 + seededNumber(id, 6) * 5);
+    const ellipse = `ellipse ${radiusX}% ${radiusY}% at ${centerX}% ${centerY}%`;
+    const shoulder = `ellipse ${shoulderRadiusX}% ${shoulderRadiusY}% at ${centerX}% ${centerY}%`;
+    const tint = (percent: number) => `color-mix(in srgb, var(--accent) ${percent}%, transparent)`;
+
+    return {
+      wash: [
+        `radial-gradient(${shoulder}, transparent 46%, ${tint(20)} 52%, ${tint(8)} 61%, transparent 72%)`,
+        `radial-gradient(${ellipse}, ${tint(46)} 0%, ${tint(44)} 40%, ${tint(28)} 53%, ${tint(10)} 65%, transparent 76%)`,
+      ].join(", "),
+      mask: `radial-gradient(${shoulder}, black 0%, black 58%, transparent 82%)`,
+    };
+  }, [id, side]);
 
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 -z-10"
-      style={{
-        background: `radial-gradient(circle at ${gradient.bloomX}% ${gradient.bloomY}%, color-mix(in srgb, var(--accent) 34%, transparent) 0%, color-mix(in srgb, var(--accent) 18%, transparent) 34%, transparent 70%)`,
-      }}
-    />
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+      <div className="absolute inset-0" style={{ backgroundImage: streak.wash }} />
+      <div
+        className="absolute inset-0 opacity-70 mix-blend-overlay"
+        style={{
+          backgroundImage: STREAK_NOISE_URI,
+          maskImage: streak.mask,
+          WebkitMaskImage: streak.mask,
+        }}
+      />
+    </div>
   );
 }
 
@@ -317,10 +348,11 @@ function ArenaSide({
       className="relative isolate flex flex-col items-center justify-center gap-5 bg-paper px-6 py-12 text-center dark:bg-[#131211] sm:min-h-[32rem] sm:px-10 sm:py-16 lg:min-h-screen"
       style={accentVariables(color)}
     >
-      {/* One full-bleed radial gradient fills each side using only the normal
-          page ground and its accent. The bloom position is seeded per event. */}
+      {/* Full-bleed airbrushed bloom in the side's accent — the hackathon
+          cards' streak treatment scaled up. Enters from the outer edge, with
+          seeded-per-event geometry. */}
       <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-[var(--accent)]" />
-      <ArenaBackdrop id={hackathon.id} />
+      <ArenaBackdrop id={hackathon.id} side={side} />
 
       <div className="relative grid size-48 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--accent)]/25 bg-[var(--accent-soft)] text-4xl font-semibold shadow-[0_18px_44px_-24px_var(--accent)] dark:bg-[var(--accent-soft-dark)] sm:size-56">
           {hackathon.image ? (

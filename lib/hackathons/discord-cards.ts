@@ -65,11 +65,3 @@ export async function getDiscordLinksByHackathon(rows: DiscordCardRow[]): Promis
 
   return links;
 }
-
-/**
- * The ids of the rows that have a Discord channel — the boolean view of
- * {@link getDiscordLinksByHackathon}, kept for callers that only badge the card.
- */
-export async function getHackathonIdsWithDiscord(rows: DiscordCardRow[]): Promise<Set<string>> {
-  return new Set((await getDiscordLinksByHackathon(rows)).keys());
-}

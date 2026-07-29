@@ -31,14 +31,14 @@ export function HeroHeadline() {
 
   return (
     <div className="relative">
-      {/* Set in the hackathon card's title voice: bold sans, tight tracking,
-          plain ink — with "hackers" carrying the accent the way a card's
-          country word does. Sized for the split hero's half-width column. */}
-      <h1 className="relative z-10 text-balance font-sans text-[clamp(2.4rem,4.8vw,4.1rem)] font-bold leading-[1.05] tracking-[-0.045em] text-ink">
+      {/* The split hero's editorial voice: an oversized cream display serif on
+          the espresso panel, regular weight and near-solid leading, with
+          "hackers" carrying the accent as an italic. */}
+      <h1 className="relative z-10 text-balance font-display text-[clamp(3rem,5.6vw,5.6rem)] font-normal leading-[1.02] tracking-[-0.01em] text-paper">
         <RevealWord index={0} still={still}>
           Where
         </RevealWord>{" "}
-        <RevealWord index={1} still={still} className="text-pine">
+        <RevealWord index={1} still={still} className="italic">
           hackers
         </RevealWord>{" "}
         <RevealWord index={2} still={still}>
