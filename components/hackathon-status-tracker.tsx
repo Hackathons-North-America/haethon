@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
+
 export type TrackableStatus = "interested" | "applied" | "accepted" | "attending";
 
 function handleUnauthenticated() {
-  window.location.href = "/sign-in";
+  showLoginRequiredDialog();
 }
 
 const stages: { value: TrackableStatus; label: string }[] = [

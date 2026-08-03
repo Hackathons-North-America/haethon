@@ -14,6 +14,8 @@ type SessionMetadata = {
   appUserId?: string;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /**
  * Derives the app role from already-fetched session claims so callers that
  * hold an auth() result don't need a second auth() call for the role.
@@ -71,8 +73,15 @@ export const getCurrentUserId = cache(async (): Promise<string | null> => {
 
   const metadata = (sessionClaims as { metadata?: SessionMetadata } | null | undefined)?.metadata;
 
-  if (metadata?.appUserId) {
+  if (metadata?.appUserId && UUID_PATTERN.test(metadata.appUserId)) {
     return metadata.appUserId;
+  }
+
+  if (metadata?.appUserId) {
+    Sentry.captureMessage("Ignored invalid appUserId in Clerk session claims", {
+      level: "warning",
+      extra: { clerkUserId: userId },
+    });
   }
 
   const user = await getCurrentUserRecord();
@@ -141,34 +150,74 @@ export async function syncCurrentUser() {
   }
 
   const role = await getCurrentRole();
+  const email = user.primaryEmailAddress.emailAddress;
+  const profileUpdates = {
+    email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    imageUrl: user.imageUrl,
+    role,
+    updatedAt: new Date(),
+  };
 
-  const [row] = await db
-    .insert(users)
-    .values({
-      clerkUserId: user.id,
-      email: user.primaryEmailAddress.emailAddress,
-      username: createPermanentProfileUsername({
-        clerkUsername: user.username,
-        email: user.primaryEmailAddress.emailAddress,
-        clerkUserId: user.id,
-      }),
-      firstName: user.firstName,
-      lastName: user.lastName,
-      imageUrl: user.imageUrl,
-      role,
-    })
-    .onConflictDoUpdate({
-      target: users.clerkUserId,
-      set: {
-        email: user.primaryEmailAddress.emailAddress,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        imageUrl: user.imageUrl,
-        role,
-        updatedAt: new Date(),
-      },
-    })
-    .returning({ id: users.id });
+  // A Clerk user can be recreated (or move between Clerk instances) while
+  // keeping the same verified email. Reattach that identity to the existing
+  // app row so its profile, pipeline, and relationships survive. Previously
+  // this attempted a fresh insert and failed on users_email_unique.
+  const [existingByClerkId] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkUserId, user.id))
+    .limit(1);
+
+  let row: { id: string } | undefined;
+
+  if (existingByClerkId) {
+    [row] = await db
+      .update(users)
+      .set(profileUpdates)
+      .where(eq(users.id, existingByClerkId.id))
+      .returning({ id: users.id });
+  } else {
+    const [existingByEmail] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (existingByEmail) {
+      if (user.primaryEmailAddress.verification?.status !== "verified") {
+        Sentry.captureMessage("Refused to relink an unverified Clerk email", {
+          level: "warning",
+          extra: { clerkUserId: user.id },
+        });
+        return null;
+      }
+
+      [row] = await db
+        .update(users)
+        .set({ ...profileUpdates, clerkUserId: user.id })
+        .where(eq(users.id, existingByEmail.id))
+        .returning({ id: users.id });
+    } else {
+      [row] = await db
+        .insert(users)
+        .values({
+          clerkUserId: user.id,
+          email,
+          username: createPermanentProfileUsername({
+            clerkUsername: user.username,
+            email,
+            clerkUserId: user.id,
+          }),
+          firstName: user.firstName,
+          lastName: user.lastName,
+          imageUrl: user.imageUrl,
+          role,
+        })
+        .returning({ id: users.id });
+    }
+  }
 
   // Only on first sync — the account page re-syncs on every visit and must
   // not pay a Clerk API call once the claim is in place.

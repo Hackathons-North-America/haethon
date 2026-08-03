@@ -336,7 +336,7 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
         skills={skills}
       />
 
-      {status === "saved" ? <p className="mt-3 text-center text-sm font-semibold text-[#027A48]">Saved</p> : null}
+      {status === "saved" ? <p className="mt-3 text-center text-sm font-semibold text-[#362519]">Saved</p> : null}
 
       {isEditing ? (
         <div

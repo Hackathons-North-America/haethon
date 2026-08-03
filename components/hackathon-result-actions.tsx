@@ -5,8 +5,10 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Link2, Pin, Trophy, Undo2 } from "lucide-react";
 
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
+
 function handleUnauthenticated() {
-  window.location.href = "/sign-in";
+  showLoginRequiredDialog();
 }
 
 const buttonClassName =

@@ -5,96 +5,121 @@ import { HeroDemo } from "@/components/hero-demo";
 import { HeroHeadline } from "@/components/hero-headline";
 import { LandingReveal } from "@/components/landing-reveal";
 
-/* The landing hero, split like a magazine spread: copy on a grained pine
-   panel at left — the site's own accent green, treated with the same
-   wash-and-grain airbrushing as the hackathon cards — and at right a plain
-   paper field where a corner of the app itself pokes in: a browser window
-   cropped by the viewport's right and bottom edges, holding the giant
-   animated card. */
+/* The landing hero, split like a magazine spread: copy on a finely grained
+   espresso panel at left — the Federato reference's ground, with its green
+   swapped for the site's pine on the CTA — and at right a plain paper field
+   where a corner of the app itself pokes in: a browser window cropped by the
+   viewport's right and bottom edges, holding the giant animated card. Moss
+   hairlines rule off the panels the way the reference's drafting lines do. */
 
-/* Fine speckle: high-contrast desaturated turbulence, tiled small — the same
-   grain recipe the cards ride over their tier streaks. */
-const GRAIN_FINE_URI =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
+/* The hackathon cards' streak grain, verbatim (see `STREAK_NOISE_URI` in
+   hackathon-card.tsx): desaturated feTurbulence pushed to near-binary contrast
+   so the speckle survives overlay-blending, tiled at its natural 140px. Shared
+   so the hero's mesh reads as the same material as the cards' tier washes
+   rather than a separate texture. */
+const GRAIN_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-/* Coarse mottle: low-frequency turbulence tiled large, for the cloudy
-   light-and-shadow drift under the speckle. */
-const GRAIN_COARSE_URI =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.045' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='320' height='320' filter='url(%23n)'/%3E%3C/svg%3E\")";
+/* The panel's shadow, built on the hackathon cards' airbrushed-streak recipe
+   (see `getTierStreak`): a broad ellipse whose centre sits off-canvas, drawn
+   twice — a faint outer shoulder over a deeper core — so the darkness rolls
+   off in stages and dissolves into the ground instead of ending on a ring.
+   The card seeds these positions per name; the panel is a single fixed
+   composition, so the geometry is written out rather than generated. */
+const SHADOW_CORE = "ellipse 58% 74% at 104% 30%";
+const SHADOW_SHOULDER = "ellipse 62% 79% at 104% 30%";
 
-/* Tonal pools over the pine ground — moss light gathering at the corners and
-   deeper pine shadow pulling away from it, soft-edged like the cards'
-   airbrushed streaks. */
-const PINE_BLOOMS = [
-  "radial-gradient(48% 55% at 14% 16%, rgb(0 160 113 / 0.34), transparent 72%)",
-  "radial-gradient(40% 50% at 88% 8%, rgb(0 138 98 / 0.28), transparent 70%)",
-  "radial-gradient(55% 48% at 70% 72%, rgb(0 84 61 / 0.5), transparent 75%)",
-  "radial-gradient(42% 55% at 4% 86%, rgb(0 150 106 / 0.24), transparent 70%)",
-  "radial-gradient(60% 40% at 45% 105%, rgb(0 62 46 / 0.55), transparent 76%)",
+/* Tonal pools over the espresso ground: the black bloom sweeping in from the
+   panel's inner edge on top, warm light gathering high and shadow sinking to
+   the foot beneath it. Earlier layers paint over later ones. */
+const BARK_BLOOMS = [
+  `radial-gradient(${SHADOW_SHOULDER}, transparent 46%, rgb(0 0 0 / 0.2) 52%, rgb(0 0 0 / 0.08) 61%, transparent 72%)`,
+  `radial-gradient(${SHADOW_CORE}, rgb(0 0 0 / 0.46) 0%, rgb(0 0 0 / 0.44) 40%, rgb(0 0 0 / 0.28) 53%, rgb(0 0 0 / 0.1) 65%, transparent 76%)`,
+  "radial-gradient(50% 58% at 18% 14%, rgb(80 55 36 / 0.5), transparent 72%)",
+  "radial-gradient(44% 50% at 86% 18%, rgb(66 44 29 / 0.4), transparent 70%)",
+  "radial-gradient(46% 52% at 8% 82%, rgb(58 39 26 / 0.35), transparent 70%)",
+  "radial-gradient(62% 46% at 52% 104%, rgb(24 15 10 / 0.55), transparent 76%)",
 ].join(", ");
 
 export function HeroSplit() {
   return (
-    <section className="relative grid overflow-hidden bg-pine lg:min-h-svh lg:grid-cols-2">
-      {/* ————— Left: copy on grained pine. ————— */}
-      <div className="relative flex flex-col justify-center overflow-hidden px-6 pb-20 pt-36 sm:px-12 lg:py-40 lg:pl-16 xl:pl-24">
-        {/* Tonal blooms, then the two-scale grain riding over them. */}
+    <section className="relative grid overflow-hidden bg-bark lg:min-h-svh lg:grid-cols-2">
+      {/* ————— Left: copy on the grained espresso panel. ————— */}
+      {/* The reference's top inset is 11.02vw, but that only clears the fold
+          because its copy block is shorter than ours. These are minimums: with
+          the block now short enough to fit, justify-center takes over and the
+          copy sits centred in the panel with room under the CTA. */}
+      <div className="relative flex flex-col justify-center overflow-hidden px-6 pb-20 pt-36 sm:px-12 lg:px-0 lg:pb-16 lg:pt-[7vw]">
+        {/* Tonal blooms, then the grain riding over them — the same single
+            overlay-blended speckle layer the cards put over their tier wash,
+            with no low-frequency mottle beneath it: the blooms alone carry the
+            large-scale variation, so the surface reads as sand rather than
+            leather. */}
         <div
           aria-hidden="true"
           className="absolute inset-0"
-          style={{ backgroundImage: PINE_BLOOMS }}
+          style={{ backgroundImage: BARK_BLOOMS }}
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0 opacity-50 mix-blend-soft-light"
+          className="absolute inset-0 opacity-70 mix-blend-overlay"
           style={
             {
-              backgroundImage: GRAIN_COARSE_URI,
-              backgroundSize: "320px 320px",
+              backgroundImage: GRAIN_URI,
+              backgroundSize: "140px 140px",
             } as CSSProperties
           }
         />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-45 mix-blend-overlay"
-          style={{ backgroundImage: GRAIN_FINE_URI } as CSSProperties}
-        />
 
-        {/* Hairline rule, echoing the reference layout's drafting lines. */}
+        {/* Drafting line at the panel's edge, as in the reference — ruled in
+            cream rather than the reference's coral, at the same strength as
+            the nav's underline so the hairlines read as one weight. */}
         <span
           aria-hidden="true"
-          className="absolute inset-y-0 left-7 hidden w-px bg-paper/25 lg:block xl:left-12"
+          className="absolute inset-y-0 left-7 hidden w-px bg-paper/60 lg:block xl:left-12"
         />
 
-        <div className="relative max-w-[34rem]">
+        {/* The copy column, measured off the reference: it sits 11.12vw in
+            from the panel's left edge (142px at a 1280 viewport) and runs
+            33vw wide, left-aligned rather than centered — the reference gives
+            the left margin more room than the right. Below lg the panel keeps
+            its own padding and the column just centers. */}
+        <div className="relative mx-auto w-full max-w-[34rem] lg:mx-0 lg:ml-[11.12vw] lg:w-[33vw] lg:max-w-none">
           <HeroHeadline />
 
           <LandingReveal delay={0.55}>
-            <p className="mt-8 max-w-[28rem] text-pretty text-base leading-relaxed text-paper/75 sm:text-lg">
-              Search hundreds of upcoming hackathons, build your profile, and
-              never miss another application deadline.
+            {/* Reference metrics: 1.495vw (19.1px at 1280), 1.3 leading, light
+                weight, same cream as the headline, and a 3.68vw (47px) gap up
+                to it. The paragraph runs the full column width. */}
+            <p className="mt-[clamp(1.75rem,3.68vw,3.5rem)] text-[clamp(1rem,1.495vw,1.625rem)] font-light leading-[1.3] text-paper">
+              The only platform that spans the full hackathon lifecycle —
+              search every event, track your applications, and never miss a
+              deadline.
             </p>
           </LandingReveal>
 
           <LandingReveal delay={0.7}>
-            {/* No pill: the card-cell CTA voice, outlined in paper on the
-                pine ground and filling solid on hover. */}
+            {/* The reference's filled CTA, reversed to cream with a black
+                frame — matching the nav pill. The reference sets a 1.84vw
+                (23.5px) gap under the paragraph. */}
             <Link
               href="/hackathons"
-              className="mt-10 inline-flex min-h-13 items-center justify-center gap-2 border border-paper/85 px-8 font-mono text-xs font-medium uppercase tracking-[0.14em] text-paper transition-colors hover:bg-paper hover:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper sm:text-sm"
+              className="mt-6 inline-flex items-center justify-center rounded-md border border-black bg-paper px-7 py-3.5 text-[15px] font-medium text-ink transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper"
             >
               Open App
-              <span aria-hidden="true">→</span>
             </Link>
           </LandingReveal>
         </div>
       </div>
 
-      {/* ————— Right: plain paper, with a corner of the app itself. The
-          browser frame runs flush off the right and bottom edges, so only its
-          top-left corner shows — as if the real site were peeking into the
-          page — with the giant animated card inside. ————— */}
-      <div className="relative flex min-h-[40rem] flex-col overflow-hidden bg-paper pl-6 pt-28 sm:min-h-[46rem] sm:pl-10 lg:min-h-full lg:pl-14 lg:pt-36">
+      {/* ————— Right: the app itself, filling the panel edge to edge. The
+          browser window is inset only far enough to clear the fixed nav bar;
+          past that it runs flush off the left, right, and bottom edges, so the
+          hero's right half *is* the product. ————— */}
+      {/* The top inset only exists at lg, where the panel's top edge sits
+          under the fixed nav; stacked below lg the window starts flush against
+          the copy panel. */}
+      <div className="relative flex min-h-[40rem] flex-col overflow-hidden bg-paper sm:min-h-[46rem] lg:min-h-full lg:border-l lg:border-moss lg:pt-[4.25rem]">
         <LandingReveal className="flex w-full flex-1 flex-col" delay={0.45}>
           <HeroDemo />
         </LandingReveal>

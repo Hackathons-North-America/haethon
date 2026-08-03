@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LoginRequiredLink } from "@/components/login-required-dialog";
 
 export const metadata: Metadata = {
   title: "Unsubscribed | Hackathons North America",
@@ -15,12 +15,12 @@ export default function UnsubscribedPage() {
           You won&apos;t receive any more emails from Haethon. You can turn emails back on any time from your account
           page.
         </p>
-        <Link
+        <LoginRequiredLink
           className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
           href="/account"
         >
           Go to account settings
-        </Link>
+        </LoginRequiredLink>
       </div>
     </main>
   );

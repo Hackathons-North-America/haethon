@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { BellRing } from "lucide-react";
 
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import { formatReminderDate, reminderTypeLabels } from "@/lib/hackathons/reminder-labels";
 import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
 
@@ -22,7 +23,7 @@ function isUpcoming(preference: NotificationPreference) {
 }
 
 function handleUnauthenticated() {
-  window.location.href = "/sign-in";
+  showLoginRequiredDialog();
 }
 
 export function HackathonNotificationPreferences({

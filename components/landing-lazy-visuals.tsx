@@ -8,10 +8,26 @@ import { LazyMount } from "@/components/lazy-mount";
    no SSR) and only mounted once scrolled near the viewport via LazyMount.
    Placeholder sizing approximates each visual's rendered height to avoid
    layout shift. */
-const LandingWorldMap = dynamic(
+const SourcedEverywhereVisual = dynamic(
   () =>
-    import("@/components/landing-world-map").then(
-      (mod) => mod.LandingWorldMap,
+    import("@/components/landing-coverage-bento").then(
+      (mod) => mod.SourcedEverywhereVisual,
+    ),
+  { ssr: false },
+);
+
+const CommunityDiscordVisual = dynamic(
+  () =>
+    import("@/components/landing-coverage-bento").then(
+      (mod) => mod.CommunityDiscordVisual,
+    ),
+  { ssr: false },
+);
+
+const ApprovalFlowVisual = dynamic(
+  () =>
+    import("@/components/landing-coverage-bento").then(
+      (mod) => mod.ApprovalFlowVisual,
     ),
   { ssr: false },
 );
@@ -24,29 +40,28 @@ const PipelineSpotlightVisual = dynamic(
   { ssr: false },
 );
 
-const SearchSpotlightVisual = dynamic(
-  () =>
-    import("@/components/landing-search-spotlight").then(
-      (mod) => mod.SearchSpotlightVisual,
-    ),
-  { ssr: false },
-);
-
-export function LazyLandingWorldMap() {
+/* The bento cards size their own visual wells (relative, min-height), so the
+   first two wrappers just fill whatever well they're dropped into. */
+export function LazySourcedEverywhere() {
   return (
-    // Aspect matches the dotted map's generated ratio (~159/60) so the
-    // placeholder reserves the right height and avoids layout shift.
-    <LazyMount className="aspect-[159/60] w-full">
-      <LandingWorldMap />
+    <LazyMount className="absolute inset-0">
+      <SourcedEverywhereVisual />
     </LazyMount>
   );
 }
 
-export function LazySearchSpotlight() {
+export function LazyCommunityDiscord() {
   return (
-    /* Mobile shows just the spotlight card; md+ adds the tall backdrop grid. */
-    <LazyMount className="min-h-[34rem] md:min-h-[64rem]">
-      <SearchSpotlightVisual />
+    <LazyMount className="absolute inset-0">
+      <CommunityDiscordVisual />
+    </LazyMount>
+  );
+}
+
+export function LazyApprovalFlow() {
+  return (
+    <LazyMount className="min-h-[11rem]">
+      <ApprovalFlowVisual />
     </LazyMount>
   );
 }

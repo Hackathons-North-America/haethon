@@ -18,15 +18,14 @@ import {
 } from "lucide-react";
 
 import { DiscordIcon } from "@/components/discord-icon";
-import { LandingWash } from "@/components/landing-wash";
 
 /* "Who it's for" bento: a 2×2 grid — Hackers and Organizers stacked in the
    first column, Corporate spanning both rows of the second. Clicking a card
    morphs it into a full-screen modal (shared `layoutId`) holding the full
    pitch and CTA. Each card carries a unique UI vignette instead of imagery:
    a mini event feed, a growth chart, and an email composer. Everything is set
-   in the hackathon card's language — black-ruled paper panels, small-caps
-   mono labels, and the seeded green wash-and-grain bloom. */
+   in the hackathon card's language — black-ruled paper panels and small-caps
+   mono labels. */
 
 type AudienceCta = {
   label: string;
@@ -115,8 +114,8 @@ function OrganizersGraphic({ className }: GraphicProps) {
       <svg viewBox="0 0 220 64" className="mt-3 h-16 w-full">
         <defs>
           <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#007354" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#007354" stopOpacity="0" />
+            <stop offset="0%" stopColor="#362519" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#362519" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path
@@ -126,11 +125,11 @@ function OrganizersGraphic({ className }: GraphicProps) {
         <path
           d="M0 56 C28 54 46 48 72 42 C98 36 118 34 144 22 C166 12 194 10 220 5"
           fill="none"
-          stroke="#007354"
+          stroke="#362519"
           strokeWidth="2.5"
           strokeLinecap="round"
         />
-        <circle cx="220" cy="5" r="3.5" fill="#007354" />
+        <circle cx="220" cy="5" r="3.5" fill="#362519" />
       </svg>
       <div className="mt-3 flex items-center gap-1.5">
         <div className="flex -space-x-1.5">
@@ -303,8 +302,6 @@ export function AudienceCards() {
                   : ""
             }`}
           >
-            <LandingWash seed={`audience-${audience.id}`} />
-
             <div className="relative">
               <motion.p
                 layoutId={`audience-category-${audience.id}`}
@@ -363,8 +360,6 @@ export function AudienceCards() {
               transition={spring}
               className="relative z-10 mx-auto my-10 w-[92%] max-w-2xl overflow-hidden border border-black bg-paper p-7 shadow-2xl shadow-black/40 sm:p-10"
             >
-              <LandingWash seed={`audience-${active.id}`} />
-
               <button
                 type="button"
                 onClick={() => setActive(null)}

@@ -176,7 +176,7 @@ function EnlargedSearchBar() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(ellipse_at_center,rgba(0,115,84,0.16),rgba(0,115,84,0.06)_55%,transparent_80%)] blur-3xl"
+        className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(ellipse_at_center,rgba(54,37,25,0.16),rgba(54,37,25,0.06)_55%,transparent_80%)] blur-3xl"
       />
 
       {/* md+: the horizontal pill at magnified scale. */}
@@ -200,7 +200,7 @@ function EnlargedSearchBar() {
           </div>
         ))}
         <div className="flex items-center px-3 py-2">
-          <span className="grid size-14 place-items-center rounded-full bg-pine text-paper shadow-[0_14px_30px_-12px_rgba(0,115,84,0.7)]">
+          <span className="grid size-14 place-items-center rounded-full bg-pine text-paper shadow-[0_14px_30px_-12px_rgba(54,37,25,0.7)]">
             <Search aria-hidden="true" className="size-6" strokeWidth={2.5} />
           </span>
         </div>

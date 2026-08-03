@@ -58,7 +58,7 @@ function FindingRow({
               <span className="flex flex-wrap items-center gap-2">
                 {resolution?.message ? (
                   <span
-                    className={`text-sm font-semibold ${resolution.status === "error" ? "text-[#B42318]" : "text-[#027A48]"}`}
+                    className={`text-sm font-semibold ${resolution.status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}
                   >
                     {resolution.message}
                   </span>
@@ -66,7 +66,7 @@ function FindingRow({
                 {settled ? null : (
                   <>
                     <button
-                      className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#027A48] px-3 text-sm font-semibold text-white disabled:opacity-50"
+                      className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#362519] px-3 text-sm font-semibold text-white disabled:opacity-50"
                       disabled={busy}
                       onClick={() => onResolve(finding.userId, hackathon.id, "verify")}
                       type="button"

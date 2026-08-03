@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BellPlus, Check, ChevronDown, Globe2, Search, Trash2 } from "lucide-react";
 
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 
 export type CountryAlertSubscription = {
@@ -11,7 +12,7 @@ export type CountryAlertSubscription = {
 };
 
 function handleUnauthenticated() {
-  window.location.href = "/sign-in";
+  showLoginRequiredDialog();
 }
 
 /* Country alert bar at the top of the My Hackathons board. One alert per

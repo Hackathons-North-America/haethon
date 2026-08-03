@@ -164,7 +164,7 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
         </p>
       ) : null}
       {message ? (
-        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#027A48]"}`}>{message}</p>
+        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>{message}</p>
       ) : null}
     </section>
   );
@@ -172,7 +172,7 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
 
 function AttendeeTierBadge({ tier }: { tier: Attendee["tier"] }) {
   if (tier === "verified") {
-    return <span className="rounded-full bg-[#027A48]/10 px-2.5 py-0.5 text-xs font-semibold text-[#027A48]">Verified</span>;
+    return <span className="rounded-full bg-[#362519]/10 px-2.5 py-0.5 text-xs font-semibold text-[#362519]">Verified</span>;
   }
 
   if (tier === "self_reported") {
@@ -342,7 +342,7 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#027A48] px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
               disabled={status === "verifying" || !selected.size}
               onClick={verifySelected}
               type="button"
@@ -365,7 +365,7 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
       ) : null}
 
       {message ? (
-        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#027A48]"}`}>{message}</p>
+        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>{message}</p>
       ) : null}
     </section>
   );
@@ -682,14 +682,14 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#027A48] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
                   disabled={status === "saving"}
                   type="submit"
                 >
                   {status === "saving" ? "Saving..." : "Save changes"}
                 </button>
                 {message ? (
-                  <p className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#027A48]"}`}>
+                  <p className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>
                     {message}
                   </p>
                 ) : null}

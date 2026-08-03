@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
+import { LoginRequiredLink } from "@/components/login-required-dialog";
 import type { HackathonCardData } from "@/components/hackathon-card";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
@@ -639,12 +639,12 @@ export function HackathonSearch({
               })}
             </div>
             <div className="flex items-center gap-1.5 sm:absolute sm:right-0">
-              <Link
+              <LoginRequiredLink
                 className="inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
                 href="/submit"
               >
                 Submit a hackathon
-              </Link>
+              </LoginRequiredLink>
             </div>
           </div>
 
@@ -1055,7 +1055,7 @@ export function HackathonSearch({
               </button>
               <button
                 aria-label={isSearching ? "Searching hackathons" : "Search hackathons"}
-                className="grid size-11 shrink-0 place-items-center rounded-full bg-pine text-wheat shadow-[0_10px_24px_-10px_rgba(0,115,84,0.65)] transition-colors hover:bg-pine/90 disabled:cursor-wait disabled:opacity-60 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
+                className="grid size-11 shrink-0 place-items-center rounded-full bg-pine text-wheat shadow-[0_10px_24px_-10px_rgba(54,37,25,0.65)] transition-colors hover:bg-pine/90 disabled:cursor-wait disabled:opacity-60 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
                 disabled={isSearching}
                 type="submit"
               >

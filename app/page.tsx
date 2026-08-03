@@ -1,38 +1,25 @@
-import Link from "next/link";
-
 import { HeroSplit } from "@/components/hero-split";
-import { AudienceCards } from "@/components/audience-cards";
-import { ShieldCheck, Rss, Users } from "lucide-react";
+import { HackathonMarquee } from "@/components/hackathon-marquee";
 
 import {
-  LazyLandingWorldMap,
+  LazyApprovalFlow,
+  LazyCommunityDiscord,
   LazyPipelineSpotlight,
-  LazySearchSpotlight,
+  LazySourcedEverywhere,
 } from "@/components/landing-lazy-visuals";
-import { LandingWash } from "@/components/landing-wash";
+import { LoginRequiredLink } from "@/components/login-required-dialog";
 import { PrimaryNav } from "@/components/primary-nav";
 import { HoverUnderline } from "@/components/hover-underline";
 import { SiteFooter } from "@/components/site-footer";
 
-const coveragePillars = [
-  {
-    Icon: Rss,
-    title: "Sourced from everywhere",
-    body: "We pull hackathons from dev posts, LinkedIn, Luma, and MLH. If an event is announced somewhere, it lands here.",
-  },
-  {
-    Icon: Users,
-    title: "Built by 5,000+ of us",
-    body: "Our 5,000 strong community, from first time hackers to seasoned organizers, can add their own hackathon with a simple form.",
-  },
-  {
-    Icon: ShieldCheck,
-    title: "Approved by admins",
-    body: "Every hackathon is read over and approved by an admin before it's published, so a bad event never slips through.",
-  },
-];
+/* Titles on the coverage pillars, a notch under the section head. */
+const bentoTitleClassName =
+  "text-xl font-medium leading-tight tracking-[-0.03em] text-ink sm:text-2xl";
 
-/* The numbered section links ("1.0 Search →"), set in the card footer's voice:
+const bentoBodyClassName =
+  "mt-2 max-w-[30rem] text-[0.95rem] leading-relaxed text-ink/60";
+
+/* The numbered section links ("1.0 Track →"), set in the card footer's voice:
    small-caps mono, muted until hovered, with the shared slide-in underline. */
 const sectionLinkClassName =
   "group relative mt-8 inline-flex min-h-8 items-center gap-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/70 transition-colors hover:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
@@ -50,15 +37,17 @@ export default function Home() {
   // this page fully static.
   return (
     <main className="min-h-screen overflow-x-clip bg-paper text-ink">
-      <PrimaryNav tone="pine" />
+      <PrimaryNav tone="bark" />
 
       <HeroSplit />
 
-      {/* Everything below the hero is one ruled sheet, framed in the card's
-          black. Sections inside share single rules the way the card's band,
-          cover, and body do — no gaps, panels glued edge to edge. */}
+      <HackathonMarquee />
+
+      {/* Everything below the hero is one continuous sheet, closed off by a
+          single rule against the footer. Sections inside run together with no
+          dividers — spacing alone separates them. */}
       <div>
-        <div className="border-y border-black bg-paper">
+        <div className="border-b border-black bg-paper">
 
           <section
             id="coverage"
@@ -66,99 +55,85 @@ export default function Home() {
             className="scroll-mt-24"
           >
             <div className="relative overflow-hidden">
-              <div className={`relative max-w-[36rem] ${panelPaddingClassName}`}>
-                <h2 id="coverage-heading" className={sectionHeadingClassName}>
-                  Hackathons across the globe
-                </h2>
-                <p className="mt-4 max-w-[32rem] text-base leading-relaxed text-ink/60">
-                  One home for every event: sourced from across the web,
-                  submitted by the community, and vetted by real people.
-                </p>
-              </div>
-            </div>
-
-            {/* The map sits like the card's cover image, running straight out
-                of the header with no rule between them. */}
-            <div className="relative overflow-hidden">
-              <div className="relative">
-                <LazyLandingWorldMap />
-              </div>
-            </div>
-
-            {/* Ruled off like the card's pipeline band: one black rule between
-                cells, with the paper ground continuing under all three. */}
-            <div className="relative grid overflow-hidden border-t border-black sm:grid-cols-3">
-              {coveragePillars.map(({ Icon, title, body }, index) => (
-                <div
-                  key={title}
-                  className={`relative px-6 py-7 sm:px-7 sm:py-8 ${
-                    index > 0 ? "border-t border-black sm:border-l sm:border-t-0" : ""
-                  }`}
-                >
-                  <Icon
-                    aria-hidden="true"
-                    className="size-6 text-pine"
-                    strokeWidth={1.75}
-                  />
-                  <h3 className="mt-4 text-lg font-semibold tracking-[-0.02em] text-ink">
-                    {title}
-                  </h3>
-                  <p className="mt-2 text-[0.95rem] leading-relaxed text-ink/60">
-                    {body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section
-            aria-labelledby="search-spotlight-heading"
-            className="border-t border-black"
-          >
-            <div className="relative overflow-hidden">
-              <div
-                className={`relative grid gap-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20 ${panelPaddingClassName}`}
-              >
+              <div className={`relative ${panelPaddingClassName}`}>
+                {/* One running sentence, bold lead then muted continuation —
+                    the whole pitch in a single breath. */}
                 <h2
-                  id="search-spotlight-heading"
-                  className={`max-w-[22rem] ${sectionHeadingClassName}`}
+                  id="coverage-heading"
+                  className="max-w-[46rem] text-2xl font-medium leading-[1.25] tracking-[-0.04em] sm:text-3xl lg:text-4xl"
                 >
-                  Find the ones worth going to
+                  <span className="text-ink">
+                    The entire hackathon stack.
+                  </span>{" "}
+                  <span className="text-ink/45">
+                    The most comprehensive list of hackathons anywhere —
+                    discover the ones you&apos;d never have found, track and
+                    manage the ones you plan on attending, and document every
+                    win across your journey.
+                  </span>
                 </h2>
-                <div>
-                  <p className="max-w-[32rem] text-base leading-relaxed text-ink/60 sm:text-lg">
-                    Search hackathons by country, filter by date and format, and
-                    surface the events that reimburse your travel. Find the
-                    hackathon you actually want to attend in your area, and
-                    never miss a single one.
-                  </p>
-                  <Link href="/hackathons" className={sectionLinkClassName}>
-                    1.0
-                    <span>
-                      Search{" "}
-                      <span aria-hidden="true" className="ml-1">
-                        →
-                      </span>
-                    </span>
-                    <HoverUnderline className="inset-x-0 bottom-1" />
-                  </Link>
-                </div>
-              </div>
-            </div>
 
-            <div className="relative overflow-hidden">
-              <div className="relative px-6 py-10 sm:px-10 sm:py-14">
-                <LazySearchSpotlight />
+                {/* The three coverage pillars, laid straight onto the paper —
+                    no card chrome, so column gaps and the section padding do
+                    the separating. Two pillars up top (2/3 + 1/3), one
+                    full-width below. Each visual well is relative + clipped
+                    with a min-height; the lazy visuals fill and crop to it. */}
+                <div className="mt-10 grid gap-12 sm:mt-12 lg:grid-cols-3 lg:gap-x-12 lg:gap-y-16">
+                  <article className="relative flex flex-col lg:col-span-2">
+                    <div className="relative">
+                      <h3 className={bentoTitleClassName}>
+                        Sourced from everywhere
+                      </h3>
+                      <p className={bentoBodyClassName}>
+                        We pull hackathons from Devpost, MLH, Luma, and
+                        Eventbrite. If an event is announced somewhere, it
+                        lands here.
+                      </p>
+                    </div>
+                    <div className="relative mt-6 min-h-[19rem] flex-1 overflow-hidden">
+                      <LazySourcedEverywhere />
+                    </div>
+                  </article>
+
+                  <article className="relative flex flex-col">
+                    <div className="relative">
+                      <h3 className={bentoTitleClassName}>
+                        Built by 5,000+ of us
+                      </h3>
+                      <p className={bentoBodyClassName}>
+                        Our 5,000 strong community, from first time hackers to
+                        seasoned organizers, can add their own hackathon with a
+                        simple form.
+                      </p>
+                    </div>
+                    <div className="relative mt-6 min-h-[16rem] flex-1 overflow-hidden">
+                      <LazyCommunityDiscord />
+                    </div>
+                  </article>
+
+                  <article className="relative lg:col-span-3">
+                    <div className="relative grid gap-8 lg:grid-cols-[minmax(0,22rem)_1fr] lg:items-center lg:gap-14">
+                      <div>
+                        <h3 className={bentoTitleClassName}>
+                          Approved by admins
+                        </h3>
+                        <p className={bentoBodyClassName}>
+                          Every hackathon is read over and approved by an admin
+                          before it&apos;s published, so a bad event never
+                          slips through.
+                        </p>
+                      </div>
+                      <LazyApprovalFlow />
+                    </div>
+                  </article>
+                </div>
               </div>
             </div>
           </section>
 
           <section
-            aria-labelledby="pipeline-spotlight-heading"
-            className="border-t border-black"
-          >
+            aria-labelledby="pipeline-spotlight-heading">
             <div className="relative overflow-hidden">
-              <LandingWash seed="pipeline-header" />
               <div
                 className={`relative grid gap-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20 ${panelPaddingClassName}`}
               >
@@ -176,8 +151,8 @@ export default function Home() {
                     you&apos;ve applied to (interested, applied, accepted) on
                     one board.
                   </p>
-                  <Link href="/my" className={sectionLinkClassName}>
-                    2.0
+                  <LoginRequiredLink href="/my" className={sectionLinkClassName} forcePrompt>
+                    1.0
                     <span>
                       Track{" "}
                       <span aria-hidden="true" className="ml-1">
@@ -185,37 +160,16 @@ export default function Home() {
                       </span>
                     </span>
                     <HoverUnderline className="inset-x-0 bottom-1" />
-                  </Link>
+                  </LoginRequiredLink>
                 </div>
               </div>
             </div>
 
             <div className="relative overflow-hidden">
-              <LandingWash seed="pipeline-visual" />
               <div className="relative px-6 py-10 sm:px-10 sm:py-14">
                 <LazyPipelineSpotlight />
               </div>
             </div>
-          </section>
-
-          <section
-            aria-labelledby="audiences-heading"
-            className="border-t border-black"
-          >
-            <div className="relative overflow-hidden">
-              <LandingWash seed="audiences-header" />
-              <div className={`relative mx-auto max-w-[30rem] text-center ${panelPaddingClassName}`}>
-                {/* The card's tier-label voice: small-caps mono kicker. */}
-                <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-pine">
-                  Who it&apos;s for
-                </p>
-                <h2 id="audiences-heading" className={`mt-3 ${sectionHeadingClassName}`}>
-                  One platform, three jobs
-                </h2>
-              </div>
-            </div>
-
-            <AudienceCards />
           </section>
 
         </div>

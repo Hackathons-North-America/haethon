@@ -1,4 +1,5 @@
 import { and, eq, inArray, ne, or } from "drizzle-orm";
+import * as Sentry from "@sentry/nextjs";
 
 import { db } from "@/lib/db";
 import { userFollows, userHackathons, users } from "@/lib/db/schema";
@@ -36,40 +37,47 @@ export async function getFriendActivityByHackathon(
     return activity;
   }
 
-  const rows = await db
-    .select({
-      hackathonId: userHackathons.hackathonId,
-      username: users.username,
-      firstName: users.firstName,
-      lastName: users.lastName,
-      imageUrl: users.imageUrl,
-      status: userHackathons.applicationStatus,
-    })
-    .from(userFollows)
-    .innerJoin(users, eq(users.id, userFollows.followeeId))
-    .innerJoin(userHackathons, eq(userHackathons.userId, userFollows.followeeId))
-    .where(
-      and(
-        eq(userFollows.followerId, viewerId),
-        eq(userFollows.status, "approved"),
-        inArray(userHackathons.hackathonId, hackathonIds),
-        // Mirrors the My Hackathons visibility rule: an unsaved row still at
-        // the default "interested" stage isn't on their board, so friends
-        // don't see it either.
-        or(eq(userHackathons.isSaved, true), ne(userHackathons.applicationStatus, "interested"))
-      )
-    );
+  try {
+    const rows = await db
+      .select({
+        hackathonId: userHackathons.hackathonId,
+        username: users.username,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        imageUrl: users.imageUrl,
+        status: userHackathons.applicationStatus,
+      })
+      .from(userFollows)
+      .innerJoin(users, eq(users.id, userFollows.followeeId))
+      .innerJoin(userHackathons, eq(userHackathons.userId, userFollows.followeeId))
+      .where(
+        and(
+          eq(userFollows.followerId, viewerId),
+          eq(userFollows.status, "approved"),
+          inArray(userHackathons.hackathonId, hackathonIds),
+          // Mirrors the My Hackathons visibility rule: an unsaved row still at
+          // the default "interested" stage isn't on their board, so friends
+          // don't see it either.
+          or(eq(userHackathons.isSaved, true), ne(userHackathons.applicationStatus, "interested"))
+        )
+      );
 
-  for (const row of rows) {
-    const friends = activity.get(row.hackathonId) ?? [];
+    for (const row of rows) {
+      const friends = activity.get(row.hackathonId) ?? [];
 
-    friends.push({
-      username: row.username,
-      name: [row.firstName, row.lastName].filter(Boolean).join(" ").trim() || row.username,
-      imageUrl: row.imageUrl,
-      status: row.status,
-    });
-    activity.set(row.hackathonId, friends);
+      friends.push({
+        username: row.username,
+        name: [row.firstName, row.lastName].filter(Boolean).join(" ").trim() || row.username,
+        imageUrl: row.imageUrl,
+        status: row.status,
+      });
+      activity.set(row.hackathonId, friends);
+    }
+  } catch (error) {
+    // Social context is optional decoration on otherwise public catalog and
+    // detail pages. A missing/out-of-date friends table must not take the
+    // whole application down for signed-in visitors.
+    Sentry.captureException(error, { tags: { feature: "friend-activity" } });
   }
 
   return activity;

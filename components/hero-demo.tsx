@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Lock,
+  Plus,
+  RotateCw,
+  Star,
+  X,
+} from "lucide-react";
 
 const easeOut = [0.22, 1, 0.36, 1] as const;
 
@@ -164,38 +173,57 @@ export function HeroDemo() {
       className="pointer-events-none relative flex h-full w-full select-none"
       ref={containerRef}
     >
-      {/* The browser window, framed in the card's black on its two visible
-          sides only — the right and bottom run off the hero's edges. */}
-      <div className="flex w-full flex-col overflow-hidden border-l border-t border-black bg-paper shadow-[-28px_-20px_70px_-45px_rgba(27,25,23,0.45)]">
-        {/* Title bar: traffic dots and the address of the page being demoed. */}
-        <div className="flex items-center gap-2 border-b border-black bg-ink/[0.04] px-5 py-3">
-          <span className="size-2.5 rounded-full bg-ink/20" />
-          <span className="size-2.5 rounded-full bg-ink/20" />
-          <span className="size-2.5 rounded-full bg-ink/20" />
-          <span className="mx-auto flex min-w-0 items-center gap-1.5 rounded-full bg-paper px-5 py-1.5 font-mono text-[11px] font-medium tracking-[0.08em] text-ink/55 ring-1 ring-ink/10">
-            haethon.dev/hackathons
+      {/* The browser window — a Mac's, filling the hero's right half. Every
+          edge is cropped by the panel, so the window carries no frame of its
+          own; its chrome tints are what set it off from the paper. */}
+      <div className="flex w-full flex-col overflow-hidden bg-paper">
+        {/* Tab strip: macOS traffic lights, the active tab, and a new-tab
+            button on the darker window chrome. */}
+        <div className="flex items-end gap-3 bg-ink/[0.09] px-4 pt-2.5">
+          <div className="flex items-center gap-2 self-center pb-1">
+            <span className="size-3 rounded-full bg-[#ff5f57] ring-1 ring-black/10" />
+            <span className="size-3 rounded-full bg-[#febc2e] ring-1 ring-black/10" />
+            <span className="size-3 rounded-full bg-[#28c840] ring-1 ring-black/10" />
+          </div>
+
+          {/* Active tab, merging into the toolbar below it. */}
+          <div className="relative z-10 -mb-px flex min-w-0 max-w-64 items-center gap-2 rounded-t-lg bg-ink/[0.03] px-3.5 py-2 shadow-[0_-1px_0_rgba(27,25,23,0.12)]">
+            <span className="grid size-4 shrink-0 place-items-center rounded-sm bg-pine text-[8px] font-bold leading-none text-paper">
+              H
+            </span>
+            <span className="truncate text-[11px] font-medium text-ink/75">
+              Hackathons North America
+            </span>
+            <X aria-hidden="true" className="size-3 shrink-0 text-ink/40" />
+          </div>
+
+          <Plus aria-hidden="true" className="mb-2 size-3.5 text-ink/45" />
+        </div>
+
+        {/* Toolbar: navigation arrows, reload, and the address bar. */}
+        <div className="flex items-center gap-2.5 bg-ink/[0.03] px-4 py-2">
+          <div className="flex items-center gap-2">
+            <ArrowLeft aria-hidden="true" className="size-4 text-ink/70" strokeWidth={2} />
+            <ArrowRight aria-hidden="true" className="size-4 text-ink/25" strokeWidth={2} />
+            <RotateCw aria-hidden="true" className="size-3.5 text-ink/60" strokeWidth={2} />
+          </div>
+          <span className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-ink/[0.06] px-4 py-1.5">
+            <Lock aria-hidden="true" className="size-3 shrink-0 text-ink/45" />
+            <span className="truncate font-mono text-[11px] font-medium tracking-[0.06em] text-ink/60">
+              haethon.dev/hackathons
+            </span>
           </span>
-          <span className="w-12" />
+          <Star aria-hidden="true" className="size-3.5 shrink-0 text-ink/45" />
+          <span className="size-5 shrink-0 rounded-full bg-pine/25 ring-1 ring-pine/40" />
         </div>
 
         {/* The page itself, running to the cropped edges — paper continuing
             past the card reads as the rest of the site. */}
         <div className="flex-1 px-6 py-7 sm:px-10 sm:py-9">
           <div className="mx-auto w-full max-w-[32rem]">
-            {/* Search bar stub, so the window reads as the hackathon db page. */}
-            <div className="flex items-center gap-2.5 border border-ink/20 bg-paper px-4 py-3">
-              <Search aria-hidden="true" className="size-4 shrink-0 text-ink/45" />
-              <span className="truncate text-sm text-ink/45">
-                Search hackathons…
-              </span>
-              <span className="ml-auto hidden shrink-0 bg-pine/10 px-2.5 py-1 text-[11px] font-medium text-pine sm:inline-flex">
-                Canada
-              </span>
-            </div>
-
             {/* The giant hackathon card, styled after HackathonCard's cover
                 layout. */}
-            <article className="relative mt-5 flex flex-col overflow-hidden border border-black bg-paper">
+            <article className="relative flex flex-col overflow-hidden border border-black bg-paper">
               <div className="relative aspect-[5/2] w-full shrink-0 overflow-hidden border-b border-black">
                 <Image
                   alt=""

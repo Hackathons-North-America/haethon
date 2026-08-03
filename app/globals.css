@@ -3,16 +3,25 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  /* Paper-and-ink palette: warm cream ground, near-black warm ink,
-     evergreen accents. Cabernet is now only used by the faceoff game's
-     wrong-answer state and the logo fallback ramp — not by destructive
+  /* Paper-and-ink palette: warm cream ground, near-black warm ink, espresso
+     accents. Pine and moss keep their names for continuity but now carry the
+     landing hero's bark brown and a lighter tone from the same family, so the
+     product accent matches the nav. Cabernet is now only used by the faceoff
+     game's wrong-answer state and the logo fallback ramp — not by destructive
      actions or errors, which use pine. */
   --color-paper: #fbf7f0;
   --color-ink: #1b1917;
-  --color-pine: #007354;
-  --color-moss: #00a071;
+  --color-pine: #362519;
+  --color-moss: #6b4a30;
   --color-fog: #aeada9;
   --color-cabernet: #721c24;
+
+  /* Landing-hero palette, matched to the Federato reference: espresso brown
+     ground for the nav and copy panel. Bark is the same value as pine — the
+     token is kept so hero surfaces read intentionally rather than as an
+     accent; ember is the warm accent token. */
+  --color-bark: #362519;
+  --color-ember: #e4572e;
 
   /* Legacy tokens — kept only while the migration sweep is in flight.
      Do not use in new code; delete once no references remain. */
@@ -22,6 +31,20 @@
   --color-ivory: #f7f3ea;
   --color-gold: #fbbf24;
   --color-boreal: #2d4a22;
+
+  /* Continuous left-drift for the hero's logo-cloud marquee. The track holds
+     two identical copies of the list, so sliding exactly half its width lands
+     back on an identical frame — the loop reads as endless. */
+  --animate-marquee: marquee 42s linear infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
 
   --font-sans: var(--font-geist);
   --font-serif: var(--font-geist);

@@ -257,7 +257,7 @@ function SpotlightReminderCard() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(ellipse_at_center,rgba(0,115,84,0.14),rgba(0,115,84,0.06)_55%,transparent_80%)] blur-3xl"
+        className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(ellipse_at_center,rgba(54,37,25,0.14),rgba(54,37,25,0.06)_55%,transparent_80%)] blur-3xl"
       />
 
       <div className="relative border border-ink/15 bg-paper p-4 shadow-[0_32px_70px_-32px_rgba(27,25,23,0.38)]">

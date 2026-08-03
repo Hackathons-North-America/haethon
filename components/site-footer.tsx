@@ -26,7 +26,7 @@ const footerLinkClassName =
 
 export function SiteFooter() {
   return (
-    <footer className="bg-pine text-paper">
+    <footer className="bg-bark text-paper">
       <div className="grid lg:grid-cols-[1.35fr_1fr]">
         <div className="px-6 py-12 sm:px-10 sm:py-16 lg:px-12 lg:py-20">
           <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-paper/65">

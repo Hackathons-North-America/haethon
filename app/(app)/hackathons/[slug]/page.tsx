@@ -214,7 +214,7 @@ function getInitials(name: string) {
 function getStatusPill(status: string) {
   switch (status) {
     case "live":
-      return { label: "Live now", dot: "#1A7F37", bg: "#E6F4EA", text: "#1A7F37" };
+      return { label: "Live now", dot: "#362519", bg: "#EDE5DD", text: "#362519" };
     case "completed":
       return { label: "Completed", dot: "#838a98", bg: "#f4f4f6", text: "#616a7c" };
     default:

@@ -93,7 +93,7 @@ export function HackathonCheckinForm({ hackathonId }: { hackathonId: string }) {
         </button>
       )}
       {feedback ? (
-        <p className={`mt-1 text-sm ${feedback.tone === "error" ? "text-[#B3261E]" : "text-[#18785C]"}`}>{feedback.text}</p>
+        <p className={`mt-1 text-sm ${feedback.tone === "error" ? "text-[#B3261E]" : "text-moss"}`}>{feedback.text}</p>
       ) : null}
     </div>
   );

@@ -3,16 +3,17 @@ import type { CSSProperties } from "react";
 /**
  * Email-safe equivalents of the product's paper, ink, and pine design tokens.
  * Keep these as literal values because email clients cannot reliably resolve
- * the CSS custom properties used by the web app.
+ * the CSS custom properties used by the web app. Mirror any change to the
+ * matching token in app/globals.css.
  */
 export const emailColors = {
   paper: "#FBF7F0",
   ink: "#1B1917",
-  pine: "#007354",
-  moss: "#00A071",
+  pine: "#362519",
+  moss: "#6B4A30",
   mutedInk: "#6E6A66",
   border: "#D9D4CE",
-  pineWash: "#E2ECE5",
+  pineWash: "#EDE5DD",
 } as const;
 
 const sans =

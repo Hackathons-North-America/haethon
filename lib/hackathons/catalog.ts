@@ -1,4 +1,5 @@
 import { revalidateTag, unstable_cache } from "next/cache";
+import * as Sentry from "@sentry/nextjs";
 import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -402,17 +403,31 @@ export async function applyUserCardState<Card extends { id: string }>(
 ): Promise<(Card & { trackedStatus: string | null; friends: HackathonFriend[] })[]> {
   const hackathonIds = cards.map((card) => card.id);
 
+  async function loadTrackedRows() {
+    if (!userId || !hackathonIds.length) {
+      return [];
+    }
+
+    try {
+      return await db
+        .select({
+          hackathonId: userHackathons.hackathonId,
+          applicationStatus: userHackathons.applicationStatus,
+          isSaved: userHackathons.isSaved,
+        })
+        .from(userHackathons)
+        .where(and(eq(userHackathons.userId, userId), inArray(userHackathons.hackathonId, hackathonIds)));
+    } catch (error) {
+      // Personalization should never make the public catalog unavailable. The
+      // account areas still surface database outages, while this page falls
+      // back to untracked cards and reports the failure for investigation.
+      Sentry.captureException(error, { tags: { feature: "catalog-user-state" } });
+      return [];
+    }
+  }
+
   const [trackedRows, friendsByHackathon] = await Promise.all([
-    userId && hackathonIds.length
-      ? db
-          .select({
-            hackathonId: userHackathons.hackathonId,
-            applicationStatus: userHackathons.applicationStatus,
-            isSaved: userHackathons.isSaved,
-          })
-          .from(userHackathons)
-          .where(and(eq(userHackathons.userId, userId), inArray(userHackathons.hackathonId, hackathonIds)))
-      : Promise.resolve([]),
+    loadTrackedRows(),
     userId
       ? getFriendActivityByHackathon(userId, hackathonIds)
       : Promise.resolve(new Map<string, HackathonFriend[]>()),

@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
+
 function handleUnauthenticated() {
-  window.location.href = "/sign-in";
+  showLoginRequiredDialog();
 }
 
 export function MarkAttendedButton({ userHackathonId }: { userHackathonId: string }) {

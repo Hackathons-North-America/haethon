@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Fragment, useState, type ElementType, type FocusEvent } from "react";
 
 import { DiscordIcon } from "@/components/discord-icon";
+import { LoginRequiredLink } from "@/components/login-required-dialog";
 import {
   Building2,
   CalendarDays,
@@ -24,6 +25,7 @@ type SidebarLink = {
   icon: ElementType;
   label: string;
   external?: boolean;
+  requiresAuth?: boolean;
   // Featured entries render like the other rows but add a small muted
   // description under the label, separated from neighbours by dividers.
   description?: string;
@@ -32,9 +34,9 @@ type SidebarLink = {
 const items: SidebarLink[] = [
   { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
   { href: "/face-off", icon: Swords, label: "Face Off" },
-  { href: "/my", icon: CalendarDays, label: "My Hackathons" },
-  { href: "/friends", icon: Users, label: "Friends" },
-  { href: "/account", icon: CircleUser, label: "Hacker Profile" },
+  { href: "/my", icon: CalendarDays, label: "My Hackathons", requiresAuth: true },
+  { href: "/friends", icon: Users, label: "Friends", requiresAuth: true },
+  { href: "/account", icon: CircleUser, label: "Hacker Profile", requiresAuth: true },
 ];
 
 const collapsedWidth = 76;
@@ -87,6 +89,7 @@ export function AppSidebar({
       href: "/submit",
       icon: PlusSquare,
       label: "New hackathon",
+      requiresAuth: true,
       description:
         "Enter a new hackathon — one you just spotted or one you're organizing yourself.",
     },
@@ -151,8 +154,9 @@ export function AppSidebar({
             aria-label="App navigation"
             className="flex gap-1 overflow-x-auto px-3 py-3 lg:mt-6 lg:flex-col lg:overflow-visible lg:px-0 lg:py-0"
           >
-            {links.map(({ href, icon: Icon, label, external, description }) => {
+            {links.map(({ href, icon: Icon, label, external, description, requiresAuth }) => {
               const active = href === activeHref;
+              const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
               const labelTransition = prefersReducedMotion
                 ? { duration: 0 }
                 : {
@@ -165,12 +169,13 @@ export function AppSidebar({
                 return (
                   <Fragment key={href}>
                     <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
-                    <Link
+                    <NavigationLink
                       aria-current={active ? "page" : undefined}
                       className={`inline-flex min-h-10 shrink-0 flex-col justify-center py-3 pl-3 pr-1 text-sm font-medium transition-colors lg:min-h-12 lg:w-64 lg:px-7 ${
                         active ? "text-pine" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
                       }`}
                       href={href}
+                      {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
                     >
                       <span className="inline-flex items-center gap-3 lg:gap-4">
                         <Icon aria-hidden="true" className="size-4 shrink-0 lg:size-5" />
@@ -208,20 +213,21 @@ export function AppSidebar({
                           {description}
                         </span>
                       </motion.span>
-                    </Link>
+                    </NavigationLink>
                     <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
                   </Fragment>
                 );
               }
 
               return (
-                <Link
+                <NavigationLink
                   aria-current={active ? "page" : undefined}
                   className={`inline-flex min-h-10 shrink-0 items-center gap-3 pl-3 pr-1 text-sm font-medium transition-colors lg:min-h-12 lg:w-64 lg:gap-4 lg:px-7 ${
                     active ? "text-pine" : "text-ink/55 hover:bg-pine/5 hover:text-ink"
                   }`}
                   href={href}
                   key={href}
+                  {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
                   rel={external ? "noreferrer" : undefined}
                   target={external ? "_blank" : undefined}
                 >
@@ -237,7 +243,7 @@ export function AppSidebar({
                   >
                     {label}
                   </motion.span>
-                </Link>
+                </NavigationLink>
               );
             })}
           </nav>
@@ -254,23 +260,25 @@ export function AppSidebar({
         transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <ul className="flex items-stretch">
-          {barLinks.map(({ href, icon: Icon, label }) => {
+          {barLinks.map(({ href, icon: Icon, label, requiresAuth }) => {
             const active = href === activeHref;
+            const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
 
             return (
               <li className="flex-1" key={href}>
-                <Link
+                <NavigationLink
                   aria-current={active ? "page" : undefined}
                   aria-label={label}
                   className="flex h-14 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine"
                   href={href}
+                  {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
                 >
                   <Icon
                     aria-hidden="true"
                     className={`size-6 transition-colors ${active ? "text-pine" : "text-ink/45"}`}
                     strokeWidth={active ? 2.4 : 1.8}
                   />
-                </Link>
+                </NavigationLink>
               </li>
             );
           })}

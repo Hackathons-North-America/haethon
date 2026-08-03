@@ -31,27 +31,37 @@ export function HeroHeadline() {
 
   return (
     <div className="relative">
-      {/* The split hero's editorial voice: an oversized cream display serif on
-          the espresso panel, regular weight and near-solid leading, with
-          "hackers" carrying the accent as an italic. */}
-      <h1 className="relative z-10 text-balance font-display text-[clamp(3rem,5.6vw,5.6rem)] font-normal leading-[1.02] tracking-[-0.01em] text-paper">
+      {/* The split hero's voice, set in the same Geist sans the hackathon
+          cards use for their titles. Metrics are lifted one-to-one from the
+          Federato reference: solid 1.0 leading, -0.02em tracking, light
+          weight. The size is dialled back from the reference's 6.9vw to 5vw so
+          the whole copy block — headline, description and CTA — clears the
+          fold. 5vw is the largest size that still wraps to four lines
+          ("Every / hackathon, / from discovery / to demo day"); a hair larger
+          and "from discovery" stops fitting the column and the block jumps to
+          five. No text-balance — the reference lets the lines wrap naturally
+          against the column edge. */}
+      <h1 className="relative z-10 font-sans text-[clamp(3rem,5vw,5.5rem)] font-light leading-[1] tracking-[-0.02em] text-paper">
         <RevealWord index={0} still={still}>
-          Where
+          Every
         </RevealWord>{" "}
-        <RevealWord index={1} still={still} className="italic">
-          hackers
+        <RevealWord index={1} still={still}>
+          hackathon,
         </RevealWord>{" "}
         <RevealWord index={2} still={still}>
-          find
+          from
         </RevealWord>{" "}
         <RevealWord index={3} still={still}>
-          their
+          discovery
         </RevealWord>{" "}
         <RevealWord index={4} still={still}>
-          next
+          to
         </RevealWord>{" "}
         <RevealWord index={5} still={still}>
-          weekend.
+          demo
+        </RevealWord>{" "}
+        <RevealWord index={6} still={still}>
+          day
         </RevealWord>
       </h1>
     </div>

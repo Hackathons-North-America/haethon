@@ -551,7 +551,7 @@ export function SubmissionReviewCard({
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#027A48] px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
             disabled={disabled}
             name="intent"
             type="submit"
@@ -593,7 +593,7 @@ export function SubmissionReviewCard({
             Reject
           </button>
           {message ? (
-            <p aria-live="polite" className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#027A48]"}`}>
+            <p aria-live="polite" className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>
               {message}
             </p>
           ) : null}

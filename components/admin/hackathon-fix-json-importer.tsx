@@ -218,7 +218,7 @@ export function HackathonFixJsonImporter({
           className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
             status === "error"
               ? "border-[#B42318]/30 bg-[#FEF3F2] text-[#B42318]"
-              : "border-[#027A48]/25 bg-[#ECFDF3] text-[#027A48]"
+              : "border-[#362519]/25 bg-[#EDE5DD] text-[#362519]"
           }`}
         >
           {status === "error" ? (
@@ -243,7 +243,7 @@ export function HackathonFixJsonImporter({
                 <span className="font-semibold text-navy dark:text-wheat">{result.name}</span>
                 <span className="text-navy/55 dark:text-wheat/55">{result.duplicateScore.toFixed(2)}</span>
                 {result.status === "auto_merged" ? (
-                  <span className="inline-flex items-start gap-2 text-[#027A48]">
+                  <span className="inline-flex items-start gap-2 text-[#362519]">
                     <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                     Merged into {result.matchedName ?? "an existing hackathon"}
                   </span>

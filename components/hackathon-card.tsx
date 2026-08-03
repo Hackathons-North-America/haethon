@@ -9,6 +9,7 @@ import { ArrowUpRight, BellPlus, Check, ChevronDown, Swords } from "lucide-react
 import { DiscordGlyph } from "@/components/discord-glyph";
 import { FriendAvatarRow } from "@/components/hackathon-friends";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import type { HackathonFriend } from "@/lib/follows/activity";
 import { calendarProviderLinks } from "@/lib/hackathons/calendar-links";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
@@ -67,7 +68,7 @@ export type HackathonCardData = {
 };
 
 function handleUnauthenticated() {
-  window.location.href = "/sign-in";
+  showLoginRequiredDialog();
 }
 
 /* Only Canada and the United States get flag-colored treatment; every other

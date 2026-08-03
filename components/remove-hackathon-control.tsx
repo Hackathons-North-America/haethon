@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
 
+import { showLoginRequiredDialog } from "@/components/login-required-dialog";
+
 /* Trash button + a self-contained confirmation dialog used on the My Hackathons
    cards. Confirming hits DELETE /api/hackathons/{id}/track, which drops the
    tracking row entirely — undoing the interested/applied/accepted tag and
@@ -62,7 +64,7 @@ export function RemoveHackathonControl({
       });
 
       if (response.status === 401) {
-        window.location.href = "/sign-in";
+        showLoginRequiredDialog();
         return;
       }
 
