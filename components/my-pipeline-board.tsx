@@ -10,7 +10,7 @@ import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
 
 const trashButtonClassName =
-  "relative z-20 grid size-8 place-items-center rounded-full text-navy/45 dark:text-wheat/45 transition-colors hover:bg-pine/10 hover:text-pine dark:hover:bg-white/10 dark:hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 disabled:cursor-wait disabled:opacity-60";
+  "relative z-20 grid size-8 place-items-center rounded-full text-ink/45 dark:text-paper/45 transition-colors hover:bg-pine/10 hover:text-pine dark:hover:bg-white/10 dark:hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 disabled:cursor-wait disabled:opacity-60";
 
 function redirectToSignIn() {
   showLoginRequiredDialog();
@@ -131,10 +131,10 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
 
         return (
           <section
-            className={`flex min-w-[320px] flex-1 shrink-0 flex-col rounded-2xl border bg-ivory dark:bg-white/5 p-3 transition-colors ${
+            className={`flex min-w-[320px] flex-1 shrink-0 flex-col rounded-2xl border bg-paper dark:bg-white/5 p-3 transition-colors ${
               isDropTarget
                 ? "border-pine dark:border-moss/60 bg-pine/5 dark:bg-moss/10"
-                : "border-navy/10 dark:border-white/10"
+                : "border-ink/10 dark:border-white/10"
             }`}
             key={column.stage}
             onDragLeave={(event) => {
@@ -157,7 +157,7 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
                 <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
                 {column.title}
               </span>
-              <span className="text-sm font-semibold text-navy/45 dark:text-wheat/45">{column.cards.length}</span>
+              <span className="text-sm font-semibold text-ink/45 dark:text-paper/45">{column.cards.length}</span>
             </div>
 
             <div className="mt-2 flex-1 space-y-3">

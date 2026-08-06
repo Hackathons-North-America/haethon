@@ -31,7 +31,7 @@ export type ProfileSocialValues = {
 };
 
 export const profileSectionTitleClassName =
-  "font-serif text-4xl font-semibold tracking-[-0.035em] text-ink dark:text-wheat sm:text-5xl";
+  "font-serif text-4xl font-semibold tracking-[-0.035em] text-ink dark:text-paper sm:text-5xl";
 
 function labelFromUrl(url: string) {
   try {
@@ -88,7 +88,7 @@ export function ProfileSocialsSection({ links, emptyText }: { links: ProfileLink
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           {links.map(({ href, icon: Icon, label }) => (
             <a
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/10 bg-ivory px-3.5 py-2 text-sm text-navy/65 transition hover:border-pine hover:text-pine dark:border-white/10 dark:bg-white/5 dark:text-wheat/65 dark:hover:border-moss/60 dark:hover:text-moss"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/10 bg-paper px-3.5 py-2 text-sm text-ink/65 transition hover:border-pine hover:text-pine dark:border-white/10 dark:bg-white/5 dark:text-paper/65 dark:hover:border-moss/60 dark:hover:text-moss"
               href={href}
               key={href}
               rel="noreferrer nofollow"
@@ -100,7 +100,7 @@ export function ProfileSocialsSection({ links, emptyText }: { links: ProfileLink
           ))}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-ink/55 dark:text-wheat/55">{emptyText}</p>
+        <p className="mt-4 text-sm text-ink/55 dark:text-paper/55">{emptyText}</p>
       )}
     </div>
   );
@@ -116,7 +116,7 @@ export function ProfileSkillsSection({ skills, emptyText }: { skills: string[]; 
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           {skills.map((skill) => (
             <span
-              className="inline-flex min-h-10 items-center rounded-full bg-navy px-3.5 py-2 text-sm font-medium text-wheat dark:bg-wheat dark:text-[#141414]"
+              className="inline-flex min-h-10 items-center rounded-full bg-ink px-3.5 py-2 text-sm font-medium text-paper dark:bg-paper dark:text-[#141414]"
               key={skill}
             >
               {skill}
@@ -124,7 +124,7 @@ export function ProfileSkillsSection({ skills, emptyText }: { skills: string[]; 
           ))}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-ink/55 dark:text-wheat/55">{emptyText}</p>
+        <p className="mt-4 text-sm text-ink/55 dark:text-paper/55">{emptyText}</p>
       )}
     </div>
   );
@@ -194,8 +194,8 @@ function PinnedHackathonCard({ item }: { item: PinnedProfileItem }) {
 
       {/* Text block below the image. */}
       <div className="flex flex-1 flex-col p-4">
-        <p className="font-semibold text-navy dark:text-wheat">{item.hackathonName}</p>
-        <p className="mt-1 flex items-center gap-1 text-sm text-navy/55 dark:text-wheat/55">
+        <p className="font-semibold text-ink dark:text-paper">{item.hackathonName}</p>
+        <p className="mt-1 flex items-center gap-1 text-sm text-ink/55 dark:text-paper/55">
           <CalendarDays aria-hidden="true" className="size-3.5 shrink-0" />
           <span>{formatDateRange(item.startsAt, item.endsAt)}</span>
         </p>
@@ -205,7 +205,7 @@ function PinnedHackathonCard({ item }: { item: PinnedProfileItem }) {
             Won · {item.detail}
           </p>
         ) : (
-          <p className="mt-1.5 text-sm text-navy/55 dark:text-wheat/55">{item.detail}</p>
+          <p className="mt-1.5 text-sm text-ink/55 dark:text-paper/55">{item.detail}</p>
         )}
         {devpostUrl ? (
           <a

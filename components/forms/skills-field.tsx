@@ -13,9 +13,9 @@ type SkillsFieldProps = {
 const basePillClassName =
   "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition";
 const selectedPillClassName =
-  "border-pine bg-pine text-wheat dark:border-moss dark:bg-moss dark:text-[#141414]";
+  "border-pine bg-pine text-paper dark:border-moss dark:bg-moss dark:text-[#141414]";
 const unselectedPillClassName =
-  "border-navy/15 bg-white text-navy/75 hover:border-pine hover:text-pine dark:border-white/15 dark:bg-white/[0.06] dark:text-wheat/75 dark:hover:border-moss/60 dark:hover:text-moss";
+  "border-ink/15 bg-white text-ink/75 hover:border-pine hover:text-pine dark:border-white/15 dark:bg-white/[0.06] dark:text-paper/75 dark:hover:border-moss/60 dark:hover:text-moss";
 
 function matches(query: string, value: string) {
   return value.toLowerCase().includes(query);
@@ -74,7 +74,7 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
         <div className="relative w-full max-w-xs">
           <Search
             aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-navy/40 dark:text-wheat/40"
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink/40 dark:text-paper/40"
           />
           <input
             value={query}
@@ -82,21 +82,21 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
             placeholder="Search languages & frameworks"
             autoComplete="off"
             spellCheck={false}
-            className="w-full rounded-xl border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] py-2 pl-9 pr-3 text-sm text-navy dark:text-wheat outline-none transition placeholder:text-navy/45 dark:placeholder:text-wheat/40 focus:border-pine focus:ring-2 focus:ring-pine/15"
+            className="w-full rounded-xl border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] py-2 pl-9 pr-3 text-sm text-ink dark:text-paper outline-none transition placeholder:text-ink/45 dark:placeholder:text-paper/40 focus:border-pine focus:ring-2 focus:ring-pine/15"
           />
         </div>
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-navy/55 dark:text-wheat/55">
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55">
           {value.length} selected
         </span>
       </div>
 
-      <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-navy/10 dark:border-white/10 bg-navy/[0.02] dark:bg-white/[0.02] p-4">
+      <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-ink/10 dark:border-white/10 bg-ink/[0.02] dark:bg-white/[0.02] p-4">
         {groups.length ? (
           groups.map(({ language, frameworks }) => (
             <div key={language.name}>
               <div className="flex flex-wrap items-center gap-2">
                 <Pill skill={language.name} isLanguage />
-                <span aria-hidden="true" className="text-navy/25 dark:text-wheat/25">
+                <span aria-hidden="true" className="text-ink/25 dark:text-paper/25">
                   ·
                 </span>
                 {frameworks.map((framework) => (
@@ -106,7 +106,7 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
             </div>
           ))
         ) : (
-          <p className="text-sm text-navy/55 dark:text-wheat/55">No languages or frameworks match “{query}”.</p>
+          <p className="text-sm text-ink/55 dark:text-paper/55">No languages or frameworks match “{query}”.</p>
         )}
       </div>
     </div>

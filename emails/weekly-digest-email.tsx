@@ -12,6 +12,7 @@ import {
   Text,
 } from "@react-email/components";
 
+import { EmailFooter, EmailHeader } from "@/emails/email-chrome";
 import { emailColors, emailStyles } from "@/emails/email-theme";
 
 export type WeeklyDigestReminderItem = {
@@ -56,16 +57,16 @@ export function WeeklyDigestEmail({
 
   return (
     <Html>
-      <Head />
+      <Head>
+        {/* The palette is warm and light by design; opting out of automatic
+            dark-mode inversion keeps the bark band from being re-tinted. */}
+        <meta name="color-scheme" content="light" />
+        <meta name="supported-color-schemes" content="light" />
+      </Head>
       <Preview>{intro}</Preview>
       <Body style={emailStyles.main}>
         <Container style={emailStyles.container}>
-          <Text style={emailStyles.brand}>
-            HNA{" "}
-            <span style={emailStyles.brandDescriptor}>
-              / Hackathons North America
-            </span>
-          </Text>
+          <EmailHeader />
           <Section style={emailStyles.card}>
             <Text style={emailStyles.eyebrow}>Weekly digest</Text>
             <Heading style={emailStyles.heading}>Your week ahead</Heading>
@@ -120,13 +121,9 @@ export function WeeklyDigestEmail({
               .
             </Text>
           </Section>
-          <Text style={emailStyles.footer}>
+          <EmailFooter unsubscribeUrl={unsubscribeUrl}>
             You are receiving this weekly digest because of your saved hackathons and alerts on Haethon.
-            <br />
-            <Link href={unsubscribeUrl} style={emailStyles.unsubscribeLink}>
-              Unsubscribe from all emails
-            </Link>
-          </Text>
+          </EmailFooter>
         </Container>
       </Body>
     </Html>

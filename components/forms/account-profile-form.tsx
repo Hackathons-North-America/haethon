@@ -355,7 +355,7 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
           >
           <form
             onSubmit={onSubmit}
-            className="flex max-h-full w-full max-w-3xl flex-col rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] text-left shadow-2xl"
+            className="flex max-h-full w-full max-w-3xl flex-col rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] text-left shadow-2xl"
           >
             <div className="flex shrink-0 items-center justify-between gap-3 px-6 pt-6 pb-4">
               <h2 className={headingClassName}>Edit profile</h2>
@@ -363,7 +363,7 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
                 type="button"
                 onClick={() => setIsEditing(false)}
                 aria-label="Close"
-                className="inline-flex size-8 items-center justify-center rounded-xl text-navy/55 dark:text-wheat/55 transition hover:bg-navy/5 dark:hover:bg-white/10 hover:text-navy dark:hover:text-wheat"
+                className="inline-flex size-8 items-center justify-center rounded-xl text-ink/55 dark:text-paper/55 transition hover:bg-ink/5 dark:hover:bg-white/10 hover:text-ink dark:hover:text-paper"
               >
                 <X aria-hidden="true" className="size-4" />
               </button>
@@ -507,18 +507,18 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
             </div>
             <div className="sm:col-span-2">
               <label className={labelClassName}>Skills</label>
-              <p className="mb-2 text-xs text-navy/55 dark:text-wheat/55">
+              <p className="mb-2 text-xs text-ink/55 dark:text-paper/55">
                 Pick the languages and frameworks you know, and select as many as you like.
               </p>
               <SkillsField value={skillsDraft} onChange={setSkillsDraft} />
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-navy/10 dark:border-white/10 px-6 py-4">
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-ink/10 dark:border-white/10 px-6 py-4">
             <button
               disabled={status === "saving"}
               type="submit"
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition hover:bg-pine/90 disabled:opacity-60"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white transition hover:bg-pine/90 disabled:opacity-60"
             >
               <Save aria-hidden="true" className="size-4" />
               {status === "saving" ? "Saving" : "Save profile"}
@@ -526,7 +526,7 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
             <button
               type="button"
               onClick={() => setIsEditing(false)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/15 dark:border-white/15 px-4 text-sm font-semibold text-navy dark:text-wheat transition hover:bg-navy/5 dark:hover:bg-white/10"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 dark:border-white/15 px-4 text-sm font-semibold text-ink dark:text-paper transition hover:bg-ink/5 dark:hover:bg-white/10"
             >
               Cancel
             </button>

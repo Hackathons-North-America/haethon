@@ -85,7 +85,7 @@ export function RemoveHackathonControl({
         aria-label={`Remove ${hackathonName} from your ${listLabel} list`}
         className={
           className ??
-          "relative z-20 grid size-8 place-items-center rounded-full text-navy/55 dark:text-wheat/55 transition-colors hover:bg-pine/10 hover:text-pine dark:hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
+          "relative z-20 grid size-8 place-items-center rounded-full text-ink/55 dark:text-paper/55 transition-colors hover:bg-pine/10 hover:text-pine dark:hover:text-moss focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
         }
         draggable={false}
         onClick={(event) => {
@@ -111,22 +111,22 @@ export function RemoveHackathonControl({
             >
               <button
                 aria-label="Cancel"
-                className="absolute inset-0 bg-navy/40 dark:bg-black/60 backdrop-blur-[2px]"
+                className="absolute inset-0 bg-ink/40 dark:bg-black/60 backdrop-blur-[2px]"
                 disabled={pending}
                 onClick={() => setOpen(false)}
                 tabIndex={-1}
                 type="button"
               />
-              <div className="relative w-full max-w-md rounded-2xl border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-6 shadow-[0_30px_80px_rgb(0_0_0/0.45)]">
-                <h2 className="text-lg font-semibold leading-6 text-navy dark:text-wheat">
+              <div className="relative w-full max-w-md rounded-2xl border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-6 shadow-[0_30px_80px_rgb(0_0_0/0.45)]">
+                <h2 className="text-lg font-semibold leading-6 text-ink dark:text-paper">
                   Are you no longer interested in {hackathonName}?
                 </h2>
-                <p className="mt-2 text-sm leading-5 text-navy/60 dark:text-wheat/60">
+                <p className="mt-2 text-sm leading-5 text-ink/60 dark:text-paper/60">
                   This will remove it from your {listLabel} list and clear any reminders you set for it.
                 </p>
                 <div className="mt-6 flex items-center justify-end gap-3">
                   <button
-                    className="inline-flex min-h-10 items-center justify-center rounded-full border border-navy/15 dark:border-white/15 px-5 text-sm font-semibold text-navy dark:text-wheat transition-colors hover:bg-navy/5 dark:hover:bg-white/5 disabled:opacity-60"
+                    className="inline-flex min-h-10 items-center justify-center rounded-full border border-ink/15 dark:border-white/15 px-5 text-sm font-semibold text-ink dark:text-paper transition-colors hover:bg-ink/5 dark:hover:bg-white/5 disabled:opacity-60"
                     disabled={pending}
                     onClick={() => setOpen(false)}
                     type="button"
@@ -134,7 +134,7 @@ export function RemoveHackathonControl({
                     No
                   </button>
                   <button
-                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-wheat transition-colors hover:bg-pine/90 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white disabled:cursor-wait disabled:opacity-70"
+                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-paper transition-colors hover:bg-pine/90 dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:cursor-wait disabled:opacity-70"
                     disabled={pending}
                     onClick={confirmRemove}
                     type="button"

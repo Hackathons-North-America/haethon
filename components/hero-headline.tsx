@@ -34,34 +34,26 @@ export function HeroHeadline() {
       {/* The split hero's voice, set in the same Geist sans the hackathon
           cards use for their titles. Metrics are lifted one-to-one from the
           Federato reference: solid 1.0 leading, -0.02em tracking, light
-          weight. The size is dialled back from the reference's 6.9vw to 5vw so
-          the whole copy block — headline, description and CTA — clears the
-          fold. 5vw is the largest size that still wraps to four lines
-          ("Every / hackathon, / from discovery / to demo day"); a hair larger
-          and "from discovery" stops fitting the column and the block jumps to
-          five. No text-balance — the reference lets the lines wrap naturally
-          against the column edge. */}
-      <h1 className="relative z-10 font-sans text-[clamp(3rem,5vw,5.5rem)] font-light leading-[1] tracking-[-0.02em] text-paper">
+          weight. 6.2vw is the largest size where the copy still wraps to
+          three lines in the 33vw column ("Find and / track every /
+          hackathon"), so the whole copy block — headline, description and
+          CTA — clears the fold. No text-balance — the reference lets the
+          lines wrap naturally against the column edge. */}
+      <h1 className="relative z-10 font-sans text-[clamp(3.5rem,6.2vw,6.75rem)] font-light leading-[1] tracking-[-0.02em] text-paper">
         <RevealWord index={0} still={still}>
-          Every
+          Find
         </RevealWord>{" "}
         <RevealWord index={1} still={still}>
-          hackathon,
+          and
         </RevealWord>{" "}
         <RevealWord index={2} still={still}>
-          from
+          track
         </RevealWord>{" "}
         <RevealWord index={3} still={still}>
-          discovery
+          every
         </RevealWord>{" "}
         <RevealWord index={4} still={still}>
-          to
-        </RevealWord>{" "}
-        <RevealWord index={5} still={still}>
-          demo
-        </RevealWord>{" "}
-        <RevealWord index={6} still={still}>
-          day
+          hackathon
         </RevealWord>
       </h1>
     </div>

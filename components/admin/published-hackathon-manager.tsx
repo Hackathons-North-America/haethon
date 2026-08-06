@@ -101,7 +101,7 @@ function AdminHackathonCard({
       />
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-wheat hover:bg-pine/90 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
           disabled={deleting}
           onClick={() => onEdit(item)}
           type="button"
@@ -113,8 +113,8 @@ function AdminHackathonCard({
           aria-pressed={item.isRecurring}
           className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold disabled:opacity-50 ${
             item.isRecurring
-              ? "border-pine bg-pine text-wheat dark:border-wheat dark:bg-wheat dark:text-[#141414]"
-              : "border-navy/20 text-navy/70 dark:border-white/20 dark:text-wheat/70"
+              ? "border-pine bg-pine text-paper dark:border-paper dark:bg-paper dark:text-[#141414]"
+              : "border-ink/20 text-ink/70 dark:border-white/20 dark:text-paper/70"
           }`}
           disabled={busy}
           onClick={() => void toggleRecurring()}
@@ -149,7 +149,7 @@ export function PublishedHackathonManager({ hackathons }: { hackathons: AdminHac
 
   if (!items.length) {
     return (
-      <p className="rounded-xl border border-navy/10 bg-white p-6 text-sm text-navy/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-wheat/55">
+      <p className="rounded-xl border border-ink/10 bg-white p-6 text-sm text-ink/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-paper/55">
         No hackathons are currently displayed on the hackathons page.
       </p>
     );

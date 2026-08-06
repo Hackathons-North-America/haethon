@@ -11,9 +11,9 @@ type HackathonFormat = "in_person" | "online";
 // Sentinel source URL so reviewers can tell a submission came from this form
 // rather than a scraped or imported source.
 const inputClassName =
-  "w-full rounded-none border-0 border-b border-navy/15 dark:border-white/15 bg-transparent px-0 py-2 text-[15px] text-navy dark:text-wheat outline-none transition-colors placeholder:text-navy/45 focus:border-pine";
+  "w-full rounded-none border-0 border-b border-ink/15 dark:border-white/15 bg-transparent px-0 py-2 text-[15px] text-ink dark:text-paper outline-none transition-colors placeholder:text-ink/45 focus:border-pine";
 const labelClassName =
-  "mb-2 block font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-navy/55 dark:text-wheat/55";
+  "mb-2 block font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55";
 const sectionHeadingClassName =
   "font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-pine dark:text-moss";
 
@@ -142,8 +142,8 @@ export function HackathonSubmissionForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="border border-navy/10 bg-transparent text-navy dark:border-white/10 dark:text-wheat">
-      <div className="flex border-b border-navy/10 dark:border-white/10" role="tablist" aria-label="Submission type">
+    <form onSubmit={onSubmit} className="border border-ink/10 bg-transparent text-ink dark:border-white/10 dark:text-paper">
+      <div className="flex border-b border-ink/10 dark:border-white/10" role="tablist" aria-label="Submission type">
         {[
           {
             value: "community" as const,
@@ -160,8 +160,8 @@ export function HackathonSubmissionForm() {
             aria-selected={submitterType === value}
             className={`flex flex-1 flex-col items-center justify-center gap-1.5 border-b-2 px-4 py-4 outline-none transition-colors ${
               submitterType === value
-                ? "border-pine dark:border-moss/50 text-navy dark:text-wheat"
-                : "border-transparent text-navy/55 dark:text-wheat/55 hover:text-navy dark:hover:text-wheat focus-visible:text-navy"
+                ? "border-pine dark:border-moss/50 text-ink dark:text-paper"
+                : "border-transparent text-ink/55 dark:text-paper/55 hover:text-ink dark:hover:text-paper focus-visible:text-ink"
             }`}
             key={value}
             onClick={() => setSubmitterType(value)}
@@ -169,7 +169,7 @@ export function HackathonSubmissionForm() {
             type="button"
           >
             <span className="font-mono text-xs font-medium uppercase tracking-[0.14em]">{label}</span>
-            <span className="text-xs text-navy/55 dark:text-wheat/55">{note}</span>
+            <span className="text-xs text-ink/55 dark:text-paper/55">{note}</span>
           </button>
         ))}
       </div>
@@ -226,7 +226,7 @@ export function HackathonSubmissionForm() {
 
         {submitterType === "organizer" ? (
           <>
-            <div className="space-y-7 border-t border-navy/10 dark:border-white/10 pt-8">
+            <div className="space-y-7 border-t border-ink/10 dark:border-white/10 pt-8">
               <p className={sectionHeadingClassName}>Dates</p>
               <div className="grid gap-x-8 gap-y-7 md:grid-cols-4">
                 <div>
@@ -256,7 +256,7 @@ export function HackathonSubmissionForm() {
               </div>
             </div>
 
-            <div className="space-y-7 border-t border-navy/10 dark:border-white/10 pt-8">
+            <div className="space-y-7 border-t border-ink/10 dark:border-white/10 pt-8">
               <p className={sectionHeadingClassName}>Format &amp; location</p>
               <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="Format">
                 {[
@@ -265,10 +265,10 @@ export function HackathonSubmissionForm() {
                 ].map(({ value, label, note }) => (
                   <button
                     aria-checked={format === value}
-                    className={`flex min-w-52 flex-col gap-1 border px-5 py-4 text-left outline-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine dark:focus-visible:outline-wheat ${
+                    className={`flex min-w-52 flex-col gap-1 border px-5 py-4 text-left outline-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine dark:focus-visible:outline-paper ${
                       format === value
-                        ? "border-pine dark:border-moss/60 bg-pine/5 dark:bg-moss/10 text-navy dark:text-wheat"
-                        : "border-navy/15 dark:border-white/15 text-navy/55 dark:text-wheat/55 hover:border-pine/60 hover:text-navy dark:hover:text-wheat"
+                        ? "border-pine dark:border-moss/60 bg-pine/5 dark:bg-moss/10 text-ink dark:text-paper"
+                        : "border-ink/15 dark:border-white/15 text-ink/55 dark:text-paper/55 hover:border-pine/60 hover:text-ink dark:hover:text-paper"
                     }`}
                     key={value}
                     onClick={() => setFormat(value)}
@@ -276,7 +276,7 @@ export function HackathonSubmissionForm() {
                     type="button"
                   >
                     <span className="font-mono text-xs font-medium uppercase tracking-[0.14em]">{label}</span>
-                    <span className="text-xs text-navy/55 dark:text-wheat/55">{note}</span>
+                    <span className="text-xs text-ink/55 dark:text-paper/55">{note}</span>
                   </button>
                 ))}
               </div>
@@ -329,13 +329,13 @@ export function HackathonSubmissionForm() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm leading-6 text-navy/55 dark:text-wheat/55">
+                <p className="text-sm leading-6 text-ink/55 dark:text-paper/55">
                   No location needed — your hackathon will simply show as online.
                 </p>
               )}
             </div>
 
-            <div className="space-y-7 border-t border-navy/10 dark:border-white/10 pt-8">
+            <div className="space-y-7 border-t border-ink/10 dark:border-white/10 pt-8">
               <p className={sectionHeadingClassName}>Details</p>
               <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
                 <div>
@@ -345,17 +345,17 @@ export function HackathonSubmissionForm() {
                   <input id="prizeAmountUsd" name="prizeAmountUsd" min="0" type="number" className={inputClassName} />
                 </div>
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-3 pb-2">
-                  <label className="inline-flex items-center gap-2.5 text-sm text-navy dark:text-wheat">
+                  <label className="inline-flex items-center gap-2.5 text-sm text-ink dark:text-paper">
                     <input name="beginnerFriendly" type="checkbox" className="size-4 accent-pine" />
                     Beginner friendly
                   </label>
                   {format === "in_person" ? (
-                    <label className="inline-flex items-center gap-2.5 text-sm text-navy dark:text-wheat">
+                    <label className="inline-flex items-center gap-2.5 text-sm text-ink dark:text-paper">
                       <input name="travelReimbursement" type="checkbox" className="size-4 accent-pine" />
                       Travel reimbursement
                     </label>
                   ) : null}
-                  <label className="inline-flex items-center gap-2.5 text-sm text-navy dark:text-wheat">
+                  <label className="inline-flex items-center gap-2.5 text-sm text-ink dark:text-paper">
                     <input name="highSchoolersOnly" type="checkbox" className="size-4 accent-pine" />
                     High school only
                   </label>
@@ -373,18 +373,18 @@ export function HackathonSubmissionForm() {
 
         <div
           className={`flex flex-wrap items-center gap-4 ${
-            submitterType === "organizer" ? "border-t border-navy/10 dark:border-white/10 pt-8" : ""
+            submitterType === "organizer" ? "border-t border-ink/10 dark:border-white/10 pt-8" : ""
           }`}
         >
           <button
             disabled={status === "submitting"}
             type="submit"
-            className="inline-flex rounded-full min-h-11 items-center justify-center border border-pine dark:border-moss/50 px-6 font-mono text-xs font-medium uppercase tracking-[0.14em] text-pine dark:text-moss transition-colors hover:bg-pine hover:text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white focus-visible:bg-pine focus-visible:text-wheat focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pine dark:focus-visible:outline-wheat disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex rounded-full min-h-11 items-center justify-center border border-pine dark:border-moss/50 px-6 font-mono text-xs font-medium uppercase tracking-[0.14em] text-pine dark:text-moss transition-colors hover:bg-pine hover:text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white focus-visible:bg-pine focus-visible:text-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pine dark:focus-visible:outline-paper disabled:cursor-not-allowed disabled:opacity-50"
           >
             {status === "submitting" ? "Submitting" : "Submit for review"}
           </button>
           {message ? (
-            <p aria-live="polite" className={`text-sm ${status === "error" ? "text-pine dark:text-moss" : "text-navy/70 dark:text-wheat/70"}`}>
+            <p aria-live="polite" className={`text-sm ${status === "error" ? "text-pine dark:text-moss" : "text-ink/70 dark:text-paper/70"}`}>
               {message}
             </p>
           ) : null}

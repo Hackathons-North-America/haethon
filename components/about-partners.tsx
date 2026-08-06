@@ -86,7 +86,7 @@ export function AboutPartners() {
 
     return (
       <li
-        className="font-serif text-3xl font-semibold leading-none tracking-tight text-navy transition-none sm:text-4xl lg:text-5xl dark:text-wheat"
+        className="font-serif text-3xl font-semibold leading-none tracking-tight text-ink transition-none sm:text-4xl lg:text-5xl dark:text-paper"
         key={name}
         style={{
           opacity,
@@ -116,12 +116,12 @@ export function AboutPartners() {
 
             <div className="order-1 text-center lg:order-2">
               <h2
-                className="font-serif text-6xl font-semibold leading-none tracking-tight text-navy lg:text-7xl dark:text-wheat"
+                className="font-serif text-6xl font-semibold leading-none tracking-tight text-ink lg:text-7xl dark:text-paper"
                 id="about-partners-heading"
               >
                 Partners
               </h2>
-              <p className="mt-5 font-serif text-lg italic text-navy/60 dark:text-wheat/60">
+              <p className="mt-5 font-serif text-lg italic text-ink/60 dark:text-paper/60">
                 and the teams building alongside us
               </p>
             </div>

@@ -28,9 +28,10 @@ const sectionLinkClassName =
 const sectionHeadingClassName =
   "text-2xl font-medium leading-[1.1] tracking-[-0.045em] text-ink sm:text-3xl lg:text-4xl";
 
-/* Shared interior padding for the sheet's text panels, so every rule-to-text
-   distance matches across sections. */
-const panelPaddingClassName = "px-6 py-12 sm:px-10 sm:py-16";
+/* Universal vertical rhythm for every landing section below the hero — one
+   generous band of padding per section (2.33×/2.25× the old py-12/sm:py-16),
+   so whitespace alone separates them. */
+const sectionPaddingClassName = "px-6 py-32 sm:px-10 sm:py-40";
 
 export default function Home() {
   // Signed-in visitors are redirected into the app by the middleware, keeping
@@ -55,7 +56,7 @@ export default function Home() {
             className="scroll-mt-24"
           >
             <div className="relative overflow-hidden">
-              <div className={`relative ${panelPaddingClassName}`}>
+              <div className={`relative ${sectionPaddingClassName}`}>
                 {/* One running sentence, bold lead then muted continuation —
                     the whole pitch in a single breath. */}
                 <h2
@@ -134,40 +135,44 @@ export default function Home() {
           <section
             aria-labelledby="pipeline-spotlight-heading">
             <div className="relative overflow-hidden">
-              <div
-                className={`relative grid gap-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20 ${panelPaddingClassName}`}
-              >
-                <h2
-                  id="pipeline-spotlight-heading"
-                  className={`max-w-[22rem] ${sectionHeadingClassName}`}
-                >
-                  Get reminders and keep track of them all
-                </h2>
-                <div>
-                  <p className="max-w-[32rem] text-base leading-relaxed text-ink/60 sm:text-lg">
-                    Choose email reminders that land a week before applications
-                    open, a day before they open, and a day before the hackathon
-                    starts. Then follow the status of every hackathon
-                    you&apos;ve applied to (interested, applied, accepted) on
-                    one board.
-                  </p>
-                  <LoginRequiredLink href="/my" className={sectionLinkClassName} forcePrompt>
-                    1.0
-                    <span>
-                      Track{" "}
-                      <span aria-hidden="true" className="ml-1">
-                        →
-                      </span>
-                    </span>
-                    <HoverUnderline className="inset-x-0 bottom-1" />
-                  </LoginRequiredLink>
-                </div>
-              </div>
-            </div>
+              <div className={`relative ${sectionPaddingClassName}`}>
+                {/* A true miniature of the section: w-[85%] under zoom 0.85
+                    makes the inner layout compute at the original full width
+                    (identical proportions), then render at 85% size, centered,
+                    with the freed space joining the padding around it. */}
+                <div className="mx-auto w-[85%] [zoom:0.85]">
+                  <div className="relative grid gap-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
+                    <h2
+                      id="pipeline-spotlight-heading"
+                      className={`max-w-[22rem] ${sectionHeadingClassName}`}
+                    >
+                      Get reminders and keep track of them all
+                    </h2>
+                    <div>
+                      <p className="max-w-[32rem] text-base leading-relaxed text-ink/60 sm:text-lg">
+                        Choose email reminders that land a week before
+                        applications open, a day before they open, and a day
+                        before the hackathon starts. Then follow the status of
+                        every hackathon you&apos;ve applied to (interested,
+                        applied, accepted) on one board.
+                      </p>
+                      <LoginRequiredLink href="/my" className={sectionLinkClassName} forcePrompt>
+                        1.0
+                        <span>
+                          Track{" "}
+                          <span aria-hidden="true" className="ml-1">
+                            →
+                          </span>
+                        </span>
+                        <HoverUnderline className="inset-x-0 bottom-1" />
+                      </LoginRequiredLink>
+                    </div>
+                  </div>
 
-            <div className="relative overflow-hidden">
-              <div className="relative px-6 py-10 sm:px-10 sm:py-14">
-                <LazyPipelineSpotlight />
+                  <div className="relative pt-10 sm:pt-14">
+                    <LazyPipelineSpotlight />
+                  </div>
+                </div>
               </div>
             </div>
           </section>

@@ -142,7 +142,7 @@ export function CityCombobox({
       <input name="countryCode" type="hidden" value={selected?.countryCode ?? ""} />
       {open ? (
         <ul
-          className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-72 overflow-y-auto rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] py-1 shadow-[0_18px_45px_rgba(0,0,0,0.18)]"
+          className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 max-h-72 overflow-y-auto rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] py-1 shadow-[0_18px_45px_rgba(0,0,0,0.18)]"
           id={listboxId}
           role="listbox"
         >
@@ -150,14 +150,14 @@ export function CityCombobox({
             <li key={city.id} role="option" aria-selected={index === highlighted}>
               <button
                 className={`flex w-full flex-col px-4 py-2.5 text-left transition-colors ${
-                  index === highlighted ? "bg-ivory dark:bg-white/10" : "hover:bg-ivory dark:hover:bg-white/10"
+                  index === highlighted ? "bg-paper dark:bg-white/10" : "hover:bg-paper dark:hover:bg-white/10"
                 }`}
                 onClick={() => pick(city)}
                 onMouseEnter={() => setHighlighted(index)}
                 type="button"
               >
-                <span className="text-sm font-semibold text-navy dark:text-wheat">{city.name}</span>
-                <span className="text-xs text-navy/55 dark:text-wheat/55">
+                <span className="text-sm font-semibold text-ink dark:text-paper">{city.name}</span>
+                <span className="text-xs text-ink/55 dark:text-paper/55">
                   {[city.region, city.country].filter(Boolean).join(", ")}
                 </span>
               </button>

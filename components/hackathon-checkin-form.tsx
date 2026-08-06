@@ -59,21 +59,21 @@ export function HackathonCheckinForm({ hackathonId }: { hackathonId: string }) {
           <input
             aria-label="Check-in code"
             autoFocus
-            className="h-9 w-36 rounded-xl border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 font-mono text-sm uppercase tracking-widest text-navy dark:text-wheat outline-none focus:border-pine"
+            className="h-9 w-36 rounded-xl border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 font-mono text-sm uppercase tracking-widest text-ink dark:text-paper outline-none focus:border-pine"
             maxLength={20}
             onChange={(event) => setCode(event.target.value.toUpperCase())}
             placeholder="CODE"
             value={code}
           />
           <button
-            className="h-9 rounded-xl bg-pine px-3 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition hover:bg-pine/90 disabled:opacity-50"
+            className="h-9 rounded-xl bg-pine px-3 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white transition hover:bg-pine/90 disabled:opacity-50"
             disabled={pending || !code.trim()}
             type="submit"
           >
             {pending ? "Checking…" : "Check in"}
           </button>
           <button
-            className="h-9 px-2 text-sm text-navy/55 dark:text-wheat/55 hover:text-navy dark:hover:text-wheat"
+            className="h-9 px-2 text-sm text-ink/55 dark:text-paper/55 hover:text-ink dark:hover:text-paper"
             onClick={() => {
               setOpen(false);
               setFeedback(null);

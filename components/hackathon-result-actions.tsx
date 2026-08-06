@@ -14,15 +14,15 @@ function handleUnauthenticated() {
 const buttonClassName =
   "inline-flex rounded-full min-h-8 items-center gap-1.5 border px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] transition-colors disabled:cursor-wait disabled:opacity-60";
 
-const outlineButtonClassName = `${buttonClassName} border-pine/40 bg-white dark:bg-white/[0.06] text-pine dark:text-moss hover:bg-pine hover:text-wheat`;
+const outlineButtonClassName = `${buttonClassName} border-pine/40 bg-white dark:bg-white/[0.06] text-pine dark:text-moss hover:bg-pine hover:text-paper`;
 
-const inputClassName = "h-8 border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-navy dark:text-wheat outline-none focus:border-pine";
+const inputClassName = "h-8 border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-ink dark:text-paper outline-none focus:border-pine";
 
 const submitButtonClassName =
-  "inline-flex rounded-full min-h-8 items-center bg-pine px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition hover:bg-pine/90 disabled:opacity-50";
+  "inline-flex rounded-full min-h-8 items-center bg-pine px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white transition hover:bg-pine/90 disabled:opacity-50";
 
 const cancelButtonClassName =
-  "min-h-8 px-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-navy/55 dark:text-wheat/55 hover:text-navy dark:hover:text-wheat";
+  "min-h-8 px-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/55 dark:text-paper/55 hover:text-ink dark:hover:text-paper";
 
 async function patchUserHackathon(userHackathonId: string, body: Record<string, unknown>) {
   const response = await fetch(`/api/user-hackathons/${encodeURIComponent(userHackathonId)}`, {
@@ -154,8 +154,8 @@ export function HackathonResultActions({
           aria-pressed={pinned}
           className={`${buttonClassName} ${
             pinned
-              ? "border-pine dark:border-moss/50 bg-pine text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white hover:bg-pine/90"
-              : "border-pine/40 bg-white dark:bg-white/[0.06] text-pine dark:text-moss hover:bg-pine hover:text-wheat"
+              ? "border-pine dark:border-moss/50 bg-pine text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white hover:bg-pine/90"
+              : "border-pine/40 bg-white dark:bg-white/[0.06] text-pine dark:text-moss hover:bg-pine hover:text-paper"
           }`}
           disabled={pending === "pin"}
           onClick={togglePinned}
@@ -229,7 +229,7 @@ export function HackathonResultActions({
             Cancel
           </button>
           {devpostUrl ? (
-            <span className="text-xs text-navy/55 dark:text-wheat/55">Clear the field and save to remove the link.</span>
+            <span className="text-xs text-ink/55 dark:text-paper/55">Clear the field and save to remove the link.</span>
           ) : null}
         </form>
       ) : null}

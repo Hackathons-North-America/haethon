@@ -15,7 +15,7 @@ export type YearActivity = {
 
 export type LatestAttended = { name: string; dateLabel: string } | null;
 
-const sectionTitleClassName = "font-serif text-4xl font-semibold tracking-[-0.035em] text-navy dark:text-wheat sm:text-5xl";
+const sectionTitleClassName = "font-serif text-4xl font-semibold tracking-[-0.035em] text-ink dark:text-paper sm:text-5xl";
 
 function formatChartDate(value: string | undefined) {
   if (!value) {
@@ -58,8 +58,8 @@ export function ProfileActivity({
             <button
               className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors ${
                 year.year === active.year
-                  ? "bg-pine text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
-                  : "bg-white dark:bg-white/[0.06] text-navy/55 dark:text-wheat/55 hover:text-navy dark:hover:text-wheat"
+                  ? "bg-pine text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white"
+                  : "bg-white dark:bg-white/[0.06] text-ink/55 dark:text-paper/55 hover:text-ink dark:hover:text-paper"
               }`}
               key={year.year}
               onClick={() => setSelectedYear(year.year)}
@@ -71,7 +71,7 @@ export function ProfileActivity({
         </div>
       </div>
 
-      <p className="mt-4 text-sm font-semibold text-navy dark:text-wheat">
+      <p className="mt-4 text-sm font-semibold text-ink dark:text-paper">
         {active.hackathonsAttended} hackathon{active.hackathonsAttended === 1 ? "" : "s"} attended in {active.year}, {active.wins} win{active.wins === 1 ? "" : "s"} in {active.year}
       </p>
       <div className="mt-3 overflow-x-auto">
@@ -82,23 +82,23 @@ export function ProfileActivity({
           {weeks.map((week) => (
             <div
               className={`h-8 rounded-[4px] ${
-                week.count > 2 ? "bg-pine dark:bg-moss" : week.count > 0 ? "bg-pine/60 dark:bg-moss/60" : "bg-navy/10 dark:bg-white/10"
+                week.count > 2 ? "bg-pine dark:bg-moss" : week.count > 0 ? "bg-pine/60 dark:bg-moss/60" : "bg-ink/10 dark:bg-white/10"
               }`}
               key={week.key}
               title={`Week of ${week.key}: ${week.count} attended hackathon day${week.count === 1 ? "" : "s"}`}
             />
           ))}
         </div>
-        <div className="mt-2 grid grid-cols-3 text-xs text-navy/55 dark:text-wheat/55" style={{ minWidth: `${minWidth}px` }}>
+        <div className="mt-2 grid grid-cols-3 text-xs text-ink/55 dark:text-paper/55" style={{ minWidth: `${minWidth}px` }}>
           {chartLabels.map((label) => (
             <span className={label.className} key={label.className}>
               {label.text}
             </span>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-end gap-2 text-xs text-navy/55 dark:text-wheat/55">
+        <div className="mt-3 flex items-center justify-end gap-2 text-xs text-ink/55 dark:text-paper/55">
           <span>Less</span>
-          <span className="size-3 rounded-[3px] bg-navy/10 dark:bg-white/10" />
+          <span className="size-3 rounded-[3px] bg-ink/10 dark:bg-white/10" />
           <span className="size-3 rounded-[3px] bg-pine/60 dark:bg-moss/60" />
           <span className="size-3 rounded-[3px] bg-pine dark:bg-moss" />
           <span>More</span>
@@ -106,11 +106,11 @@ export function ProfileActivity({
       </div>
 
       {latestAttended ? (
-        <div className="mt-2 flex items-center gap-2 text-sm text-navy/55 dark:text-wheat/55">
+        <div className="mt-2 flex items-center gap-2 text-sm text-ink/55 dark:text-paper/55">
           <CalendarDays aria-hidden="true" className="size-4 shrink-0 text-pine dark:text-moss" />
           <span>
             Latest attended:{" "}
-            <span className="font-semibold text-navy dark:text-wheat">{latestAttended.name}</span>
+            <span className="font-semibold text-ink dark:text-paper">{latestAttended.name}</span>
             {latestAttended.dateLabel ? ` · ${latestAttended.dateLabel}` : ""}
           </span>
         </div>

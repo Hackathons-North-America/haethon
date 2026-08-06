@@ -8,9 +8,9 @@ import { LandingReveal } from "@/components/landing-reveal";
 /* The landing hero, split like a magazine spread: copy on a finely grained
    espresso panel at left — the Federato reference's ground, with its green
    swapped for the site's pine on the CTA — and at right a plain paper field
-   where a corner of the app itself pokes in: a browser window cropped by the
-   viewport's right and bottom edges, holding the giant animated card. Moss
-   hairlines rule off the panels the way the reference's drafting lines do. */
+   carrying the stepped product demo: the Track/Reminders/Face-off pills up
+   top and the animated scene beneath them. Moss hairlines rule off the
+   panels the way the reference's drafting lines do. */
 
 /* The hackathon cards' streak grain, verbatim (see `STREAK_NOISE_URI` in
    hackathon-card.tsx): desaturated feTurbulence pushed to near-binary contrast
@@ -91,10 +91,10 @@ export function HeroSplit() {
             {/* Reference metrics: 1.495vw (19.1px at 1280), 1.3 leading, light
                 weight, same cream as the headline, and a 3.68vw (47px) gap up
                 to it. The paragraph runs the full column width. */}
-            <p className="mt-[clamp(1.75rem,3.68vw,3.5rem)] text-[clamp(1rem,1.495vw,1.625rem)] font-light leading-[1.3] text-paper">
-              The only platform that spans the full hackathon lifecycle —
-              search every event, track your applications, and never miss a
-              deadline.
+            <p className="mt-[clamp(1.75rem,3.68vw,3.5rem)] text-[clamp(1.0625rem,1.62vw,1.75rem)] font-light leading-[1.3] text-paper">
+              The most comprehensive hackathon list anywhere — follow your
+              applications on one board, with email reminders so you never
+              miss a deadline.
             </p>
           </LandingReveal>
 
@@ -112,12 +112,11 @@ export function HeroSplit() {
         </div>
       </div>
 
-      {/* ————— Right: the app itself, filling the panel edge to edge. The
-          browser window is inset only far enough to clear the fixed nav bar;
-          past that it runs flush off the left, right, and bottom edges, so the
-          hero's right half *is* the product. ————— */}
+      {/* ————— Right: the stepped product demo — the step pills across the
+          top, Federato-style, with the animated scene playing out beneath
+          whichever pill is lit. ————— */}
       {/* The top inset only exists at lg, where the panel's top edge sits
-          under the fixed nav; stacked below lg the window starts flush against
+          under the fixed nav; stacked below lg the demo starts flush against
           the copy panel. */}
       <div className="relative flex min-h-[40rem] flex-col overflow-hidden bg-paper sm:min-h-[46rem] lg:min-h-full lg:border-l lg:border-moss lg:pt-[4.25rem]">
         <LandingReveal className="flex w-full flex-1 flex-col" delay={0.45}>

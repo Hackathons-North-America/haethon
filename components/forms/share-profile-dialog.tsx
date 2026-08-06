@@ -7,7 +7,7 @@ import { profileShareUrl } from "@/lib/profile/username";
 
 const headingClassName = "text-sm font-semibold uppercase tracking-[0.2em] text-pine";
 const primaryButtonClassName =
-  "inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-wheat transition hover:bg-pine/90 disabled:opacity-60 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white";
+  "inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper transition hover:bg-pine/90 disabled:opacity-60 dark:bg-paper dark:text-[#141414] dark:hover:bg-white";
 
 export function ShareProfileDialog({ username }: { username: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -87,28 +87,28 @@ export function ShareProfileDialog({ username }: { username: string }) {
               }
             }}
           >
-            <div className="flex max-h-full w-full max-w-xl flex-col rounded-xl border border-navy/10 bg-white text-left shadow-2xl dark:border-white/10 dark:bg-[#1b1b1b]">
+            <div className="flex max-h-full w-full max-w-xl flex-col rounded-xl border border-ink/10 bg-white text-left shadow-2xl dark:border-white/10 dark:bg-[#1b1b1b]">
               <div className="flex shrink-0 items-center justify-between gap-3 px-6 pb-4 pt-6">
                 <h2 className={headingClassName}>Share profile</h2>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
                   aria-label="Close"
-                  className="inline-flex size-8 items-center justify-center rounded-xl text-navy/55 transition hover:bg-navy/5 hover:text-navy dark:text-wheat/55 dark:hover:bg-white/10 dark:hover:text-wheat"
+                  className="inline-flex size-8 items-center justify-center rounded-xl text-ink/55 transition hover:bg-ink/5 hover:text-ink dark:text-paper/55 dark:hover:bg-white/10 dark:hover:text-paper"
                 >
                   <X aria-hidden="true" className="size-4" />
                 </button>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-                <p className="text-sm text-navy/65 dark:text-wheat/65">
+                <p className="text-sm text-ink/65 dark:text-paper/65">
                   Anyone can view your public profile without signing in. It shows your name, school, bio, socials,
                   skills, pinned events, activity, and hackathons attended. Your email address and account settings are
                   never included.
                 </p>
 
-                <div className="mt-4 flex items-stretch overflow-hidden rounded-xl border border-navy/15 bg-ivory dark:border-white/15 dark:bg-white/5">
-                  <span aria-hidden="true" className="flex select-none items-center pl-3 text-navy/45 dark:text-wheat/45">
+                <div className="mt-4 flex items-stretch overflow-hidden rounded-xl border border-ink/15 bg-paper dark:border-white/15 dark:bg-white/5">
+                  <span aria-hidden="true" className="flex select-none items-center pl-3 text-ink/45 dark:text-paper/45">
                     <Link2 className="size-4" />
                   </span>
                   <input
@@ -127,7 +127,7 @@ export function ShareProfileDialog({ username }: { username: string }) {
                   </button>
                 </div>
 
-                <p className="mt-4 text-xs text-navy/50 dark:text-wheat/50">
+                <p className="mt-4 text-xs text-ink/50 dark:text-paper/50">
                   This link is based on your username and stays the same.
                 </p>
               </div>

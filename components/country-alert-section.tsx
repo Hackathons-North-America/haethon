@@ -147,15 +147,15 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
   return (
     <section aria-label="Country alerts" className="relative z-30 mb-10">
       <div
-        className="relative flex flex-col gap-2 rounded-[2.35rem] border border-navy/10 p-2 dark:border-white/10 md:flex-row md:items-center"
+        className="relative flex flex-col gap-2 rounded-[2.35rem] border border-ink/10 p-2 dark:border-white/10 md:flex-row md:items-center"
         ref={rootRef}
       >
         <div className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-center rounded-[2rem] px-6 py-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-navy dark:text-wheat">
+          <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink dark:text-paper">
             <Globe2 aria-hidden="true" className="size-3.5" />
             Country Alerts
           </span>
-          <span className="mt-1 text-sm leading-5 text-navy/55 dark:text-wheat/55">
+          <span className="mt-1 text-sm leading-5 text-ink/55 dark:text-paper/55">
             {saved
               ? `New hackathons in ${saved.country} land in your Monday digest email`
               : "New hackathons in a country you pick, in one weekly digest email."}
@@ -166,7 +166,7 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
           {saved ? (
             <button
               aria-label="Remove country alert"
-              className="grid size-10 place-items-center rounded-full text-navy/55 transition-colors hover:bg-navy/[0.05] hover:text-navy dark:text-wheat/55 dark:hover:bg-white/5 dark:hover:text-wheat focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
+              className="grid size-10 place-items-center rounded-full text-ink/55 transition-colors hover:bg-ink/[0.05] hover:text-ink dark:text-paper/55 dark:hover:bg-white/5 dark:hover:text-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
               disabled={pending}
               onClick={remove}
               type="button"
@@ -176,10 +176,10 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
           ) : null}
           <button
             aria-expanded={open}
-            className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+            className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
               open
-                ? "border-pine bg-pine text-wheat dark:border-moss/50 dark:bg-moss/15 dark:text-moss"
-                : "border-pine text-pine hover:bg-pine hover:text-wheat dark:border-moss/50 dark:text-moss dark:hover:bg-moss/10"
+                ? "border-pine bg-pine text-paper dark:border-moss/50 dark:bg-moss/15 dark:text-moss"
+                : "border-pine text-pine hover:bg-pine hover:text-paper dark:border-moss/50 dark:text-moss dark:hover:bg-moss/10"
             }`}
             onClick={toggleOpen}
             type="button"
@@ -191,12 +191,12 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
         </div>
 
         {open ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+0.9rem)] z-50 overflow-hidden rounded-[1.75rem] border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:left-auto md:right-0 md:w-[34rem]">
-            <div className="flex items-center gap-2 rounded-full border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-4 py-3">
-              <Search aria-hidden="true" className="size-4 text-navy/55 dark:text-wheat/55" />
+          <div className="absolute left-0 right-0 top-[calc(100%+0.9rem)] z-50 overflow-hidden rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:left-auto md:right-0 md:w-[34rem]">
+            <div className="flex items-center gap-2 rounded-full border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-4 py-3">
+              <Search aria-hidden="true" className="size-4 text-ink/55 dark:text-paper/55" />
               <input
                 aria-label="Search countries"
-                className="min-w-0 flex-1 bg-transparent text-sm leading-5 text-navy dark:text-wheat outline-none placeholder:text-navy/55 dark:placeholder:text-wheat/40"
+                className="min-w-0 flex-1 bg-transparent text-sm leading-5 text-ink dark:text-paper outline-none placeholder:text-ink/55 dark:placeholder:text-paper/40"
                 onChange={(event) => setCountryQuery(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && filteredCountries[0]) {
@@ -218,23 +218,23 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
                 return (
                   <button
                     aria-selected={selected}
-                    className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40 ${
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
                       selected
                         ? "border-pine/35 dark:border-moss/40 bg-pine/5 dark:bg-moss/10"
-                        : "border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] hover:border-navy/20 hover:bg-ivory dark:hover:bg-white/10"
+                        : "border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] hover:border-ink/20 hover:bg-paper dark:hover:bg-white/10"
                     }`}
                     key={country}
                     onClick={() => setDraftCountry(country)}
                     role="option"
                     type="button"
                   >
-                    <span className="block truncate text-sm font-semibold text-navy dark:text-wheat">{country}</span>
+                    <span className="block truncate text-sm font-semibold text-ink dark:text-paper">{country}</span>
                     <span
                       aria-hidden="true"
                       className={`grid size-6 shrink-0 place-items-center rounded-full border ${
                         selected
-                          ? "border-pine dark:border-moss/50 bg-pine text-wheat dark:bg-wheat dark:text-[#141414]"
-                          : "border-navy/15 dark:border-white/15 text-transparent"
+                          ? "border-pine dark:border-moss/50 bg-pine text-paper dark:bg-paper dark:text-[#141414]"
+                          : "border-ink/15 dark:border-white/15 text-transparent"
                       }`}
                     >
                       <Check className="size-3.5" strokeWidth={3} />
@@ -243,18 +243,18 @@ export function CountryAlertSection({ subscription }: { subscription: CountryAle
                 );
               })}
               {!filteredCountries.length ? (
-                <div className="col-span-full rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-4 py-5 text-sm font-semibold text-navy/55 dark:text-wheat/55">
+                <div className="col-span-full rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-4 py-5 text-sm font-semibold text-ink/55 dark:text-paper/55">
                   No countries match that search.
                 </div>
               ) : null}
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="text-xs text-navy/55 dark:text-wheat/55">
+              <p className="text-xs text-ink/55 dark:text-paper/55">
                 {error ?? "One alert per account, delivered in your Monday digest — saving replaces your current one."}
               </p>
               <button
-                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-wheat transition-opacity disabled:opacity-50 dark:bg-wheat dark:text-[#141414] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-wheat/40"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-paper transition-opacity disabled:opacity-50 dark:bg-paper dark:text-[#141414] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
                 disabled={!draftCountry || pending}
                 onClick={save}
                 type="button"

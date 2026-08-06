@@ -43,16 +43,16 @@ export function PastHackathonCard({
   const attended = status === "attended";
 
   return (
-    <article className="group rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 p-5">
+    <article className="group rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link
-            className="text-lg font-semibold text-navy dark:text-wheat underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
+            className="text-lg font-semibold text-ink dark:text-paper underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
             href={`/hackathons/${slug}`}
           >
             {hackathonName}
           </Link>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-navy/55 dark:text-wheat/55">
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink/55 dark:text-paper/55">
             <span className="inline-flex items-center gap-1">
               <CalendarDays aria-hidden="true" className="size-3.5 shrink-0" />
               {dateRange}
@@ -65,12 +65,12 @@ export function PastHackathonCard({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {won ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-pine px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pine px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white">
               <Trophy aria-hidden="true" className="size-3.5" />
               Winner
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-navy/55 dark:text-wheat/55">
+            <span className="inline-flex items-center rounded-full border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/55 dark:text-paper/55">
               {attended ? "Attended" : "Ended"}
             </span>
           )}
@@ -99,7 +99,7 @@ export function PastHackathonCard({
           ) : null}
           {devpostUrl ? (
             <a
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-navy dark:text-wheat underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-ink dark:text-paper underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
               href={devpostUrl}
               rel="noreferrer"
               target="_blank"
@@ -111,7 +111,7 @@ export function PastHackathonCard({
         </div>
       ) : null}
 
-      <div className="mt-4 border-t border-navy/10 dark:border-white/10 pt-4">
+      <div className="mt-4 border-t border-ink/10 dark:border-white/10 pt-4">
         {won || attended ? (
           <HackathonResultActions
             awardName={awardName}

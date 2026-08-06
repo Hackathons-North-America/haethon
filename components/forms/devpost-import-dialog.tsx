@@ -42,10 +42,10 @@ type ImportSummary = {
 
 const headingClassName = "text-sm font-semibold uppercase tracking-[0.2em] text-pine";
 const primaryButtonClassName =
-  "inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-wheat transition hover:bg-pine/90 disabled:opacity-60 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white";
+  "inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper transition hover:bg-pine/90 disabled:opacity-60 dark:bg-paper dark:text-[#141414] dark:hover:bg-white";
 const secondaryButtonClassName =
-  "inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/15 px-4 text-sm font-semibold text-navy transition hover:bg-navy/5 disabled:opacity-60 dark:border-white/15 dark:text-wheat dark:hover:bg-white/10";
-const mutedTextClassName = "text-sm text-navy/65 dark:text-wheat/65";
+  "inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink transition hover:bg-ink/5 disabled:opacity-60 dark:border-white/15 dark:text-paper dark:hover:bg-white/10";
+const mutedTextClassName = "text-sm text-ink/65 dark:text-paper/65";
 
 async function postJson<T>(url: string, body?: unknown): Promise<{ data?: T; error?: string }> {
   const response = await fetch(url, {
@@ -321,7 +321,7 @@ export function DevpostImportDialog({
               }
             }}
           >
-            <div className="flex max-h-full w-full max-w-xl flex-col rounded-xl border border-navy/10 bg-white text-left shadow-2xl dark:border-white/10 dark:bg-[#1b1b1b]">
+            <div className="flex max-h-full w-full max-w-xl flex-col rounded-xl border border-ink/10 bg-white text-left shadow-2xl dark:border-white/10 dark:bg-[#1b1b1b]">
               <div className="flex shrink-0 items-center justify-between gap-3 px-6 pb-4 pt-6">
                 <h2 className={headingClassName}>Import from Devpost</h2>
                 <button
@@ -331,7 +331,7 @@ export function DevpostImportDialog({
                     setPendingHandle(null);
                   }}
                   aria-label="Close"
-                  className="inline-flex size-8 items-center justify-center rounded-xl text-navy/55 transition hover:bg-navy/5 hover:text-navy dark:text-wheat/55 dark:hover:bg-white/10 dark:hover:text-wheat"
+                  className="inline-flex size-8 items-center justify-center rounded-xl text-ink/55 transition hover:bg-ink/5 hover:text-ink dark:text-paper/55 dark:hover:bg-white/10 dark:hover:text-paper"
                 >
                   <X aria-hidden="true" className="size-4" />
                 </button>
@@ -347,10 +347,10 @@ export function DevpostImportDialog({
                       <label className="mb-1.5 block text-sm font-semibold text-ink" htmlFor="devpost-import-handle">
                         Devpost profile
                       </label>
-                      <div className="flex items-stretch overflow-hidden rounded-xl border border-navy/15 bg-ivory transition focus-within:border-pine dark:border-white/15 dark:bg-white/5">
+                      <div className="flex items-stretch overflow-hidden rounded-xl border border-ink/15 bg-paper transition focus-within:border-pine dark:border-white/15 dark:bg-white/5">
                         <span
                           aria-hidden="true"
-                          className="flex select-none items-center border-r border-navy/10 px-3 text-sm text-navy/55 dark:border-white/10 dark:text-wheat/55"
+                          className="flex select-none items-center border-r border-ink/10 px-3 text-sm text-ink/55 dark:border-white/10 dark:text-paper/55"
                         >
                           devpost.com/
                         </span>
@@ -399,13 +399,13 @@ export function DevpostImportDialog({
                       . Your activity and attended list are updated below.
                     </p>
                     {summary.warnings.length > 0 ? (
-                      <ul className="mt-3 space-y-1 text-xs text-navy/55 dark:text-wheat/55">
+                      <ul className="mt-3 space-y-1 text-xs text-ink/55 dark:text-paper/55">
                         {summary.warnings.map((warning) => (
                           <li key={warning}>{warning}</li>
                         ))}
                       </ul>
                     ) : null}
-                    <p className="mt-4 text-xs text-navy/50 dark:text-wheat/50">
+                    <p className="mt-4 text-xs text-ink/50 dark:text-paper/50">
                       You can now remove the verification code from your Devpost bio. Run another import any time to pick
                       up new projects.
                     </p>
@@ -428,7 +428,7 @@ export function DevpostImportDialog({
                       First, prove that <span className="font-semibold">devpost.com/{handle}</span> is your
                       profile so nobody can import someone else&apos;s wins:
                     </p>
-                    <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-navy/65 dark:text-wheat/65">
+                    <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink/65 dark:text-paper/65">
                       <li>Copy your one-time code below.</li>
                       <li>
                         Paste it anywhere in the <span className="font-semibold">bio</span> of your Devpost profile
@@ -438,7 +438,7 @@ export function DevpostImportDialog({
                     </ol>
 
                     {code ? (
-                      <div className="mt-4 flex items-stretch overflow-hidden rounded-xl border border-navy/15 bg-ivory dark:border-white/15 dark:bg-white/5">
+                      <div className="mt-4 flex items-stretch overflow-hidden rounded-xl border border-ink/15 bg-paper dark:border-white/15 dark:bg-white/5">
                         <input
                           readOnly
                           value={code}
@@ -450,7 +450,7 @@ export function DevpostImportDialog({
                           type="button"
                           onClick={copyCode}
                           aria-label="Copy code"
-                          className="flex items-center px-3 text-navy/55 transition hover:text-navy dark:text-wheat/55 dark:hover:text-wheat"
+                          className="flex items-center px-3 text-ink/55 transition hover:text-ink dark:text-paper/55 dark:hover:text-paper"
                         >
                           {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
                         </button>
@@ -504,7 +504,7 @@ export function DevpostImportDialog({
                       </button>
                     </div>
                     {working === "scan" ? (
-                      <p className="mt-3 text-xs text-navy/50 dark:text-wheat/50">
+                      <p className="mt-3 text-xs text-ink/50 dark:text-paper/50">
                         Reading each project page — this can take up to half a minute.
                       </p>
                     ) : null}
@@ -525,7 +525,7 @@ export function DevpostImportDialog({
 
                         return (
                           <li key={item.id}>
-                            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-navy/10 px-3 py-2.5 transition hover:bg-navy/[0.03] dark:border-white/10 dark:hover:bg-white/5">
+                            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-ink/10 px-3 py-2.5 transition hover:bg-ink/[0.03] dark:border-white/10 dark:hover:bg-white/5">
                               <input
                                 type="checkbox"
                                 checked={selected.has(item.id)}
@@ -536,13 +536,13 @@ export function DevpostImportDialog({
                                 <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
                                   {item.hackathonName}
                                   {item.isWin ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-pine/10 px-2 py-0.5 text-xs font-semibold text-pine dark:bg-wheat/10 dark:text-wheat">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-pine/10 px-2 py-0.5 text-xs font-semibold text-pine dark:bg-paper/10 dark:text-paper">
                                       <Trophy aria-hidden="true" className="size-3" />
                                       {item.awards[0] ?? "Winner"}
                                     </span>
                                   ) : null}
                                 </span>
-                                <span className="mt-0.5 block text-xs text-navy/55 dark:text-wheat/55">
+                                <span className="mt-0.5 block text-xs text-ink/55 dark:text-paper/55">
                                   {item.projectTitle}
                                   {dateLabel ? ` · ${dateLabel}` : ""}
                                   {item.alreadyTracked

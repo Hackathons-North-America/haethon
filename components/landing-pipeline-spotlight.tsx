@@ -205,12 +205,12 @@ function BackdropBoard() {
     <div
       aria-hidden="true"
       inert
-      className="pointer-events-none hidden select-none overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white/45 p-6 [mask-image:linear-gradient(to_bottom,black_45%,transparent_97%)] md:block lg:p-8"
+      className="pointer-events-none hidden select-none overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white/60 p-6 [mask-image:linear-gradient(to_bottom,black_72%,transparent_100%)] md:block lg:p-8"
     >
-      <div className="flex items-start gap-5 opacity-80">
+      <div className="flex items-start gap-5">
         {backdropColumns.map((column) => (
           <section
-            className="w-[320px] shrink-0 rounded-2xl border border-ink/10 bg-white/55 p-3"
+            className="w-[320px] shrink-0 rounded-2xl border border-ink/10 bg-white/75 p-3"
             key={column.title}
           >
             <div className="flex items-center gap-2 px-1 py-1">

@@ -36,13 +36,13 @@ function StatusCell({ tier, isWinner }: { tier: AttendanceTrustTier | null; isWi
 
   if (tier === "self_reported") {
     return (
-      <span className="rounded-full border border-navy/10 dark:border-white/10 px-2 py-0.5 text-xs font-semibold text-navy/55 dark:text-wheat/55">
+      <span className="rounded-full border border-ink/10 dark:border-white/10 px-2 py-0.5 text-xs font-semibold text-ink/55 dark:text-paper/55">
         Self reported
       </span>
     );
   }
 
-  return <span className="text-sm text-navy/40 dark:text-wheat/40">-</span>;
+  return <span className="text-sm text-ink/40 dark:text-paper/40">-</span>;
 }
 
 // Column headers mirror the Notion database layout: a muted label preceded by a
@@ -67,16 +67,16 @@ export function AttendedHackathonsTable({
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (!rows.length) {
-    return <p className="text-sm text-navy/55 dark:text-wheat/55">{emptyText}</p>;
+    return <p className="text-sm text-ink/55 dark:text-paper/55">{emptyText}</p>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse text-left">
         <thead>
-          <tr className="border-b border-navy/10 dark:border-white/10">
+          <tr className="border-b border-ink/10 dark:border-white/10">
             {columns.map((column) => (
-              <th className="py-2 pr-4 text-sm font-normal text-navy/50 dark:text-wheat/50" key={column.label} scope="col">
+              <th className="py-2 pr-4 text-sm font-normal text-ink/50 dark:text-paper/50" key={column.label} scope="col">
                 <span className="flex items-center gap-1.5">
                   <column.icon aria-hidden="true" className="size-3.5" />
                   {column.label}
@@ -95,17 +95,17 @@ export function AttendedHackathonsTable({
             return (
               <Fragment key={row.id}>
                 <tr
-                  className={`border-b border-navy/[0.06] dark:border-white/[0.06] ${
-                    expandable ? "cursor-pointer hover:bg-navy/[0.03] dark:hover:bg-white/[0.03]" : ""
+                  className={`border-b border-ink/[0.06] dark:border-white/[0.06] ${
+                    expandable ? "cursor-pointer hover:bg-ink/[0.03] dark:hover:bg-white/[0.03]" : ""
                   }`}
                   onClick={expandable ? () => setExpandedId(isOpen ? null : row.id) : undefined}
                 >
                   <td className="py-3 pr-4">
-                    <span className="flex items-center gap-2 font-semibold text-navy dark:text-wheat">
+                    <span className="flex items-center gap-2 font-semibold text-ink dark:text-paper">
                       {expandable ? (
                         <ChevronRight
                           aria-hidden="true"
-                          className={`size-3.5 shrink-0 text-navy/40 dark:text-wheat/40 transition-transform ${
+                          className={`size-3.5 shrink-0 text-ink/40 dark:text-paper/40 transition-transform ${
                             isOpen ? "rotate-90" : ""
                           }`}
                         />
@@ -115,14 +115,14 @@ export function AttendedHackathonsTable({
                       {row.name}
                     </span>
                   </td>
-                  <td className="py-3 pr-4 text-sm text-navy/60 dark:text-wheat/60">{row.date ?? "-"}</td>
-                  <td className="py-3 pr-4 text-sm text-navy/60 dark:text-wheat/60">{row.location}</td>
+                  <td className="py-3 pr-4 text-sm text-ink/60 dark:text-paper/60">{row.date ?? "-"}</td>
+                  <td className="py-3 pr-4 text-sm text-ink/60 dark:text-paper/60">{row.location}</td>
                   <td className="py-3">
                     <StatusCell isWinner={row.isWinner} tier={row.tier} />
                   </td>
                 </tr>
                 {expandable && isOpen ? (
-                  <tr className="border-b border-navy/[0.06] dark:border-white/[0.06]">
+                  <tr className="border-b border-ink/[0.06] dark:border-white/[0.06]">
                     <td className="pb-4" colSpan={columns.length}>
                       <HackathonCheckinForm hackathonId={row.id} />
                     </td>

@@ -9,10 +9,10 @@ import { HackathonCard } from "@/components/hackathon-card";
 import { useUploadThing } from "@/lib/uploadthing";
 
 const inputClassName =
-  "w-full rounded-xl border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-navy dark:text-wheat outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
+  "w-full rounded-xl border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-ink dark:text-paper outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
 const checkboxClassName =
-  "size-4 rounded border-navy/20 dark:border-white/20 text-pine dark:text-moss focus:ring-pine/20";
-const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-navy/55 dark:text-wheat/55";
+  "size-4 rounded border-ink/20 dark:border-white/20 text-pine dark:text-moss focus:ring-pine/20";
+const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55";
 
 function emptyPreviewPayload(): Record<string, unknown> {
   return {
@@ -256,14 +256,14 @@ export function HackathonCreateForm() {
       </div>
 
       <form
-        className="rounded-xl border border-navy/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6"
+        className="rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6"
         onSubmit={publish}
       >
         {published ? (
           <p
             className={`mb-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
               published.status === "completed" && !published.isRecurring
-                ? "border-rust/30 bg-rust/10 text-rust"
+                ? "border-pine/30 bg-pine/10 text-pine"
                 : "border-[#137a4c]/30 bg-[#137a4c]/10 text-[#137a4c]"
             }`}
           >
@@ -316,7 +316,7 @@ export function HackathonCreateForm() {
                 value={imageUrl}
               />
               <button
-                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-navy/20 px-4 text-sm font-semibold text-navy/70 hover:bg-ivory hover:text-navy dark:border-white/20 dark:text-wheat/70 dark:hover:bg-white/10 dark:hover:text-wheat disabled:opacity-50"
+                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink dark:border-white/20 dark:text-paper/70 dark:hover:bg-white/10 dark:hover:text-paper disabled:opacity-50"
                 disabled={isUploading}
                 onClick={() => photoInputRef.current?.click()}
                 type="button"
@@ -346,7 +346,7 @@ export function HackathonCreateForm() {
             {uploadError ? (
               <p className="mt-1 text-xs font-semibold text-[#B42318]">{uploadError}</p>
             ) : (
-              <p className="mt-1 text-xs leading-5 text-navy/55 dark:text-wheat/55">
+              <p className="mt-1 text-xs leading-5 text-ink/55 dark:text-paper/55">
                 Or paste an image anywhere on the page to upload it.
               </p>
             )}
@@ -452,24 +452,24 @@ export function HackathonCreateForm() {
             </label>
             <input id="new-prizeAmountUsd" name="prizeAmountUsd" type="number" min="0" className={inputClassName} />
           </div>
-          <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+          <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
             <input className={checkboxClassName} name="beginnerFriendly" type="checkbox" />
             Beginner friendly
           </label>
-          <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+          <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
             <input className={checkboxClassName} name="travelReimbursement" type="checkbox" />
             Travel support
           </label>
-          <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+          <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
             <input className={checkboxClassName} name="highSchoolersOnly" type="checkbox" />
             High school only
           </label>
           <div className="sm:col-span-2">
-            <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+            <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
               <input className={checkboxClassName} name="recurring" type="checkbox" />
               Repeats yearly (recurring series)
             </label>
-            <p className="mt-1 text-xs leading-5 text-navy/55 dark:text-wheat/55">
+            <p className="mt-1 text-xs leading-5 text-ink/55 dark:text-paper/55">
               Required for backfilled past events to stay on the public page — a past edition of a repeating series is
               shown until the next edition is published. Turning this on marks the whole series; it cannot be undone from
               this form.
@@ -493,12 +493,12 @@ export function HackathonCreateForm() {
               placeholder="123456789012345678"
               value={discordChannelId}
             />
-            <p id="new-discordChannelId-note" className="mt-1 text-xs leading-5 text-navy/55 dark:text-wheat/55">
+            <p id="new-discordChannelId-note" className="mt-1 text-xs leading-5 text-ink/55 dark:text-paper/55">
               Paste a channel ID to adopt a text channel that already exists in the configured Discord server.
             </p>
           </div>
           <div className="sm:col-span-2">
-            <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+            <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
               <input
                 checked={createDiscordChannel}
                 className={checkboxClassName}
@@ -509,7 +509,7 @@ export function HackathonCreateForm() {
               />
               Create Discord channel
             </label>
-            <p className="mt-1 text-xs leading-5 text-navy/55 dark:text-wheat/55">
+            <p className="mt-1 text-xs leading-5 text-ink/55 dark:text-paper/55">
               Use this only when the server does not already have a channel for the hackathon. Existing channel IDs and
               new channel creation are mutually exclusive.
             </p>
@@ -518,7 +518,7 @@ export function HackathonCreateForm() {
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-5 text-sm font-semibold text-wheat hover:bg-pine/90 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-5 text-sm font-semibold text-paper hover:bg-pine/90 dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
             disabled={saving}
             type="submit"
           >

@@ -110,8 +110,8 @@ export function HackathonNotificationPreferences({
   const upcomingPreferences = preferences.filter(isUpcoming);
 
   return (
-    <div className="mt-5 border-t border-navy/10 dark:border-white/10 pt-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-navy dark:text-wheat">
+    <div className="mt-5 border-t border-ink/10 dark:border-white/10 pt-4">
+      <div className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-paper">
         <BellRing aria-hidden="true" className="size-4 text-pine dark:text-moss" />
         Email notifications
       </div>
@@ -125,8 +125,8 @@ export function HackathonNotificationPreferences({
               <label
                 className={`flex min-h-20 cursor-pointer flex-col justify-between rounded-md border bg-white dark:bg-white/[0.06] p-3 text-sm transition-colors ${
                   preference.enabled
-                    ? "border-pine/40 text-navy dark:text-wheat"
-                    : "border-navy/10 dark:border-white/10 text-navy/55 dark:text-wheat/55"
+                    ? "border-pine/40 text-ink dark:text-paper"
+                    : "border-ink/10 dark:border-white/10 text-ink/55 dark:text-paper/55"
                 } hover:border-pine/40 dark:hover:border-moss/40`}
                 key={preference.type}
               >
@@ -140,7 +140,7 @@ export function HackathonNotificationPreferences({
                     type="checkbox"
                   />
                 </span>
-                <span className="mt-2 text-xs text-navy/55 dark:text-wheat/55">
+                <span className="mt-2 text-xs text-ink/55 dark:text-paper/55">
                   {scheduledFor
                     ? formatReminderDate(scheduledFor)
                     : isUpcoming(preference)
@@ -162,22 +162,22 @@ export function HackathonNotificationPreferences({
             >
               <button
                 aria-label="Close"
-                className="absolute inset-0 bg-navy/40 dark:bg-black/60 backdrop-blur-[2px]"
+                className="absolute inset-0 bg-ink/40 dark:bg-black/60 backdrop-blur-[2px]"
                 onClick={() => setLimitNoticeOpen(false)}
                 tabIndex={-1}
                 type="button"
               />
-              <div className="relative w-full max-w-md rounded-2xl border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-6 shadow-[0_30px_80px_rgb(0_0_0/0.45)]">
-                <h2 className="text-lg font-semibold leading-6 text-navy dark:text-wheat">
+              <div className="relative w-full max-w-md rounded-2xl border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-6 shadow-[0_30px_80px_rgb(0_0_0/0.45)]">
+                <h2 className="text-lg font-semibold leading-6 text-ink dark:text-paper">
                   For now, you&apos;re limited to five emails.
                 </h2>
-                <p className="mt-2 text-sm leading-5 text-navy/60 dark:text-wheat/60">
+                <p className="mt-2 text-sm leading-5 text-ink/60 dark:text-paper/60">
                   You can get at most five emails in a week, and this reminder would land in a week that&apos;s
                   already full. Turn another reminder off to make room for this one.
                 </p>
                 <div className="mt-6 flex items-center justify-end">
                   <button
-                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-wheat transition-colors hover:bg-pine/90 dark:bg-moss dark:text-[#141414] dark:hover:bg-moss/90"
+                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-pine px-5 text-sm font-semibold text-paper transition-colors hover:bg-pine/90 dark:bg-moss dark:text-[#141414] dark:hover:bg-moss/90"
                     onClick={() => setLimitNoticeOpen(false)}
                     type="button"
                   >

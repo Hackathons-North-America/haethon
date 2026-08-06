@@ -97,10 +97,10 @@ export function HackathonStatusTracker({
               compact ? "min-h-8" : "min-h-9"
             } ${
               active
-                ? "border-pine dark:border-moss/50 bg-pine text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white"
+                ? "border-pine dark:border-moss/50 bg-pine text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white"
                 : reached
                   ? "border-pine/40 bg-pine/5 dark:bg-moss/10 text-pine dark:text-moss hover:bg-pine/10"
-                  : "border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] text-navy/55 dark:text-wheat/55 hover:border-pine/40 dark:hover:border-moss/40 hover:text-pine dark:hover:text-moss"
+                  : "border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] text-ink/55 dark:text-paper/55 hover:border-pine/40 dark:hover:border-moss/40 hover:text-pine dark:hover:text-moss"
             }`}
             disabled={pending || isPastPipeline}
             key={stage.value}
@@ -113,7 +113,7 @@ export function HackathonStatusTracker({
         );
       })}
       {isPastPipeline ? (
-        <span className="inline-flex rounded-full min-h-8 items-center border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 font-medium text-navy dark:text-wheat">
+        <span className="inline-flex rounded-full min-h-8 items-center border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 font-medium text-ink dark:text-paper">
           {status === "won" ? "Won" : "Attended"}
         </span>
       ) : null}

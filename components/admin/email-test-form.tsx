@@ -66,30 +66,30 @@ export function EmailTestForm({ hackathons }: { hackathons: HackathonOption[] })
   }
 
   if (!hackathons.length) {
-    return <p className="text-sm text-navy/55 dark:text-wheat/55">No hackathons available to test against yet.</p>;
+    return <p className="text-sm text-ink/55 dark:text-paper/55">No hackathons available to test against yet.</p>;
   }
 
   return (
     <form className="grid max-w-2xl gap-5" onSubmit={handleSubmit}>
       <label className="grid gap-2">
-        <span className="text-sm font-semibold text-navy dark:text-wheat">Send test to</span>
+        <span className="text-sm font-semibold text-ink dark:text-paper">Send test to</span>
         <input
-          className="min-h-11 rounded-md border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-navy dark:text-wheat outline-none focus:border-pine"
+          className="min-h-11 rounded-md border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-ink dark:text-paper outline-none focus:border-pine"
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
           required
           type="email"
           value={email}
         />
-        <span className="text-xs text-navy/55 dark:text-wheat/55">
+        <span className="text-xs text-ink/55 dark:text-paper/55">
           The reminder is sent here instead of to hackers, so you can preview the real thing.
         </span>
       </label>
 
       <label className="grid gap-2">
-        <span className="text-sm font-semibold text-navy dark:text-wheat">Hackathon</span>
+        <span className="text-sm font-semibold text-ink dark:text-paper">Hackathon</span>
         <select
-          className="min-h-11 rounded-md border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-navy dark:text-wheat outline-none focus:border-pine"
+          className="min-h-11 rounded-md border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-ink dark:text-paper outline-none focus:border-pine"
           onChange={(event) => setHackathonId(event.target.value)}
           value={hackathonId}
         >
@@ -102,9 +102,9 @@ export function EmailTestForm({ hackathons }: { hackathons: HackathonOption[] })
       </label>
 
       <label className="grid gap-2">
-        <span className="text-sm font-semibold text-navy dark:text-wheat">Reminder type</span>
+        <span className="text-sm font-semibold text-ink dark:text-paper">Reminder type</span>
         <select
-          className="min-h-11 rounded-md border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-navy dark:text-wheat outline-none focus:border-pine"
+          className="min-h-11 rounded-md border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 text-sm text-ink dark:text-paper outline-none focus:border-pine"
           onChange={(event) => setType(event.target.value as SelectableReminderType)}
           value={type}
         >
@@ -118,7 +118,7 @@ export function EmailTestForm({ hackathons }: { hackathons: HackathonOption[] })
 
       <div className="flex items-center gap-3">
         <button
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-wheat dark:bg-wheat dark:text-[#141414] dark:hover:bg-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white transition-opacity hover:opacity-90 disabled:opacity-50"
           disabled={disabled}
           type="submit"
         >

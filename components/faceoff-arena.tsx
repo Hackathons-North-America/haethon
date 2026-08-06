@@ -76,7 +76,7 @@ const SHADOW: RGB = { r: 14, g: 11, b: 9 };
    given hackathon always lands on the same side color. */
 const FALLBACK_COLORS: RGB[] = [
   { r: 29, g: 42, b: 68 }, // navy
-  { r: 114, g: 28, b: 36 }, // cabernet
+  { r: 54, g: 37, b: 25 }, // bark
   { r: 179, g: 84, b: 30 }, // rust
   { r: 24, g: 120, b: 92 }, // pine
   { r: 138, g: 98, b: 30 }, // old gold
@@ -197,7 +197,7 @@ function ConfettiBurst({ burstId }: { burstId: number }) {
         id: `${burstId}-${index}`,
         angle: (index / 14) * Math.PI * 2 + ((index * 37) % 10) * 0.04,
         distance: 60 + ((index * 53) % 55),
-        color: ["#721C24", "#D9A441", "#5A6CFF", "#18785C"][index % 4],
+        color: ["#362519", "#D9A441", "#5A6CFF", "#18785C"][index % 4],
       })),
     [burstId]
   );
@@ -270,7 +270,7 @@ function EloDeltaChip({ delta, reduceMotion }: { delta: number; reduceMotion: bo
     <motion.span
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className={`absolute -top-2 left-full ml-1.5 rounded-full px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums text-white shadow-lg ${
-        delta > 0 ? "bg-pine" : "bg-cabernet"
+        delta > 0 ? "bg-pine" : "bg-bark"
       }`}
       initial={reduceMotion ? false : { opacity: 0, scale: 0.6, y: 6 }}
       transition={springTransition}
@@ -448,7 +448,7 @@ function ArenaSide({
               <motion.span
                 animate={{ opacity: 1, scale: 1 }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-xs font-bold uppercase tracking-wide text-white shadow-lg ${
-                  reveal.correct ? "bg-pine" : "bg-cabernet"
+                  reveal.correct ? "bg-pine" : "bg-bark"
                 }`}
                 initial={reduceMotion ? false : { opacity: 0, scale: 0.7 }}
                 transition={{ ...springTransition, delay: reduceMotion ? 0 : 0.55 }}
@@ -835,11 +835,11 @@ export function FaceoffArena({
 
   if (livePool.length < 2) {
     return (
-      <div className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-3xl border border-navy/10 bg-ivory p-10 text-center dark:border-white/10 dark:bg-white/5">
-        <div className="grid size-12 place-items-center rounded-full bg-navy/5 dark:bg-white/5">
-          <Swords aria-hidden="true" className="size-5 text-navy/40 dark:text-wheat/40" />
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-3xl border border-ink/10 bg-paper p-10 text-center dark:border-white/10 dark:bg-white/5">
+        <div className="grid size-12 place-items-center rounded-full bg-ink/5 dark:bg-white/5">
+          <Swords aria-hidden="true" className="size-5 text-ink/40 dark:text-paper/40" />
         </div>
-        <p className="text-navy dark:text-wheat">Not enough hackathons published yet to face off. Check back soon.</p>
+        <p className="text-ink dark:text-paper">Not enough hackathons published yet to face off. Check back soon.</p>
       </div>
     );
   }
@@ -898,8 +898,8 @@ export function FaceoffArena({
               key="matchup-loading"
               role="status"
             >
-              <div className="border-t-4 border-navy/30" />
-              <div className="border-t-4 border-cabernet/30" />
+              <div className="border-t-4 border-ink/30" />
+              <div className="border-t-4 border-bark/30" />
               <motion.div
                 animate={reduceMotion ? undefined : { opacity: [0.55, 1, 0.55], scale: [0.96, 1.04, 0.96] }}
                 aria-hidden="true"
@@ -973,7 +973,7 @@ export function FaceoffArena({
                 initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.95 }}
                 transition={springTransition}
               >
-                <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-cabernet dark:text-[#e4a3ab]">
+                <p className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-bark dark:text-[#d6bda4]">
                   Streak over
                 </p>
                 <h2 className="mt-2 font-serif text-xl font-semibold leading-7 text-ink dark:text-paper">
@@ -985,7 +985,7 @@ export function FaceoffArena({
                   Score {score} &middot; Best {highScore}
                 </p>
                 <button
-                  className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-cabernet px-6 text-sm font-bold text-wheat transition-transform hover:scale-[1.02] active:scale-95"
+                  className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-bark px-6 text-sm font-bold text-paper transition-transform hover:scale-[1.02] active:scale-95"
                   onClick={playAgain}
                   type="button"
                 >

@@ -6,15 +6,13 @@
   /* Paper-and-ink palette: warm cream ground, near-black warm ink, espresso
      accents. Pine and moss keep their names for continuity but now carry the
      landing hero's bark brown and a lighter tone from the same family, so the
-     product accent matches the nav. Cabernet is now only used by the faceoff
-     game's wrong-answer state and the logo fallback ramp — not by destructive
-     actions or errors, which use pine. */
+     product accent matches the nav. There is no red accent left in the system —
+     the faceoff game's wrong-answer state and destructive actions all use the
+     bark/pine brown. */
   --color-paper: #fbf7f0;
   --color-ink: #1b1917;
   --color-pine: #362519;
   --color-moss: #6b4a30;
-  --color-fog: #aeada9;
-  --color-cabernet: #721c24;
 
   /* Landing-hero palette, matched to the Federato reference: espresso brown
      ground for the nav and copy panel. Bark is the same value as pine — the
@@ -22,15 +20,6 @@
      accent; ember is the warm accent token. */
   --color-bark: #362519;
   --color-ember: #e4572e;
-
-  /* Legacy tokens — kept only while the migration sweep is in flight.
-     Do not use in new code; delete once no references remain. */
-  --color-wheat: #f4ebd9;
-  --color-navy: #1d2a44;
-  --color-rust: #b3541e;
-  --color-ivory: #f7f3ea;
-  --color-gold: #fbbf24;
-  --color-boreal: #2d4a22;
 
   /* Continuous left-drift for the hero's logo-cloud marquee. The track holds
      two identical copies of the list, so sliding exactly half its width lands

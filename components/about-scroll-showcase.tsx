@@ -118,13 +118,13 @@ function TechPanel({ activeIndex }: { activeIndex: number }) {
             }`}
             key={company.id}
           >
-            <p className="font-mono text-[0.65rem] font-medium uppercase tracking-[0.16em] text-rust">
+            <p className="font-mono text-[0.65rem] font-medium uppercase tracking-[0.16em] text-pine">
               {company.name}
             </p>
-            <h3 className="mt-4 font-serif text-3xl font-semibold leading-[1.05] tracking-tight text-navy sm:text-4xl lg:text-5xl dark:text-wheat">
+            <h3 className="mt-4 font-serif text-3xl font-semibold leading-[1.05] tracking-tight text-ink sm:text-4xl lg:text-5xl dark:text-paper">
               {company.heading}
             </h3>
-            <p className="mt-5 max-w-[420px] text-sm leading-6 text-navy/60 sm:text-base sm:leading-7 dark:text-wheat/60">
+            <p className="mt-5 max-w-[420px] text-sm leading-6 text-ink/60 sm:text-base sm:leading-7 dark:text-paper/60">
               {company.description}
             </p>
           </div>
@@ -141,7 +141,7 @@ function StripImage({ image }: { image: CompanyImage }) {
   return (
     <Image
       alt={image.alt}
-      className="h-auto w-full rounded-2xl border border-navy/10 dark:border-wheat/10"
+      className="h-auto w-full rounded-2xl border border-ink/10 dark:border-paper/10"
       height={image.height}
       sizes="(max-width: 1024px) 90vw, 24vw"
       src={image.src}
@@ -154,20 +154,20 @@ function StripImage({ image }: { image: CompanyImage }) {
 // Used for the HNA section — the product the visitor is already looking at.
 function BrowserShowcase() {
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-navy/10 bg-white shadow-[0_20px_50px_-30px_rgba(20,24,40,0.55)] dark:border-wheat/10 dark:bg-navy">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-[0_20px_50px_-30px_rgba(20,24,40,0.55)] dark:border-paper/10 dark:bg-ink">
       {/* Browser chrome: traffic-light dots + address bar */}
-      <div className="flex items-center gap-2 border-b border-navy/10 bg-navy/[0.04] px-4 py-3 dark:border-wheat/10 dark:bg-wheat/[0.06]">
+      <div className="flex items-center gap-2 border-b border-ink/10 bg-ink/[0.04] px-4 py-3 dark:border-paper/10 dark:bg-paper/[0.06]">
         <span className="size-3 rounded-full bg-[#ff5f57]" />
         <span className="size-3 rounded-full bg-[#febc2e]" />
         <span className="size-3 rounded-full bg-[#28c840]" />
-        <div className="ml-3 flex-1 truncate rounded-md bg-navy/[0.06] px-3 py-1 text-center font-mono text-[0.7rem] text-navy/50 dark:bg-wheat/[0.08] dark:text-wheat/50">
+        <div className="ml-3 flex-1 truncate rounded-md bg-ink/[0.06] px-3 py-1 text-center font-mono text-[0.7rem] text-ink/50 dark:bg-paper/[0.08] dark:text-paper/50">
           hna.dev
         </div>
       </div>
 
       {/* Page body */}
       <div className="flex flex-1 items-center justify-center px-6 py-8">
-        <p className="text-center font-serif text-2xl font-medium leading-tight tracking-tight text-navy sm:text-3xl lg:text-4xl dark:text-wheat">
+        <p className="text-center font-serif text-2xl font-medium leading-tight tracking-tight text-ink sm:text-3xl lg:text-4xl dark:text-paper">
           You are on it right now.
         </p>
       </div>
@@ -178,11 +178,11 @@ function BrowserShowcase() {
 // Placeholder fallback for sections without photos or a browser card yet.
 function PlaceholderPanel({ label }: { label: string }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-2xl border border-navy/10 bg-navy/[0.04] dark:border-wheat/10 dark:bg-wheat/[0.06]">
-      <span className="font-mono text-[0.55rem] font-medium uppercase tracking-[0.16em] text-navy/40 dark:text-wheat/40">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-2xl border border-ink/10 bg-ink/[0.04] dark:border-paper/10 dark:bg-paper/[0.06]">
+      <span className="font-mono text-[0.55rem] font-medium uppercase tracking-[0.16em] text-ink/40 dark:text-paper/40">
         Placeholder
       </span>
-      <span className="px-2 text-center font-serif text-base text-navy/55 dark:text-wheat/55">
+      <span className="px-2 text-center font-serif text-base text-ink/55 dark:text-paper/55">
         {label}
       </span>
     </div>
@@ -400,7 +400,7 @@ export function AboutScrollShowcase() {
               {activeIndex === 0 && (
                 <ChevronDown
                   aria-hidden="true"
-                  className="absolute left-1/2 -translate-x-1/2 text-navy/30 dark:text-wheat/30"
+                  className="absolute left-1/2 -translate-x-1/2 text-ink/30 dark:text-paper/30"
                   data-about-scroll-hint
                   size={26}
                   strokeWidth={1.5}
@@ -430,7 +430,7 @@ export function AboutScrollShowcase() {
                       >
                         <button
                           aria-current={isActive ? "true" : undefined}
-                          className="px-4 text-center font-serif text-3xl font-medium leading-tight tracking-tight text-navy transition-opacity duration-300 ease-out motion-reduce:transition-none sm:text-4xl lg:text-6xl dark:text-wheat"
+                          className="px-4 text-center font-serif text-3xl font-medium leading-tight tracking-tight text-ink transition-opacity duration-300 ease-out motion-reduce:transition-none sm:text-4xl lg:text-6xl dark:text-paper"
                           onClick={() => scrollToSection(index)}
                           style={{
                             opacity: isActive ? 1 : distance === 1 ? 0.25 : 0.12,

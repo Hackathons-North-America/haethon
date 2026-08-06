@@ -10,10 +10,10 @@ import { HACKATHON_SOURCES, sourceBadge } from "@/lib/hackathons/source-provenan
 import { dateToInputValue } from "@/lib/hackathons/utils";
 
 const inputClassName =
-  "w-full rounded-xl border border-navy/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-navy dark:text-wheat outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
+  "w-full rounded-xl border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-ink dark:text-paper outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
 const checkboxClassName =
-  "size-4 rounded border-navy/20 dark:border-white/20 text-pine dark:text-moss focus:ring-pine/20";
-const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-navy/55 dark:text-wheat/55";
+  "size-4 rounded border-ink/20 dark:border-white/20 text-pine dark:text-moss focus:ring-pine/20";
+const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55";
 
 function itemToPreviewPayload(item: AdminHackathonListItem): Record<string, unknown> {
   return {
@@ -129,7 +129,7 @@ export function HackathonEditDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-navy/50 p-4 backdrop-blur-sm dark:bg-black/60 sm:p-6"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/50 p-4 backdrop-blur-sm dark:bg-black/60 sm:p-6"
       onMouseDown={(event) => {
         // Only dismiss when the backdrop itself is pressed, not on a drag that
         // started inside the panel and released on the overlay.
@@ -139,15 +139,15 @@ export function HackathonEditDialog({
       }}
       role="dialog"
     >
-      <div className="my-8 w-full max-w-3xl rounded-2xl border border-navy/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+      <div className="my-8 w-full max-w-3xl rounded-2xl border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rust">Edit listing</p>
-            <h2 className="mt-1 font-serif text-2xl font-semibold tracking-[-0.02em] text-navy dark:text-wheat">{item.name}</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pine">Edit listing</p>
+            <h2 className="mt-1 font-serif text-2xl font-semibold tracking-[-0.02em] text-ink dark:text-paper">{item.name}</h2>
           </div>
           <button
             aria-label="Close editor"
-            className="grid size-9 shrink-0 place-items-center rounded-full border border-navy/15 dark:border-white/15 text-navy dark:text-wheat hover:border-navy dark:hover:border-white/60"
+            className="grid size-9 shrink-0 place-items-center rounded-full border border-ink/15 dark:border-white/15 text-ink dark:text-paper hover:border-ink dark:hover:border-white/60"
             onClick={onClose}
             type="button"
           >
@@ -382,18 +382,18 @@ export function HackathonEditDialog({
                 />
                 <p
                   id={`${item.id}-discordChannelId-note`}
-                  className="mt-1 text-xs leading-5 text-navy/55 dark:text-wheat/55"
+                  className="mt-1 text-xs leading-5 text-ink/55 dark:text-paper/55"
                 >
                   {item.discordChannelId
                     ? "Paste a different channel ID to reassign this hackathon. The old Discord channel is left untouched."
                     : "Paste the ID of an existing text channel in the configured Discord server."}
                 </p>
               </div>
-              <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+              <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
                 <input className={checkboxClassName} defaultChecked={item.beginnerFriendly} name="beginnerFriendly" type="checkbox" />
                 Beginner friendly
               </label>
-              <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+              <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
                 <input
                   className={checkboxClassName}
                   defaultChecked={item.travelReimbursement}
@@ -402,7 +402,7 @@ export function HackathonEditDialog({
                 />
                 Travel support
               </label>
-              <label className="flex items-center gap-2 rounded-xl border border-navy/10 dark:border-white/10 bg-ivory dark:bg-white/5 px-3 py-2 text-sm font-semibold text-navy dark:text-wheat">
+              <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
                 <input
                   className={checkboxClassName}
                   defaultChecked={item.highSchoolersOnly}
@@ -415,14 +415,14 @@ export function HackathonEditDialog({
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <button
-                className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-5 text-sm font-semibold text-wheat hover:bg-pine/90 dark:bg-wheat dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-5 text-sm font-semibold text-paper hover:bg-pine/90 dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
                 disabled={saving}
                 type="submit"
               >
                 {saving ? "Saving..." : "Save changes"}
               </button>
               <button
-                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-navy/15 dark:border-white/15 px-4 text-sm font-semibold text-navy dark:text-wheat disabled:opacity-50"
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 dark:border-white/15 px-4 text-sm font-semibold text-ink dark:text-paper disabled:opacity-50"
                 disabled={saving}
                 onClick={onClose}
                 type="button"
