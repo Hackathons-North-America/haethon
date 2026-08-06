@@ -262,6 +262,30 @@ export const hackathonFaceoffRatings = pgTable(
   ]
 );
 
+/* Ballots for the Icon Face Off poll. The roster itself lives in code
+   (lib/faceoff/tech-icons.ts) because each icon ships with hand-made card art,
+   so slugs are plain text here rather than a foreign key. Tallies are derived
+   from this table — there is no aggregate row to drift out of sync. */
+export const techIconFaceoffVotes = pgTable(
+  "tech_icon_faceoff_votes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /* Side-independent pairing id, so the unique index below caps a voter at
+       one ballot per matchup no matter which card they picked. */
+    matchupKey: varchar("matchup_key", { length: 129 }).notNull(),
+    winnerSlug: varchar("winner_slug", { length: 64 }).notNull(),
+    loserSlug: varchar("loser_slug", { length: 64 }).notNull(),
+    voterFingerprint: varchar("voter_fingerprint", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("tech_icon_faceoff_votes_ballot_idx").on(table.matchupKey, table.voterFingerprint),
+    index("tech_icon_faceoff_votes_winner_idx").on(table.winnerSlug),
+    index("tech_icon_faceoff_votes_loser_idx").on(table.loserSlug),
+    check("tech_icon_faceoff_votes_distinct_sides", sql`${table.winnerSlug} <> ${table.loserSlug}`),
+  ]
+);
+
 export const hackathonLocations = pgTable(
   "hackathon_locations",
   {
@@ -801,3 +825,4 @@ export type SelectHackathon = typeof hackathons.$inferSelect;
 export type SelectUser = typeof users.$inferSelect;
 export type SelectHackathonSubmission = typeof hackathonSubmissions.$inferSelect;
 export type SelectHackathonFaceoffRating = typeof hackathonFaceoffRatings.$inferSelect;
+export type SelectTechIconFaceoffVote = typeof techIconFaceoffVotes.$inferSelect;

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   }
 
   const { userId } = await auth();
-  const voter = await resolveFaceoffVoter(userId, request);
+  const voter = await resolveFaceoffVoter(userId, request.headers);
   const result = await db.execute<FaceoffVoteResult>(sql`
     select *
     from record_hackathon_faceoff_vote(

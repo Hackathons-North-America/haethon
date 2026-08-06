@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/saved", destination: "/my", permanent: false },
+      /* /faceoff/icon is its own page; the bare parent belongs to the
+         hackathon arena, which shipped under the hyphenated path. */
+      { source: "/faceoff", destination: "/face-off", permanent: false },
       { source: "/reminders", destination: "/my", permanent: false },
     ];
   },
