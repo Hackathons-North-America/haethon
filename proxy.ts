@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   "/unsubscribed",
   "/hackathons(.*)",
   "/face-off(.*)",
+  "/faceoff(.*)",
   // Shared hacker profiles. The unguessable token in the path is the
   // credential, so these render for signed-out visitors.
   "/p/(.*)",
