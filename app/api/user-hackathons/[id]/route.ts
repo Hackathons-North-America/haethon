@@ -11,7 +11,6 @@ import {
 } from "@/lib/hackathons/attendance";
 import { applyPassiveAttendanceVerification } from "@/lib/hackathons/passive-verification";
 import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
-import { syncRemindersForUserHackathon } from "@/lib/hackathons/reminders";
 import { statusShouldInferAttendance } from "@/lib/hackathons/utils";
 import { userHackathonUpdateSchema } from "@/lib/validations/hackathon";
 
@@ -79,14 +78,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!updated) {
     return NextResponse.json({ error: "Saved hackathon not found." }, { status: 404 });
-  }
-
-  if (parsed.data.applicationStatus !== undefined || parsed.data.isSaved !== undefined) {
-    await syncRemindersForUserHackathon({
-      userId: userContext.user.id,
-      hackathonId: updated.hackathonId,
-      isSaved: updated.isSaved,
-    });
   }
 
   if (parsed.data.applicationStatus) {

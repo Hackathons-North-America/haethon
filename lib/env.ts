@@ -9,8 +9,6 @@ export const env = createEnv({
     CLERK_SIGN_UP_URL: z.string().default("/sign-up"),
     CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z.string().default("/hackathons"),
     CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().default("/onboarding"),
-    RESEND_API_KEY: z.string().min(1).optional(),
-    RESEND_AUDIENCE_FROM: z.string().optional(),
     DISCORD_BOT_TOKEN: z.string().min(1).optional(),
     DISCORD_CLIENT_ID: z.string().min(1).optional(),
     DISCORD_GUILD_ID: z.string().min(1).optional(),
@@ -23,10 +21,8 @@ export const env = createEnv({
     // Optional: without it the admin photo-upload button fails, everything
     // else still works. The uploadthing SDK reads it from process.env itself.
     UPLOADTHING_TOKEN: z.string().min(1).optional(),
-    // Required: cron auth breaks silently (503s) without it, and it is the
-    // fallback signing key for unsubscribe links.
+    // Required: cron auth breaks silently (503s) without it.
     CRON_SECRET: z.string().min(1),
-    EMAIL_UNSUBSCRIBE_SECRET: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().url(),
@@ -42,8 +38,6 @@ export const env = createEnv({
     CLERK_SIGN_UP_URL: process.env.CLERK_SIGN_UP_URL,
     CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: process.env.CLERK_SIGN_IN_FALLBACK_REDIRECT_URL,
     CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: process.env.CLERK_SIGN_UP_FALLBACK_REDIRECT_URL,
-    RESEND_API_KEY: process.env.RESEND_API_KEY,
-    RESEND_AUDIENCE_FROM: process.env.RESEND_AUDIENCE_FROM,
     DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
     DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
     DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID,
@@ -55,7 +49,6 @@ export const env = createEnv({
     SENTRY_PROJECT: process.env.SENTRY_PROJECT,
     UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
     CRON_SECRET: process.env.CRON_SECRET,
-    EMAIL_UNSUBSCRIBE_SECRET: process.env.EMAIL_UNSUBSCRIBE_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,

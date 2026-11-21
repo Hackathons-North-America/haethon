@@ -1,118 +1,47 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  assignTiers,
-  isRankGuessCorrect,
-  sortByEloDescending,
-  sortByEloWithLocalBoost,
-  TIER_PERCENTAGES,
-  tierForPosition,
-} from "@/lib/hackathons/ranking";
+import { sortByStartDate, sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
 
-function card(
-  id: string,
-  eloRating: number,
-  countryCode: string | null = null,
-  rankTier: "S" | "A" | "B" | "C" | "D" = "D"
-) {
-  return { id, eloRating, countryCode, rankTier };
+function card(id: string, startsAt: string | null, countryCode: string | null = null) {
+  return { id, startsAt, countryCode };
 }
 
-describe("sortByEloDescending", () => {
-  it("orders highest rating first, breaking ties by id", () => {
-    const result = sortByEloDescending([card("b", 1500), card("a", 1600), card("c", 1500)]);
+describe("sortByStartDate", () => {
+  it("orders soonest start first, with the id as a stable tiebreak", () => {
+    const result = sortByStartDate([
+      card("c", "2026-09-18T00:00:00.000Z"),
+      card("b", "2026-03-01T00:00:00.000Z"),
+      card("a", "2026-09-18T00:00:00.000Z"),
+    ]);
 
-    expect(result.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
+    expect(result.map((entry) => entry.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("sorts hackathons without confirmed dates last", () => {
+    const result = sortByStartDate([card("tba", null), card("dated", "2026-05-01T00:00:00.000Z")]);
+
+    expect(result.map((entry) => entry.id)).toEqual(["dated", "tba"]);
   });
 });
 
-describe("isRankGuessCorrect", () => {
-  it("treats a larger rank number as a lower overall rank", () => {
-    expect(isRankGuessCorrect(12, 33, "lower")).toBe(true);
-    expect(isRankGuessCorrect(12, 33, "higher")).toBe(false);
-  });
-
-  it("treats a smaller rank number as a higher overall rank", () => {
-    expect(isRankGuessCorrect(33, 12, "higher")).toBe(true);
-    expect(isRankGuessCorrect(33, 12, "lower")).toBe(false);
-  });
-
-  it("accepts either direction when ranks are tied", () => {
-    expect(isRankGuessCorrect(12, 12, "higher")).toBe(true);
-    expect(isRankGuessCorrect(12, 12, "lower")).toBe(true);
-  });
-});
-
-describe("sortByEloWithLocalBoost", () => {
-  it("pulls the visitor's country to the top, Elo-sorted within each group", () => {
-    const cards = [card("us-low", 1400, "US"), card("ca-high", 1900, "CA"), card("ca-low", 1300, "CA"), card("us-high", 2000, "US")];
-
-    const result = sortByEloWithLocalBoost(cards, "CA");
-
-    expect(result.map((entry) => entry.id)).toEqual(["ca-high", "ca-low", "us-high", "us-low"]);
-  });
-
-  it("falls back to plain Elo order when no local country is known", () => {
-    const cards = [card("a", 1400), card("b", 1900)];
-
-    expect(sortByEloWithLocalBoost(cards, null).map((entry) => entry.id)).toEqual(["b", "a"]);
-  });
-
-  it("matches country codes case-insensitively", () => {
-    const cards = [card("a", 1400, "ca"), card("b", 1900, "US")];
-
-    expect(sortByEloWithLocalBoost(cards, "CA").map((entry) => entry.id)).toEqual(["a", "b"]);
-  });
-});
-
-describe("assignTiers", () => {
-  it("defines a complete 1/10/20/30/39 percentile distribution", () => {
-    expect(TIER_PERCENTAGES).toEqual({ S: 1, A: 10, B: 20, C: 30, D: 39 });
-    expect(Object.values(TIER_PERCENTAGES).reduce((total, percentage) => total + percentage, 0)).toBe(100);
-  });
-
-  it("groups the cached global tiers, highest first", () => {
+describe("sortByStartDateWithLocalBoost", () => {
+  it("lifts the visitor's country to the top while keeping date order within each group", () => {
     const cards = [
-      card("s", 2000, null, "S"),
-      card("a", 1900, null, "A"),
-      card("b", 1800, null, "B"),
-      card("c", 1700, null, "C"),
-      card("d", 1600, null, "D"),
+      card("us-early", "2026-02-01T00:00:00.000Z", "US"),
+      card("ca-late", "2026-10-01T00:00:00.000Z", "CA"),
+      card("ca-early", "2026-04-01T00:00:00.000Z", "ca"),
     ];
 
-    const groups = assignTiers(cards);
-
-    expect(groups.map((group) => group.tier)).toEqual(["S", "A", "B", "C", "D"]);
-    expect(groups.map((group) => group.hackathons.map((entry) => entry.id))).toEqual([
-      ["s"],
-      ["a"],
-      ["b"],
-      ["c"],
-      ["d"],
+    expect(sortByStartDateWithLocalBoost(cards, "CA").map((entry) => entry.id)).toEqual([
+      "ca-early",
+      "ca-late",
+      "us-early",
     ]);
   });
 
-  it("does not change tiers when the displayed set is filtered", () => {
-    const groups = assignTiers([card("filtered-a", 1400, null, "A"), card("filtered-d", 1900, null, "D")]);
+  it("falls back to plain date order without a visitor country", () => {
+    const cards = [card("later", "2026-06-01T00:00:00.000Z"), card("sooner", "2026-01-01T00:00:00.000Z")];
 
-    expect(groups.find((group) => group.tier === "A")?.hackathons.map((entry) => entry.id)).toEqual(["filtered-a"]);
-    expect(groups.find((group) => group.tier === "D")?.hackathons.map((entry) => entry.id)).toEqual(["filtered-d"]);
-  });
-
-  it("falls back safely to D for legacy data without a stored tier", () => {
-    const legacy = { id: "legacy", eloRating: 1800 };
-    const groups = assignTiers([legacy]);
-
-    expect(groups.find((group) => group.tier === "D")?.hackathons.map((entry) => entry.id)).toEqual(["legacy"]);
-  });
-});
-
-describe("tierForPosition", () => {
-  it("maps the global 1/10/20/30/39 percentile boundaries", () => {
-    expect(tierForPosition(1, 100)).toBe("S");
-    expect(tierForPosition(11, 100)).toBe("A");
-    expect(tierForPosition(31, 100)).toBe("B");
-    expect(tierForPosition(61, 100)).toBe("C");
-    expect(tierForPosition(62, 100)).toBe("D");
+    expect(sortByStartDateWithLocalBoost(cards, null).map((entry) => entry.id)).toEqual(["sooner", "later"]);
   });
 });

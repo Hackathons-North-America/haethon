@@ -3,14 +3,6 @@
   "regions": ["iad1"],
   "crons": [
     {
-      "path": "/api/cron/send-reminders",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/send-weekly-digest",
-      "schedule": "4 12 * * 1"
-    },
-    {
       "path": "/api/cron/sync-discord",
       "schedule": "8 12 * * *"
     },

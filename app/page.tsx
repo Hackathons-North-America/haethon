@@ -4,13 +4,10 @@ import { HackathonMarquee } from "@/components/hackathon-marquee";
 import {
   LazyApprovalFlow,
   LazyCommunityDiscord,
-  LazyPipelineSpotlight,
   LazySearchShowcase,
   LazySourcedEverywhere,
 } from "@/components/landing-lazy-visuals";
-import { LoginRequiredLink } from "@/components/login-required-dialog";
 import { PrimaryNav } from "@/components/primary-nav";
-import { HoverUnderline } from "@/components/hover-underline";
 import { SiteFooter } from "@/components/site-footer";
 
 /* Titles on the coverage pillars, a notch under the section head. */
@@ -19,15 +16,6 @@ const bentoTitleClassName =
 
 const bentoBodyClassName =
   "mt-2 max-w-[30rem] text-[0.95rem] leading-relaxed text-ink/60";
-
-/* The numbered section links ("1.0 Track →"), set in the card footer's voice:
-   small-caps mono, muted until hovered, with the shared slide-in underline. */
-const sectionLinkClassName =
-  "group relative mt-8 inline-flex min-h-8 items-center gap-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/70 transition-colors hover:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
-
-/* Card-body headings: the same tight tracking as the card's title line. */
-const sectionHeadingClassName =
-  "text-2xl font-medium leading-[1.1] tracking-[-0.045em] text-ink sm:text-3xl lg:text-4xl";
 
 /* Universal vertical rhythm for every landing section below the hero — one
    generous band of padding per section (2.33×/2.25× the old py-12/sm:py-16),
@@ -141,9 +129,10 @@ export default function Home() {
           <section aria-labelledby="search-showcase-heading">
             <div className="relative overflow-hidden">
               <div className={`relative ${sectionPaddingClassName}`}>
-                {/* Keep the same 85% miniature treatment as the tracking
-                    section below so the two product stories share a scale as
-                    well as the exact same vertical padding. */}
+                {/* A true miniature of the section: w-[85%] under zoom 0.85
+                    makes the inner layout compute at the original full width
+                    (identical proportions), then render at 85% size, centered,
+                    with the freed space joining the padding around it. */}
                 <div className="mx-auto w-[85%] [zoom:0.85]">
                   <h2
                     id="search-showcase-heading"
@@ -177,52 +166,6 @@ export default function Home() {
               </div>
             </div>
           </section>
-
-          <section
-            aria-labelledby="pipeline-spotlight-heading">
-            <div className="relative overflow-hidden">
-              <div className={`relative ${sectionPaddingClassName}`}>
-                {/* A true miniature of the section: w-[85%] under zoom 0.85
-                    makes the inner layout compute at the original full width
-                    (identical proportions), then render at 85% size, centered,
-                    with the freed space joining the padding around it. */}
-                <div className="mx-auto w-[85%] [zoom:0.85]">
-                  <div className="relative grid gap-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
-                    <h2
-                      id="pipeline-spotlight-heading"
-                      className={`max-w-[22rem] ${sectionHeadingClassName}`}
-                    >
-                      Get reminders and keep track of them all
-                    </h2>
-                    <div>
-                      <p className="max-w-[32rem] text-base leading-relaxed text-ink/60 sm:text-lg">
-                        Choose email reminders that land a week before
-                        applications open, a day before they open, and a day
-                        before the hackathon starts. Then follow the status of
-                        every hackathon you&apos;ve applied to (interested,
-                        applied, accepted) on one board.
-                      </p>
-                      <LoginRequiredLink href="/my" className={sectionLinkClassName} forcePrompt>
-                        1.0
-                        <span>
-                          Track{" "}
-                          <span aria-hidden="true" className="ml-1">
-                            →
-                          </span>
-                        </span>
-                        <HoverUnderline className="inset-x-0 bottom-1" />
-                      </LoginRequiredLink>
-                    </div>
-                  </div>
-
-                  <div className="relative pt-10 sm:pt-14">
-                    <LazyPipelineSpotlight />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
         </div>
       </div>
 

@@ -31,22 +31,6 @@ export const roleEnum = pgEnum("role", ["user", "admin", "organizer", "sponsor"]
 export const hackathonFormatEnum = pgEnum("hackathon_format", ["online", "in_person"]);
 export const hackathonStatusEnum = pgEnum("hackathon_status", ["draft", "upcoming", "live", "completed", "archived"]);
 export const applicationStatusEnum = pgEnum("application_status", ["interested", "applied", "accepted", "attending", "attended", "won"]);
-export const reminderTypeEnum = pgEnum("reminder_type", [
-  "application_open",
-  "application_close",
-  "acceptance_date",
-  "hackathon_start",
-  "hackathon_week_before",
-  "hackathon_day_before",
-  "check_in",
-  "submission_deadline",
-  "follow_up",
-  "add_to_profile",
-  "attendance_check",
-  "application_week_before",
-  "application_day_before",
-]);
-export const notificationChannelEnum = pgEnum("notification_channel", ["email", "discord", "in_app"]);
 export const importStatusEnum = pgEnum("import_status", ["pending", "approved", "rejected", "merged"]);
 export const sourceTypeEnum = pgEnum("source_type", [
   "devpost",
@@ -84,9 +68,6 @@ export const users = pgTable(
     lastName: text("last_name"),
     imageUrl: text("image_url"),
     role: roleEnum("role").notNull().default("user"),
-    // Global email opt-out (CAN-SPAM/CASL). Set via the signed unsubscribe link
-    // in every outgoing email; null means the user still receives email.
-    emailUnsubscribedAt: timestamp("email_unsubscribed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -237,52 +218,6 @@ export const hackathons = pgTable(
     index("hackathons_format_idx").on(table.format),
     index("hackathons_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
     uniqueIndex("hackathons_name_slug_idx").on(table.name, table.slug),
-  ]
-);
-
-/* High-churn Face Off state lives separately from catalog content so votes do
-   not rewrite the wide hackathons row or change its content updated_at. */
-export const hackathonFaceoffRatings = pgTable(
-  "hackathon_faceoff_ratings",
-  {
-    hackathonId: uuid("hackathon_id")
-      .primaryKey()
-      .references(() => hackathons.id, { onDelete: "cascade" }),
-    eloRating: integer("elo_rating").notNull().default(1500),
-    faceoffWins: integer("faceoff_wins").notNull().default(0),
-    faceoffLosses: integer("faceoff_losses").notNull().default(0),
-    version: integer("version").notNull().default(0),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("hackathon_faceoff_ratings_elo_idx").on(table.eloRating, table.hackathonId),
-    check("hackathon_faceoff_ratings_wins_nonnegative", sql`${table.faceoffWins} >= 0`),
-    check("hackathon_faceoff_ratings_losses_nonnegative", sql`${table.faceoffLosses} >= 0`),
-    check("hackathon_faceoff_ratings_version_nonnegative", sql`${table.version} >= 0`),
-  ]
-);
-
-/* Ballots for the Icon Face Off poll. The roster itself lives in code
-   (lib/faceoff/tech-icons.ts) because each icon ships with hand-made card art,
-   so slugs are plain text here rather than a foreign key. Tallies are derived
-   from this table — there is no aggregate row to drift out of sync. */
-export const techIconFaceoffVotes = pgTable(
-  "tech_icon_faceoff_votes",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    /* Side-independent pairing id, so the unique index below caps a voter at
-       one ballot per matchup no matter which card they picked. */
-    matchupKey: varchar("matchup_key", { length: 129 }).notNull(),
-    winnerSlug: varchar("winner_slug", { length: 64 }).notNull(),
-    loserSlug: varchar("loser_slug", { length: 64 }).notNull(),
-    voterFingerprint: varchar("voter_fingerprint", { length: 64 }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("tech_icon_faceoff_votes_ballot_idx").on(table.matchupKey, table.voterFingerprint),
-    index("tech_icon_faceoff_votes_winner_idx").on(table.winnerSlug),
-    index("tech_icon_faceoff_votes_loser_idx").on(table.loserSlug),
-    check("tech_icon_faceoff_votes_distinct_sides", sql`${table.winnerSlug} <> ${table.loserSlug}`),
   ]
 );
 
@@ -446,101 +381,6 @@ export const hackathonCheckinCodes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("hackathon_checkin_codes_hackathon_idx").on(table.hackathonId)]
-);
-
-export const reminders = pgTable(
-  "reminders",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    hackathonId: uuid("hackathon_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "cascade" }),
-    type: reminderTypeEnum("type").notNull(),
-    channel: notificationChannelEnum("channel").notNull().default("email"),
-    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
-    claimedAt: timestamp("claimed_at", { withTimezone: true }),
-    sentAt: timestamp("sent_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index("reminders_due_idx").on(table.scheduledFor),
-    index("reminders_pending_due_idx")
-      .on(table.channel, table.scheduledFor)
-      .where(sql`${table.sentAt} is null`),
-    index("reminders_user_hackathon_idx").on(table.userId, table.hackathonId),
-    uniqueIndex("reminders_pending_delivery_unique_idx")
-      .on(table.userId, table.hackathonId, table.type, table.channel, table.scheduledFor)
-      .where(sql`${table.sentAt} is null`),
-  ]
-);
-
-export const userHackathonNotificationPreferences = pgTable(
-  "user_hackathon_notification_preferences",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    hackathonId: uuid("hackathon_id")
-      .notNull()
-      .references(() => hackathons.id, { onDelete: "cascade" }),
-    type: reminderTypeEnum("type").notNull(),
-    channel: notificationChannelEnum("channel").notNull().default("email"),
-    enabled: boolean("enabled").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("user_hackathon_notification_preferences_unique_idx").on(
-      table.userId,
-      table.hackathonId,
-      table.type,
-      table.channel
-    ),
-    index("user_hackathon_notification_preferences_user_idx").on(table.userId),
-    index("user_hackathon_notification_preferences_hackathon_idx").on(table.hackathonId),
-  ]
-);
-
-/* One country watch per user (the unique userId enforces the cap): new
-   hackathons published in that country ride the user's Monday weekly digest.
-   lastNotifiedAt is the delivery watermark — only hackathons published after
-   it are "new" for this subscriber, which keeps each digest down to one email
-   no matter how many hackathons landed in between. */
-export const countryAlertSubscriptions = pgTable(
-  "country_alert_subscriptions",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" })
-      .unique(),
-    country: varchar("country", { length: 120 }).notNull(),
-    lastNotifiedAt: timestamp("last_notified_at", { withTimezone: true }).defaultNow().notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index("country_alert_subscriptions_country_idx").on(table.country)]
-);
-
-export const notifications = pgTable(
-  "notifications",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    type: reminderTypeEnum("type").notNull(),
-    channel: notificationChannelEnum("channel").notNull(),
-    title: varchar("title", { length: 180 }).notNull(),
-    body: text("body").notNull(),
-    readAt: timestamp("read_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index("notifications_user_idx").on(table.userId)]
 );
 
 /* Kept temporarily for compatibility with application instances from before
@@ -747,18 +587,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [userProfiles.userId],
   }),
   userHackathons: many(userHackathons),
-  notificationPreferences: many(userHackathonNotificationPreferences),
-  reminders: many(reminders),
-  notifications: many(notifications),
   projects: many(projects),
   achievements: many(achievements),
   organizationMemberships: many(organizationMemberships),
   hackathonSubmissions: many(hackathonSubmissions),
   attendanceDays: many(userHackathonAttendanceDays),
-  countryAlertSubscription: one(countryAlertSubscriptions, {
-    fields: [users.id],
-    references: [countryAlertSubscriptions.userId],
-  }),
   following: many(userFollows, { relationName: "follower" }),
   followers: many(userFollows, { relationName: "followee" }),
 }));
@@ -796,18 +629,6 @@ export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({
   legacySources: many(sources),
   tags: many(hackathonTags),
   attendanceDays: many(userHackathonAttendanceDays),
-  notificationPreferences: many(userHackathonNotificationPreferences),
-  faceoffRating: one(hackathonFaceoffRatings, {
-    fields: [hackathons.id],
-    references: [hackathonFaceoffRatings.hackathonId],
-  }),
-}));
-
-export const hackathonFaceoffRatingsRelations = relations(hackathonFaceoffRatings, ({ one }) => ({
-  hackathon: one(hackathons, {
-    fields: [hackathonFaceoffRatings.hackathonId],
-    references: [hackathons.id],
-  }),
 }));
 
 export const hackathonSeriesRelations = relations(hackathonSeries, ({ many }) => ({
@@ -824,5 +645,3 @@ export type SelectHackathonSeries = typeof hackathonSeries.$inferSelect;
 export type SelectHackathon = typeof hackathons.$inferSelect;
 export type SelectUser = typeof users.$inferSelect;
 export type SelectHackathonSubmission = typeof hackathonSubmissions.$inferSelect;
-export type SelectHackathonFaceoffRating = typeof hackathonFaceoffRatings.$inferSelect;
-export type SelectTechIconFaceoffVote = typeof techIconFaceoffVotes.$inferSelect;

@@ -37,16 +37,12 @@ without maintaining a separate spreadsheet or calendar.
   formats using keyword, country, date, format, feature, and proximity filters.
 - **Manage an application pipeline** with stages for interested, applied,
   accepted, attending, attended, and won.
-- **Set timely reminders** for application openings, deadlines, decisions, and
-  event start dates; subscribe to country-level event alerts.
 - **Build a public profile** with skills, activity, attended events, awards, and
   pinned highlights.
 - **Import Devpost history** through a verification flow instead of entering
   every past project and event manually.
 - **Follow other hackers** and see which friends are interested, applying, or
   attending an event.
-- **Compare the catalog** in Face Off and explore Elo-powered rankings and tier
-  lists.
 - **Jump to the right place** with calendar links, official websites, source
   attribution, and event-specific Discord channels.
 
@@ -65,8 +61,8 @@ without maintaining a separate spreadsheet or calendar.
 - Create and edit events, bulk-import structured data, and repair incomplete or
   broken imports.
 - Investigate suspicious attendance claims and resolve verification anomalies.
-- Manage Discord channel mappings and test production email templates.
-- Run scheduled catalog cleanup, email, and Discord synchronization workflows.
+- Manage Discord channel mappings.
+- Run scheduled catalog cleanup and Discord synchronization workflows.
 
 ## How the platform fits together
 
@@ -78,17 +74,17 @@ Public sources + community submissions
                   │
                   ▼
          Searchable event catalog
-          ┌───────┼────────┐
-          ▼       ▼        ▼
-     Application  Profiles  Face Off
-       pipeline   & friends  rankings
-          │
-          ▼
-    Reminders, check-in, and verified history
+            ┌─────┴─────┐
+            ▼           ▼
+       Application   Profiles
+        pipeline     & friends
+            │
+            ▼
+   Check-in and verified history
 ```
 
 The core web experience only needs the required configuration listed below.
-Email, Discord, uploads, analytics, and error reporting are separate
+Discord, uploads, analytics, and error reporting are separate
 integrations that can be added as needed.
 
 ## Technology
@@ -99,7 +95,6 @@ integrations that can be added as needed.
 | UI | Tailwind CSS 4, Motion, Lucide |
 | Authentication | [Clerk](https://clerk.com/) |
 | Data | [Neon](https://neon.tech/) Postgres, PostGIS, `pg_trgm`, Drizzle ORM |
-| Email | Resend and React Email |
 | File uploads | UploadThing |
 | Community automation | Discord REST API |
 | Observability | PostHog and Sentry |
@@ -155,9 +150,8 @@ Generate a suitable cron secret with:
 openssl rand -hex 32
 ```
 
-`CRON_SECRET` protects scheduled endpoints and is also the default signing key
-for unsubscribe links. The application validates it at startup, even when no
-cron job is being invoked locally.
+`CRON_SECRET` protects scheduled endpoints. The application validates it at
+startup, even when no cron job is being invoked locally.
 
 ### 3. Configure Clerk
 
@@ -235,7 +229,7 @@ template is [`.env.example`](.env.example).
 | `NEXT_PUBLIC_APP_URL` | Absolute application origin with no trailing slash |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser-side publishable key |
 | `CLERK_SECRET_KEY` | Clerk server-side secret key |
-| `CRON_SECRET` | Bearer token for `/api/cron/*` and fallback unsubscribe-signing key |
+| `CRON_SECRET` | Bearer token for `/api/cron/*` |
 
 ### Authentication routes
 
@@ -250,8 +244,6 @@ template is [`.env.example`](.env.example).
 
 | Integration | Variables | Enables |
 | --- | --- | --- |
-| Resend | `RESEND_API_KEY`, `RESEND_AUDIENCE_FROM` | Event reminders, weekly digests, country alerts, and admin email tests |
-| Email signing | `EMAIL_UNSUBSCRIBE_SECRET` | Dedicated unsubscribe-token signing key; falls back to `CRON_SECRET` |
 | Discord | `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID` | Event channel creation, links, sorting, and archiving |
 | Discord categories | `DISCORD_CANADA_CATEGORY_ID`, `DISCORD_US_CATEGORY_ID`, `DISCORD_DELETED_CATEGORY_ID` | Explicit category mappings; categories can otherwise be resolved by name |
 | UploadThing | `UPLOADTHING_TOKEN` | Admin-managed event image uploads |
@@ -262,23 +254,6 @@ Never commit `.env.local`, service tokens, or production connection strings.
 Only variables prefixed with `NEXT_PUBLIC_` are safe to expose to the browser.
 
 ## Optional service setup
-
-<details>
-<summary><strong>Resend email</strong></summary>
-
-1. Create a Resend API key and add it as `RESEND_API_KEY`.
-2. Verify the sending domain with the DNS records supplied by Resend.
-3. Set `RESEND_AUDIENCE_FROM` to a sender on that domain, for example
-   `Haethon <reminders@example.com>`.
-4. Sign in as an admin and use `/admin/email-test` before enabling scheduled
-   sends.
-
-The reminder and digest routes return a service-unavailable response when email
-is not fully configured; the rest of the application continues to work. See
-[the email reminder deployment guide](docs/deploying-email-reminders.md) for a
-production checklist.
-
-</details>
 
 <details>
 <summary><strong>Discord synchronization</strong></summary>
@@ -362,13 +337,11 @@ core environment variables as a normal local run.
 
 ## Scheduled jobs
 
-Vercel Cron reads [`vercel.json`](vercel.json) and calls four authenticated
+Vercel Cron reads [`vercel.json`](vercel.json) and calls two authenticated
 routes:
 
 | Route | Schedule (UTC) | Responsibility |
 | --- | --- | --- |
-| `/api/cron/send-reminders` | Daily at 12:00 | Send due application and event reminders |
-| `/api/cron/send-weekly-digest` | Monday at 12:04 | Send the weekly upcoming-events digest |
 | `/api/cron/sync-discord` | Daily at 12:08 | Create, sort, and archive Discord channels |
 | `/api/cron/cleanup-hackathons` | Daily at 12:12 | Perform stale-event housekeeping |
 
@@ -397,5 +370,3 @@ branch protection, release flow, and rollback guidance.
 ## Additional documentation
 
 - [CI/CD and production deployment](docs/ci-cd.md)
-- [Deploying email reminders](docs/deploying-email-reminders.md)
-- [Face Off Elo model](docs/faceoff-elo.md)

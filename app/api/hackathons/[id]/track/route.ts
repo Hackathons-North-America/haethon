@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathons, userHackathons } from "@/lib/db/schema";
-import { syncRemindersForUserHackathon } from "@/lib/hackathons/reminders";
 import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { hackathonTrackSchema } from "@/lib/validations/hackathon";
 
@@ -54,12 +53,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       isSaved: userHackathons.isSaved,
     });
 
-  await syncRemindersForUserHackathon({
-    userId: userContext.user.id,
-    hackathonId: id,
-    isSaved: true,
-  });
-
   revalidatePublicProfiles();
 
   return NextResponse.json({ data: tracked });
@@ -75,17 +68,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   // Drop the tracking row entirely so the hackathon leaves the pipeline — this
-  // undoes the interested/applied/accepted tag in one go — then clear
-  // any reminders that were scheduled for it.
+  // undoes the interested/applied/accepted tag in one go.
   await db
     .delete(userHackathons)
     .where(and(eq(userHackathons.userId, userContext.user.id), eq(userHackathons.hackathonId, id)));
-
-  await syncRemindersForUserHackathon({
-    userId: userContext.user.id,
-    hackathonId: id,
-    isSaved: false,
-  });
 
   revalidatePublicProfiles();
 

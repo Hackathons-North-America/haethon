@@ -33,14 +33,6 @@ const ApprovalFlowVisual = dynamic(
   { ssr: false },
 );
 
-const PipelineSpotlightVisual = dynamic(
-  () =>
-    import("@/components/landing-pipeline-spotlight").then(
-      (mod) => mod.PipelineSpotlightVisual,
-    ),
-  { ssr: false },
-);
-
 /* The bento cards size their own visual wells (relative, min-height), so the
    first two wrappers just fill whatever well they're dropped into. */
 export function LazySourcedEverywhere() {
@@ -63,15 +55,6 @@ export function LazyApprovalFlow() {
   return (
     <LazyMount className="min-h-[11rem]">
       <ApprovalFlowVisual />
-    </LazyMount>
-  );
-}
-
-export function LazyPipelineSpotlight() {
-  return (
-    /* Mobile shows just the spotlight card; md+ adds the backdrop board. */
-    <LazyMount className="min-h-[30rem] md:min-h-[36rem]">
-      <PipelineSpotlightVisual />
     </LazyMount>
   );
 }

@@ -1,11 +1,10 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
   hackathonDates,
-  hackathonFaceoffRatings,
   hackathonLocations,
   hackathonTags,
   hackathons,
@@ -17,9 +16,6 @@ import { getFriendActivityByHackathon, type HackathonFriend } from "@/lib/follow
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
 import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
-import { DISPLAY_PRIOR_GAMES } from "@/lib/hackathons/elo";
-import { getLiveFaceoffRatings } from "@/lib/hackathons/faceoff-service";
-import type { TierLabel } from "@/lib/hackathons/ranking";
 import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
 /* One page of catalog results. The listing page and the search API both read
@@ -50,8 +46,7 @@ type CatalogQuery = {
   /* ISO strings (not Dates) so the serialized cache key is stable. */
   startsAfter: string | null;
   startsBefore: string | null;
-  /* A null limit is reserved for the cached Face Off candidate pool. */
-  limit: number | null;
+  limit: number;
   offset: number;
 };
 
@@ -70,9 +65,6 @@ type PublicHackathonCard = {
   /* Deep link to the event's Discord channel, when one exists — powers the
      card's "Chat on Discord" action without a per-card lookup. */
   discordUrl: string | null;
-  eloRating: number;
-  faceoffLosses: number;
-  faceoffWins: number;
   format: "online" | "in_person";
   hasDiscord: boolean;
   highSchoolersOnly: boolean;
@@ -86,7 +78,6 @@ type PublicHackathonCard = {
   location: string;
   name: string;
   prizeAmountUsd: number | null;
-  rankTier: TierLabel;
   slug: string;
   /* True when the event's dates have passed. Only recurring-series editions
      survive in the catalog once past, badged as "last held" until the next
@@ -138,14 +129,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
   // stale — fine at whole-day event granularity.
   const now = new Date();
 
-  // SQL mirror of displayEloRating(): ratings backed by few games are pulled
-  // toward the neutral 1500 before ordering, so page boundaries fall where the
-  // client's own Elo sort would put them. Hackathons without a ratings row
-  // order at exactly 1500.
-  const faceoffGames = sql`(coalesce(${hackathonFaceoffRatings.faceoffWins}, 0) + coalesce(${hackathonFaceoffRatings.faceoffLosses}, 0))`;
-  const displayElo = sql`round(1500 + ${faceoffGames}::float / (${faceoffGames} + ${DISPLAY_PRIOR_GAMES}) * (coalesce(${hackathonFaceoffRatings.eloRating}, 1500) - 1500))`;
-
-  const rowsQuery = db
+  const rows = await db
     .select({
       id: hackathons.id,
       seriesId: hackathons.seriesId,
@@ -175,7 +159,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
-    .leftJoin(hackathonFaceoffRatings, eq(hackathonFaceoffRatings.hackathonId, hackathons.id))
     .where(
       and(
         isNotNull(hackathons.publishedAt),
@@ -197,26 +180,22 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         startsBefore ? lte(hackathonDates.startsAt, startsBefore) : undefined
       )
     )
-    // The catalog grid presents cards Elo-ranked, so pagination must hand out
-    // pages in that same order — the client re-sorts only what it has loaded
-    // and cannot pull the true #1 out of a page it hasn't fetched yet. The id
-    // tiebreak matches the client's
-    // (eloRating desc, id asc), and past (recurring) editions group after
+    // The catalog grid presents cards soonest-start first, so pagination must
+    // hand out pages in that same order — the client re-sorts only what it has
+    // loaded and cannot pull the true first card out of a page it hasn't
+    // fetched yet. Dates-TBA rows sort last and the id tiebreak matches the
+    // client's sortByStartDate(); past (recurring) editions group after
     // everything upcoming, mirroring the archive split below the grid.
     .orderBy(
       sql`case when coalesce(${hackathonDates.endsAt}, ${hackathonDates.startsAt}) < ${now} then 1 else 0 end`,
-      desc(displayElo),
+      sql`${hackathonDates.startsAt} asc nulls last`,
       asc(hackathons.id)
     )
-    .$dynamic();
+    .limit(query.limit + 1)
+    .offset(query.offset);
 
-  // Search consumers remain paginated. Face Off receives one cached pool.
-  const rows = await (query.limit === null
-    ? rowsQuery.offset(query.offset)
-    : rowsQuery.limit(query.limit + 1).offset(query.offset));
-
-  const hasMore = query.limit !== null && rows.length > query.limit;
-  const fetchedRows = hasMore && query.limit !== null ? rows.slice(0, query.limit) : rows;
+  const hasMore = rows.length > query.limit;
+  const fetchedRows = hasMore ? rows.slice(0, query.limit) : rows;
 
   // A past edition of a recurring series is only listed while no current
   // edition exists. That current edition may sit outside this page (or be
@@ -282,9 +261,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         date: formatDateRange(row.startsAt, row.endsAt),
         description: row.description,
         discordUrl: discordLinks.get(row.id) ?? null,
-        eloRating: 1500,
-        faceoffWins: 0,
-        faceoffLosses: 0,
         format: row.format,
         hasDiscord: discordLinks.has(row.id),
         highSchoolersOnly: row.highSchoolersOnly,
@@ -296,7 +272,6 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         location: location.locality ?? "Location TBA",
         name: row.name,
         prizeAmountUsd: row.prizeAmountUsd,
-        rankTier: "D" as TierLabel,
         slug: row.slug,
         source: row.source ? sourceBadge(row.source) : null,
         startsAt: row.startsAt?.toISOString() ?? null,
@@ -314,26 +289,6 @@ const getCachedCatalogPage = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG
   revalidate: CATALOG_REVALIDATE_SECONDS,
   tags: [CATALOG_CACHE_TAG],
 });
-
-/* The unbounded Face Off pool is the most expensive catalog query (every row
-   plus the tag and Discord fan-outs), and its freshness barely matters — live
-   Elo is overlaid separately every 60s, and ingest/admin changes revalidate
-   the shared tag. So it re-runs hourly instead of riding the 10-minute page
-   window. */
-const getCachedCatalogSnapshot = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG, "snapshot"], {
-  revalidate: 3600,
-  tags: [CATALOG_CACHE_TAG],
-});
-
-async function withLiveFaceoffRatings(pagePromise: Promise<CatalogPage>) {
-  const [page, ratings] = await Promise.all([pagePromise, getLiveFaceoffRatings()]);
-  const ratingsById = new Map(ratings.map((rating) => [rating.id, rating]));
-
-  return {
-    ...page,
-    cards: page.cards.map((card) => ({ ...card, ...(ratingsById.get(card.id) ?? {}) })),
-  };
-}
 
 export function revalidateHackathonCaches() {
   revalidateTag(CATALOG_CACHE_TAG, "max");
@@ -357,7 +312,7 @@ export function getPublicHackathonCatalog(input: {
   limit?: number;
   offset?: number;
 }): Promise<CatalogPage> {
-  return withLiveFaceoffRatings(getCachedCatalogPage({
+  return getCachedCatalogPage({
     /* ILIKE is case-insensitive, so normalize equivalent searches onto one
        cache entry instead of paying for "Toronto" and "toronto" separately. */
     name: (input.name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US"),
@@ -370,25 +325,7 @@ export function getPublicHackathonCatalog(input: {
     startsBefore: roundDownToHourIso(input.startsBefore),
     limit: Math.min(Math.max(input.limit ?? CATALOG_PAGE_SIZE, 1), 50),
     offset: Math.min(Math.max(input.offset ?? 0, 0), 10_000),
-  }));
-}
-
-/**
- * Returns the complete public catalog as one shared, cached Face Off pool.
- */
-export function getPublicHackathonCatalogSnapshot(): Promise<CatalogPage> {
-  return withLiveFaceoffRatings(getCachedCatalogSnapshot({
-    name: "",
-    countries: [],
-    format: null,
-    beginnerFriendly: null,
-    travelReimbursement: null,
-    highSchoolersOnly: null,
-    startsAfter: null,
-    startsBefore: null,
-    limit: null,
-    offset: 0,
-  }));
+  });
 }
 
 /**

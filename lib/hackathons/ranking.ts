@@ -1,64 +1,53 @@
 /**
- * Client- and server-safe sorting/grouping helpers for the Elo-ranked catalog
- * grid and the Face Off arena. Pure functions over already-fetched catalog
- * cards — no DB access.
+ * Client- and server-safe sorting helpers for the catalog grid. Pure functions
+ * over already-fetched catalog cards — no DB access.
  */
 
-export type EloRankable = {
+export type StartDateSortable = {
   id: string;
-  eloRating: number;
-  rankTier?: TierLabel;
+  startsAt?: string | null;
   countryCode?: string | null;
-  faceoffWins?: number;
-  faceoffLosses?: number;
 };
 
 export const TIER_LABELS = ["S", "A", "B", "C", "D"] as const;
 export type TierLabel = (typeof TIER_LABELS)[number];
 
-export const TIER_PERCENTAGES: Record<TierLabel, number> = {
-  S: 1,
-  A: 10,
-  B: 20,
-  C: 30,
-  D: 39,
-};
+/* Placeholder until a new ranking system replaces the retired Face Off Elo:
+   every catalog card shows the same tier. */
+export const PLACEHOLDER_TIER: TierLabel = "B";
 
-export function tierForPosition(position: number, population: number): TierLabel {
-  if (position <= Math.ceil(population * 0.01)) return "S";
-  if (position <= Math.ceil(population * 0.11)) return "A";
-  if (position <= Math.ceil(population * 0.31)) return "B";
-  if (position <= Math.ceil(population * 0.61)) return "C";
-  return "D";
+function startTime(card: StartDateSortable) {
+  const time = card.startsAt ? Date.parse(card.startsAt) : Number.NaN;
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
 }
 
-export type RankDirection = "higher" | "lower";
-
 /**
- * Rank #1 is higher than rank #2, so rank direction is the inverse of the
- * numeric comparison. Equal ranks are accepted in either direction.
+ * Soonest start first; hackathons with no confirmed dates sort last. The id
+ * tiebreak mirrors the catalog query's ORDER BY so paginated pages and the
+ * client's re-sort agree.
  */
-export function isRankGuessCorrect(
-  leftRank: number,
-  rightRank: number,
-  direction: RankDirection
-): boolean {
-  return direction === "higher" ? rightRank <= leftRank : rightRank >= leftRank;
-}
+export function sortByStartDate<T extends StartDateSortable>(cards: readonly T[]): T[] {
+  return [...cards].sort((a, b) => {
+    const aTime = startTime(a);
+    const bTime = startTime(b);
 
-export function sortByEloDescending<T extends EloRankable>(cards: readonly T[]): T[] {
-  return [...cards].sort((a, b) => b.eloRating - a.eloRating || a.id.localeCompare(b.id));
+    if (aTime !== bTime) {
+      return aTime < bTime ? -1 : 1;
+    }
+
+    return a.id.localeCompare(b.id);
+  });
 }
 
 /**
- * Elo-descending, but with the visitor's home country's hackathons pulled to
+ * Start-date order, but with the visitor's home country's hackathons pulled to
  * the very top first. Used by the catalog grid.
  */
-export function sortByEloWithLocalBoost<T extends EloRankable>(
+export function sortByStartDateWithLocalBoost<T extends StartDateSortable>(
   cards: readonly T[],
   localCountryCode: string | null | undefined
 ): T[] {
-  const sorted = sortByEloDescending(cards);
+  const sorted = sortByStartDate(cards);
 
   if (!localCountryCode) {
     return sorted;
@@ -73,25 +62,4 @@ export function sortByEloWithLocalBoost<T extends EloRankable>(
   }
 
   return [...local, ...rest];
-}
-
-export type TierGroup<T> = {
-  tier: TierLabel;
-  hackathons: T[];
-};
-
-/**
- * Groups by the global tier derived by the cached leaderboard. This helper
- * deliberately does not derive percentiles from `cards`: a country, date, or
- * search filter must never change a hackathon's rank.
- */
-export function assignTiers<T extends EloRankable>(cards: readonly T[]): TierGroup<T>[] {
-  const groups: TierGroup<T>[] = TIER_LABELS.map((tier) => ({ tier, hackathons: [] }));
-
-  for (const card of sortByEloDescending(cards)) {
-    const tier = card.rankTier && TIER_LABELS.includes(card.rankTier) ? card.rankTier : "D";
-    groups.find((group) => group.tier === tier)?.hackathons.push(card);
-  }
-
-  return groups;
 }

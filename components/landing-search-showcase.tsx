@@ -10,7 +10,6 @@ import {
   PlusSquare,
   Search,
   Settings2,
-  Swords,
   Users,
 } from "lucide-react";
 
@@ -93,7 +92,6 @@ const queryFields = [
 
 const appNavItems = [
   { Icon: Compass, label: "Hackathons DB", active: true },
-  { Icon: Swords, label: "Face Off" },
   { Icon: CalendarDays, label: "My Hackathons" },
   { Icon: Users, label: "Friends" },
   { Icon: CircleUser, label: "Hacker Profile" },

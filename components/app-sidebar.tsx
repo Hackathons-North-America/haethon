@@ -16,7 +16,6 @@ import {
   PlusSquare,
   Settings,
   ShieldCheck,
-  Swords,
   Users,
 } from "lucide-react";
 
@@ -33,7 +32,6 @@ type SidebarLink = {
 
 const items: SidebarLink[] = [
   { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
-  { href: "/face-off", icon: Swords, label: "Face Off" },
   { href: "/my", icon: CalendarDays, label: "My Hackathons", requiresAuth: true },
   { href: "/friends", icon: Users, label: "Friends", requiresAuth: true },
   { href: "/account", icon: CircleUser, label: "Hacker Profile", requiresAuth: true },

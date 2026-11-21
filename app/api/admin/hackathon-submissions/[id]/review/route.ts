@@ -1,11 +1,7 @@
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
 import { reviewHackathonSubmission } from "@/lib/hackathons/review-service";
-import { sendSubmissionEmail } from "@/lib/notifications/submissions";
 import { reviewActionErrorPayload, reviewActionSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -32,15 +28,6 @@ export async function POST(request: Request, context: RouteContext) {
       action: parsed.data,
       reviewerUserId: gate.user.id,
       submissionId: id,
-    });
-    const [submitter] = await db.select({ email: users.email }).from(users).where(eq(users.id, result.submission.submittedByUserId)).limit(1);
-
-    await sendSubmissionEmail({
-      to: submitter?.email,
-      status: result.submission.status === "approved" ? "approved" : result.submission.status === "merged" ? "merged" : "rejected",
-      hackathonName: result.submission.normalizedName,
-      reason: result.submission.rejectionReason,
-      hackathonUrl: result.approvedHackathonId ? "/hackathons" : null,
     });
 
     return NextResponse.json({ data: result });

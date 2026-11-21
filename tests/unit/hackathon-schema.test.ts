@@ -8,7 +8,6 @@ import {
   adminHackathonRecurringSchema,
   adminHackathonUpdateSchema,
   communitySubmissionSchema,
-  faceoffVoteSchema,
   hackathonSearchSchema,
   organizerSubmissionSchema,
   profileUpdateSchema,
@@ -85,21 +84,6 @@ describe("hackathonSearchSchema", () => {
     });
 
     expect(result.format).toBe("any");
-  });
-});
-
-describe("faceoffVoteSchema", () => {
-  it("requires two valid hackathon ids", () => {
-    const valid = faceoffVoteSchema.safeParse({
-      winnerId: "8910d03d-95b7-4386-9bb1-7e2f827d4bf8",
-      loserId: "5b3caaf5-ea43-4cc2-9efb-6f48ed90bc52",
-    });
-    const incomplete = faceoffVoteSchema.safeParse({
-      winnerId: "8910d03d-95b7-4386-9bb1-7e2f827d4bf8",
-    });
-
-    expect(valid.success).toBe(true);
-    expect(incomplete.success).toBe(false);
   });
 });
 
