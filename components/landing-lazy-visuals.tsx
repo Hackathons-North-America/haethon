@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 
+import { SearchShowcaseVisual } from "@/components/landing-search-showcase";
 import { LazyMount } from "@/components/lazy-mount";
 
 /* Below-fold landing visuals. Each is split into its own chunk (next/dynamic,
@@ -72,5 +73,16 @@ export function LazyPipelineSpotlight() {
     <LazyMount className="min-h-[30rem] md:min-h-[36rem]">
       <PipelineSpotlightVisual />
     </LazyMount>
+  );
+}
+
+export function LazySearchShowcase() {
+  return (
+    /* Render the framed database immediately inside its reserved well. The
+       other landing visuals can wait on observation, but an intentionally
+       blank product frame would weaken this section's screenshot treatment. */
+    <div className="min-h-[31rem] md:min-h-0">
+      <SearchShowcaseVisual />
+    </div>
   );
 }

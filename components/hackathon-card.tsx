@@ -325,8 +325,8 @@ function toMonthLabel(month: string) {
 }
 
 /* The card's big date block renders differently depending on the span:
-   - single    one day, one line ("Sep 30")
-   - sameMonth a range within one month — month on top, "start – end" below
+   - single    one day — month on top, day below ("Sep" / "30")
+   - sameMonth a range within one month — month on top, "start–end" below
    - multiMonth a range crossing months — "Sep 30" / "Oct 2", no dash
    - raw       anything we can't parse, shown verbatim on one line */
 type ParsedDate =
@@ -385,7 +385,8 @@ function getWeekday(startsAt?: string | null) {
 }
 
 /* Renders the big date block: weekday in small caps up top, then the bold
-   start date, with a "– end" line below it for multi-day ranges. */
+   month on its own row with the day (or "start–end" range) beneath it.
+   Cross-month ranges keep both months: "Sep 30" / "– Oct 2". */
 function CardDate({ parsed, weekday }: { parsed: ParsedDate; weekday: string | null }) {
   const lineClass = "text-[1.5rem] leading-[1.05] tracking-[-0.05em] @[26rem]:text-[1.8rem]";
 
@@ -393,9 +394,9 @@ function CardDate({ parsed, weekday }: { parsed: ParsedDate; weekday: string | n
     parsed.kind === "raw"
       ? [parsed.text]
       : parsed.kind === "single"
-        ? [`${parsed.month} ${parsed.day}`]
+        ? [parsed.month, parsed.day]
         : parsed.kind === "sameMonth"
-          ? [`${parsed.month} ${parsed.startDay}`, `– ${parsed.endDay}`]
+          ? [parsed.month, `${parsed.startDay}–${parsed.endDay}`]
           : [`${parsed.startMonth} ${parsed.startDay}`, `– ${parsed.endMonth} ${parsed.endDay}`];
 
   return (
@@ -1042,6 +1043,155 @@ function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData;
   );
 }
 
+/* Untiered cards (no Face Off ranking yet) still get the hover wash, in a
+   warm sand that sits on the paper like the tier tints do. */
+const UNTIERED_STREAK_RGB = "214 190 150";
+
+/* Applied only on hover-capable pointers: touch screens never fire the hover
+   overlay, so they keep the plain footer links instead. */
+const hoverDeviceHidden = "[@media(hover:hover)]:hidden";
+
+const overlayEase = "ease-[cubic-bezier(0.22,1,0.36,1)]";
+
+const overlayHalfClassName =
+  "relative flex min-w-0 items-center justify-center gap-1.5 px-3 font-mono text-[11px] font-medium uppercase tracking-[0.16em] @[26rem]:text-xs";
+
+/* One half of the hover overlay. A missing destination keeps its half in
+   place, dimmed and inert, so the More info / Website split never shifts. */
+function CardOverlayHalf({
+  external,
+  href,
+  label,
+  preview,
+  title,
+}: {
+  external?: boolean;
+  href: string | null;
+  label: string;
+  preview: boolean;
+  title: string;
+}) {
+  const content = (
+    <span
+      className={`inline-flex items-center gap-1.5 opacity-0 transition-opacity delay-0 duration-200 group-hover/card:opacity-100 group-hover/card:delay-200 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:delay-0 ${
+        href ? "underline-offset-4 group-hover/half:underline" : ""
+      }`}
+    >
+      {label}
+      {external ? <ArrowUpRight aria-hidden="true" className="size-3.5" /> : null}
+    </span>
+  );
+
+  if (!href) {
+    return (
+      <span aria-disabled="true" className={`${overlayHalfClassName} cursor-not-allowed text-ink/35`}>
+        {content}
+      </span>
+    );
+  }
+
+  /* Preview cards stand in for a real listing: the label shows, nothing navigates. */
+  if (preview) {
+    return (
+      <span aria-hidden="true" className={`${overlayHalfClassName} group/half text-ink`}>
+        {content}
+      </span>
+    );
+  }
+
+  const className = `${overlayHalfClassName} group/half text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-pine`;
+
+  return external ? (
+    <a className={className} href={href} rel="noopener noreferrer" target="_blank" title={title}>
+      {content}
+    </a>
+  ) : (
+    <Link className={className} href={href} title={title}>
+      {content}
+    </Link>
+  );
+}
+
+/* Hover takeover for the card body. Two tier-tinted blooms slide in from the
+   left and right edges, meet in the middle, then a flat wash fades in behind
+   them so the whole body reads as one gradient. The surface splits into two
+   targets: More info on the left, the organizer's website on the right.
+   Keyboard users get the same overlay when one of its links has focus-visible. */
+function CardHoverOverlay({
+  hackathon,
+  preview,
+  tier,
+}: {
+  hackathon: HackathonCardData;
+  preview: boolean;
+  tier?: TierLabel;
+}) {
+  const rgb = tier ? TIER_STREAK_RGB[tier] : UNTIERED_STREAK_RGB;
+  const bloom = (edge: "0%" | "100%") =>
+    `radial-gradient(ellipse 90% 130% at ${edge} 50%, rgb(${rgb} / 0.62) 0%, rgb(${rgb} / 0.4) 55%, rgb(${rgb} / 0.22) 100%)`;
+  /* Soft leading edge so each bloom arrives as a wash, not a sliding panel. */
+  const leadingEdgeMask = (direction: "right" | "left") =>
+    `linear-gradient(to ${direction}, black 62%, transparent 100%)`;
+
+  const bloomClassName = `pointer-events-none absolute inset-0 opacity-0 transition-[translate,opacity] delay-0 duration-500 ${overlayEase} group-hover/card:translate-x-0 group-hover/card:opacity-100 group-has-[:focus-visible]/overlay:translate-x-0 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-opacity`;
+
+  return (
+    <div className="group/overlay pointer-events-none absolute inset-0 z-40 overflow-hidden group-hover/card:pointer-events-auto has-[:focus-visible]:pointer-events-auto">
+      {/* Paper backdrop hides the body's text as the blooms come in. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-paper opacity-0 transition-opacity duration-200 group-hover/card:opacity-100 group-has-[:focus-visible]/overlay:opacity-100"
+      />
+      <div
+        aria-hidden="true"
+        className={`${bloomClassName} -translate-x-full`}
+        style={{
+          backgroundImage: bloom("0%"),
+          maskImage: leadingEdgeMask("right"),
+          WebkitMaskImage: leadingEdgeMask("right"),
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className={`${bloomClassName} translate-x-full`}
+        style={{
+          backgroundImage: bloom("100%"),
+          maskImage: leadingEdgeMask("left"),
+          WebkitMaskImage: leadingEdgeMask("left"),
+        }}
+      />
+      {/* Once the blooms meet, an even wash settles over the seam. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity delay-0 duration-300 group-hover/card:opacity-100 group-hover/card:delay-300 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:delay-0"
+        style={{ backgroundColor: `rgb(${rgb} / 0.2)` }}
+      />
+      {/* Same airbrushed grain as the resting streak. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 group-hover/card:opacity-60 group-has-[:focus-visible]/overlay:opacity-60"
+        style={{ backgroundImage: STREAK_NOISE_URI }}
+      />
+
+      <div className="relative grid size-full grid-cols-2">
+        <CardOverlayHalf
+          href={hackathon.slug ? `/hackathons/${hackathon.slug}` : null}
+          label="More info"
+          preview={preview}
+          title={`View ${hackathon.name} details`}
+        />
+        <CardOverlayHalf
+          external
+          href={hackathon.websiteUrl ?? null}
+          label="Website"
+          preview={preview}
+          title={`Open the ${hackathon.name} website`}
+        />
+      </div>
+    </div>
+  );
+}
+
 function BookmarkPageCard({
   cornerAction,
   hackathon,
@@ -1200,10 +1350,14 @@ export function HackathonCard({
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
   const streak = tier ? getTierStreak(hackathon.name, tier) : null;
+  /* The board's reminder picker and remove button live in the footer and must
+     stay usable above the hover overlay; without them, hover-capable devices
+     drop the footer entirely since its links moved into the overlay. */
+  const hasFooterControls = Boolean(reminder || cornerAction);
 
   return (
     <article
-      className={`group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
+      className={`group group/card @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
@@ -1313,7 +1467,11 @@ export function HackathonCard({
           {/* `min-h-10` keeps every card's footer the same height whether or
               not it carries a reminder picker or a website link, so a row of
               cards still lines up. */}
-          <div className="relative z-10 mt-5 border-t border-ink/25 pt-4">
+          <div
+            className={`relative mt-5 border-t border-ink/25 pt-4 ${
+              hasFooterControls ? "z-50" : `z-10 ${hoverDeviceHidden}`
+            }`}
+          >
             <div className="flex min-h-10 items-start justify-between gap-3">
               {reminder ? (
                 <ReminderControl
@@ -1323,15 +1481,23 @@ export function HackathonCard({
                 />
               ) : null}
               <div className="ml-auto flex min-w-0 flex-1 items-center justify-between gap-3">
-                <CardMoreInfoLink hackathon={hackathon} preview={preview} />
+                {/* Touch-only fallback: on hover devices these two links live
+                    in the hover overlay instead. */}
+                <div className={`contents ${hoverDeviceHidden}`}>
+                  <CardMoreInfoLink hackathon={hackathon} preview={preview} />
+                </div>
                 <div className="ml-auto flex shrink-0 items-center gap-3">
-                  <CardWebsiteLink hackathon={hackathon} preview={preview} />
+                  <div className={`contents ${hoverDeviceHidden}`}>
+                    <CardWebsiteLink hackathon={hackathon} preview={preview} />
+                  </div>
                   {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        <CardHoverOverlay hackathon={hackathon} preview={preview} tier={tier} />
       </div>
     </article>
   );

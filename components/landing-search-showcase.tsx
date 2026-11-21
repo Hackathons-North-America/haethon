@@ -1,13 +1,17 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
 import {
   CalendarDays,
+  CircleUser,
+  Compass,
   Globe2,
+  LogIn,
   MapPin,
   PlusSquare,
   Search,
   Settings2,
+  Swords,
+  Users,
 } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
@@ -72,10 +76,8 @@ const backdropHackathons: HackathonCardData[] = [
 /* The bar at rest inside the backdrop app, matching /hackathons before a
    query is typed. */
 const backdropSearchFields = [
-  { Icon: null, label: "Name", value: "Hackathon name" },
-  { Icon: Globe2, label: "Countries", value: "Search countries" },
+  { Icon: Globe2, label: "Location", value: "Country or near me" },
   { Icon: CalendarDays, label: "Date", value: "Any date" },
-  { Icon: MapPin, label: "Format", value: "Any format" },
   { Icon: Settings2, label: "Features", value: "Add features" },
 ];
 
@@ -83,13 +85,20 @@ const backdropSearchFields = [
    section's feature list, using the app's real filter labels. */
 const queryFields = [
   { Icon: null, label: "Name", value: "Search any hackathon…", filled: false },
-  { Icon: Globe2, label: "Countries", value: "Canada, United States", filled: true },
+  { Icon: Globe2, label: "Location", value: "Canada, United States", filled: true },
+  { Icon: MapPin, label: "Near me", value: "Within 100 km", filled: true },
   { Icon: CalendarDays, label: "Date", value: "Next 90 days", filled: true },
-  { Icon: MapPin, label: "Format", value: "In person", filled: true },
-  { Icon: Settings2, label: "Features", value: "Travel reimbursements +1", filled: true },
+  { Icon: Settings2, label: "Features", value: "Travel reimbursement", filled: true },
 ];
 
-const easeOut = [0.22, 1, 0.36, 1] as const;
+const appNavItems = [
+  { Icon: Compass, label: "Hackathons DB", active: true },
+  { Icon: Swords, label: "Face Off" },
+  { Icon: CalendarDays, label: "My Hackathons" },
+  { Icon: Users, label: "Friends" },
+  { Icon: CircleUser, label: "Hacker Profile" },
+  { Icon: LogIn, label: "Login" },
+];
 
 /* The dimmed /hackathons view sitting behind the enlarged bar — region
    presets, the resting pill search bar, and the results grid, faded toward
@@ -100,60 +109,81 @@ function BackdropApp() {
     <div
       aria-hidden="true"
       inert
-      className="pointer-events-none hidden select-none overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white/45 p-6 [mask-image:linear-gradient(to_bottom,black_45%,transparent_97%)] md:block lg:p-8"
+      className="pointer-events-none hidden aspect-[16/10] select-none overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white/45 [mask-image:linear-gradient(to_bottom,black_45%,transparent_97%)] md:flex"
     >
-      <div className="flex items-center justify-between gap-4 opacity-80">
-        <div className="inline-flex items-center gap-1 rounded-full border border-ink/10 bg-white/70 p-1.5">
-          {regionPresets.map((preset, index) => (
+      {/* A static miniature of the real /hackathons desktop navigation rail.
+          Keeping it inside the framed app makes the visual read as HNA at a
+          glance, in the same place the reference screenshot shows its site's
+          navigation. */}
+      <div className="w-[4.75rem] shrink-0 border-r border-ink/15 bg-paper/90 px-3 py-5">
+        <div className="text-center text-xl font-semibold tracking-tight text-ink">HNA</div>
+        <div className="mt-7 space-y-1">
+          {appNavItems.map(({ Icon, label, active }) => (
             <span
-              key={preset.id}
-              className={`inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-5 text-sm font-semibold ${
-                index === 0
-                  ? "bg-ink text-paper shadow-[0_8px_20px_-8px_rgba(27,25,23,0.28)]"
-                  : "text-ink/55"
-              }`}
+              aria-label={label}
+              className={`grid size-12 place-items-center ${active ? "text-pine" : "text-ink/45"}`}
+              key={label}
             >
-              <span className={`text-lg leading-none ${index === 0 ? "" : "grayscale"}`}>
-                {preset.emoji}
-              </span>
-              {preset.label}
+              <Icon className="size-5" strokeWidth={active ? 2.4 : 1.8} />
             </span>
           ))}
         </div>
-        <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink">
-          <PlusSquare aria-hidden="true" className="size-4" />
-          Submit a hackathon
-        </span>
       </div>
 
-      <div className="mt-8 flex items-stretch rounded-[2.35rem] border border-ink/10 bg-white/90 p-2 opacity-80 shadow-[0_12px_36px_-18px_rgba(27,25,23,0.32)]">
-        {backdropSearchFields.map(({ Icon, label, value }) => (
-          <div
-            key={label}
-            className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3"
-          >
-            <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink">
-              {Icon ? <Icon className="size-3.5" /> : null}
-              {label}
-            </span>
-            <span className="mt-1 block truncate text-sm leading-5 text-ink/40">{value}</span>
+      <div className="min-w-0 flex-1 p-6 lg:p-8">
+        <div className="flex items-center justify-between gap-4 opacity-80">
+          <div className="inline-flex items-center gap-1 rounded-full border border-ink/10 bg-white/70 p-1.5">
+            {regionPresets.map((preset, index) => (
+              <span
+                key={preset.id}
+                className={`inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-full px-5 text-sm font-semibold ${
+                  index === 0
+                    ? "bg-ink text-paper shadow-[0_8px_20px_-8px_rgba(27,25,23,0.28)]"
+                    : "text-ink/55"
+                }`}
+              >
+                <span className={`text-lg leading-none ${index === 0 ? "" : "grayscale"}`}>
+                  {preset.emoji}
+                </span>
+                {preset.label}
+              </span>
+            ))}
           </div>
-        ))}
-        <div className="flex items-center px-3 py-2">
-          <span className="grid size-12 place-items-center rounded-full bg-pine text-paper">
-            <Search className="size-5" strokeWidth={2.5} />
+          <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink">
+            <PlusSquare aria-hidden="true" className="size-4" />
+            Submit a hackathon
           </span>
         </div>
-      </div>
 
-      <h3 className="mt-10 text-3xl font-medium tracking-tight text-ink opacity-80">
-        Upcoming hackathons
-      </h3>
+        <div className="mt-8 flex items-stretch rounded-[2.35rem] border border-ink/10 bg-white/90 p-2 opacity-80 shadow-[0_12px_36px_-18px_rgba(27,25,23,0.32)]">
+          {backdropSearchFields.map(({ Icon, label, value }) => (
+            <div
+              key={label}
+              className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-[2rem] px-6 py-3"
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink">
+                {Icon ? <Icon className="size-3.5" /> : null}
+                {label}
+              </span>
+              <span className="mt-1 block truncate text-sm leading-5 text-ink/40">{value}</span>
+            </div>
+          ))}
+          <div className="flex items-center px-3 py-2">
+            <span className="grid size-12 place-items-center rounded-full bg-pine text-paper">
+              <Search className="size-5" strokeWidth={2.5} />
+            </span>
+          </div>
+        </div>
 
-      <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-3">
-        {backdropHackathons.map((hackathon) => (
-          <HackathonCard key={hackathon.id} hackathon={hackathon} preview />
-        ))}
+        <h3 className="mt-10 text-3xl font-medium tracking-tight text-ink opacity-80">
+          Upcoming hackathons
+        </h3>
+
+        <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-cols-3">
+          {backdropHackathons.map((hackathon) => (
+            <HackathonCard key={hackathon.id} hackathon={hackathon} preview />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -164,16 +194,8 @@ function BackdropApp() {
    zoom reads literally. Mobile trades the wide pill for the same query
    stacked into a card. */
 function EnlargedSearchBar() {
-  const prefersReducedMotion = useReducedMotion();
-
   return (
-    <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0, y: 26, scale: 0.96 }}
-      whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, amount: 0.4 }}
-      transition={{ duration: 0.6, ease: easeOut, delay: 0.15 }}
-      className="relative z-10 md:absolute md:-left-5 md:-right-5 md:top-[5.75rem] lg:-left-9 lg:-right-9"
-    >
+    <div className="relative z-10 md:absolute md:left-10 md:-right-5 md:top-[5.75rem] lg:left-7 lg:-right-9">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(ellipse_at_center,rgba(54,37,25,0.16),rgba(54,37,25,0.06)_55%,transparent_80%)] blur-3xl"
@@ -230,7 +252,7 @@ function EnlargedSearchBar() {
           Search
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
