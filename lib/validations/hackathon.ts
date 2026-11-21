@@ -429,36 +429,6 @@ export const hackathonTrackSchema = z.object({
   applicationStatus: z.enum(["interested", "applied", "accepted", "attending"]),
 });
 
-export const hackathonNotificationPreferencesSchema = z.object({
-  preferences: z
-    .array(
-      z.object({
-        type: z.enum([
-          "application_open",
-          "application_week_before",
-          "application_day_before",
-          "hackathon_week_before",
-          "hackathon_day_before",
-        ]),
-        enabled: z.boolean(),
-      })
-    )
-    .min(1)
-    .max(5),
-});
-
-export const reminderEmailTestSchema = z.object({
-  email: z.string().trim().email(),
-  hackathonId: z.string().uuid(),
-  type: z.enum([
-    "application_open",
-    "application_week_before",
-    "application_day_before",
-    "hackathon_week_before",
-    "hackathon_day_before",
-  ]),
-});
-
 export const hackathonCheckinRedeemSchema = z.object({
   code: z.string().trim().min(4).max(20),
 });
@@ -471,9 +441,4 @@ export const attendanceAnomalyResolveSchema = z.object({
   userId: z.string().uuid(),
   hackathonId: z.string().uuid(),
   action: z.enum(["verify", "revoke"]),
-});
-
-export const faceoffVoteSchema = z.object({
-  winnerId: z.string().uuid(),
-  loserId: z.string().uuid(),
 });

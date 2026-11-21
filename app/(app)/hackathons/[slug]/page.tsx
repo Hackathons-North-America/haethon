@@ -25,7 +25,6 @@ import {
 import { AddToCalendarButton } from "@/components/add-to-calendar-button";
 import { DiscordGlyph } from "@/components/discord-glyph";
 import { HackathonFriendsSection } from "@/components/hackathon-friends";
-import { HackathonNotificationPreferences } from "@/components/hackathon-notification-preferences";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
 import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -38,17 +37,11 @@ import {
   hackathons,
   organizations,
   tags,
-  userHackathonNotificationPreferences,
   userHackathons,
 } from "@/lib/db/schema";
 import { getFriendActivityByHackathon, type HackathonFriend } from "@/lib/follows/queries";
 import { formatDateRange, formatDuration, formatLocation } from "@/lib/hackathons/card-format";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
-import {
-  computeSelectableReminderOffers,
-  getSelectableReminderTypesForStatus,
-  selectableReminderTypes,
-} from "@/lib/hackathons/reminder-plan";
 
 /* "archived" is viewable here (unlike the catalog) so old links to
    pre-half-year rows never land on a 404. */
@@ -57,10 +50,6 @@ const publicStatuses = ["upcoming", "live", "completed", "archived"] as const;
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
-
-function isSelectableReminderType(type: string): type is (typeof selectableReminderTypes)[number] {
-  return selectableReminderTypes.some((selectableType) => selectableType === type);
-}
 
 async function getHackathon(slug: string) {
   const [row] = await db
@@ -247,7 +236,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
 
   // Per-user lookups (the friends overlay included) run outside the shared
   // unstable_cache above — one viewer's data must never serve another's hit.
-  const [[tracked], notificationPreferenceRows, friendActivity] = await Promise.all([
+  const [[tracked], friendActivity] = await Promise.all([
     userId
       ? db
           .select({ applicationStatus: userHackathons.applicationStatus })
@@ -255,21 +244,6 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           .where(and(eq(userHackathons.userId, userId), eq(userHackathons.hackathonId, hackathon.id)))
           .limit(1)
       : Promise.resolve([] as { applicationStatus: string }[]),
-    userId
-      ? db
-          .select({
-            type: userHackathonNotificationPreferences.type,
-            enabled: userHackathonNotificationPreferences.enabled,
-          })
-          .from(userHackathonNotificationPreferences)
-          .where(
-            and(
-              eq(userHackathonNotificationPreferences.userId, userId),
-              eq(userHackathonNotificationPreferences.hackathonId, hackathon.id),
-              eq(userHackathonNotificationPreferences.channel, "email")
-            )
-          )
-      : Promise.resolve([]),
     userId
       ? getFriendActivityByHackathon(userId, [hackathon.id])
       : Promise.resolve(new Map<string, HackathonFriend[]>()),
@@ -284,40 +258,6 @@ export default async function HackathonDetailPage({ params }: PageProps) {
     hackathon.highSchoolersOnly ? "High school only" : null,
     ...tagRows.map((tag) => tag.name),
   ].filter(Boolean) as string[];
-  const selectableReminderOffers = computeSelectableReminderOffers(
-    {
-      startsAt: hackathon.startsAt,
-      endsAt: hackathon.endsAt,
-      applicationOpensAt: hackathon.applicationOpensAt,
-      applicationClosesAt: hackathon.applicationClosesAt,
-      acceptanceAt: hackathon.acceptanceAt,
-    },
-    new Date()
-  );
-  // Reminders are opt-in: an offered type with no stored preference shows as OFF
-  // until the hacker turns it on, matching the reminder sync default.
-  const enabledByType = new Map(selectableReminderTypes.map((type) => [type, false]));
-
-  for (const row of notificationPreferenceRows) {
-    if (isSelectableReminderType(row.type)) {
-      enabledByType.set(row.type, row.enabled);
-    }
-  }
-
-  // Only show a notification control while its reminder can still be
-  // delivered. Countdown reminders need their source date to be known; "the
-  // moment applications open" is the exception — it stays selectable with a
-  // TBA date while the opening is unconfirmed, since the daily cron emails
-  // once the date is set and arrives.
-  const availableReminderTypes = new Set(getSelectableReminderTypesForStatus(tracked?.applicationStatus ?? null));
-  const notificationPreferences = selectableReminderOffers
-    .filter(({ type }) => availableReminderTypes.has(type))
-    .map(({ type, scheduledFor }) => ({
-      type,
-      enabled: enabledByType.get(type) ?? false,
-      scheduledFor: scheduledFor ? scheduledFor.toISOString() : null,
-      upcoming: true,
-    }));
 
   return (
     <main className="min-h-screen px-5 pb-40 pt-10 sm:px-8 lg:px-12">
@@ -513,12 +453,6 @@ export default async function HackathonDetailPage({ params }: PageProps) {
               </Link>
             )}
           </div>
-          {userId && notificationPreferences.length ? (
-            <HackathonNotificationPreferences
-              hackathonId={hackathon.id}
-              initialPreferences={notificationPreferences}
-            />
-          ) : null}
         </section>
       </div>
     </main>

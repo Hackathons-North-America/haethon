@@ -54,7 +54,7 @@ In the Vercel project, add the production values documented in `.env.example`. A
 - `CLERK_SECRET_KEY`
 - `CRON_SECRET`
 
-Add the optional PostHog, Sentry, Resend, Discord, and unsubscribe variables for the integrations used in production. `NEXT_PUBLIC_APP_URL` should be the final HTTPS production URL.
+Add the optional PostHog, Sentry, Discord, and UploadThing variables for the integrations used in production. `NEXT_PUBLIC_APP_URL` should be the final HTTPS production URL.
 
 ### 3. Add GitHub deployment secrets
 

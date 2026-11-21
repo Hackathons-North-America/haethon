@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 
+import { SearchShowcaseVisual } from "@/components/landing-search-showcase";
 import { LazyMount } from "@/components/lazy-mount";
 
 /* Below-fold landing visuals. Each is split into its own chunk (next/dynamic,
@@ -32,14 +33,6 @@ const ApprovalFlowVisual = dynamic(
   { ssr: false },
 );
 
-const PipelineSpotlightVisual = dynamic(
-  () =>
-    import("@/components/landing-pipeline-spotlight").then(
-      (mod) => mod.PipelineSpotlightVisual,
-    ),
-  { ssr: false },
-);
-
 /* The bento cards size their own visual wells (relative, min-height), so the
    first two wrappers just fill whatever well they're dropped into. */
 export function LazySourcedEverywhere() {
@@ -66,11 +59,13 @@ export function LazyApprovalFlow() {
   );
 }
 
-export function LazyPipelineSpotlight() {
+export function LazySearchShowcase() {
   return (
-    /* Mobile shows just the spotlight card; md+ adds the backdrop board. */
-    <LazyMount className="min-h-[30rem] md:min-h-[36rem]">
-      <PipelineSpotlightVisual />
-    </LazyMount>
+    /* Render the framed database immediately inside its reserved well. The
+       other landing visuals can wait on observation, but an intentionally
+       blank product frame would weaken this section's screenshot treatment. */
+    <div className="min-h-[31rem] md:min-h-0">
+      <SearchShowcaseVisual />
+    </div>
   );
 }

@@ -232,6 +232,13 @@
       "when": 1785956867517,
       "tag": "0032_smiling_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795241237857,
+      "tag": "0033_remove_faceoff_and_email",
+      "breakpoints": true
     }
   ]
 }

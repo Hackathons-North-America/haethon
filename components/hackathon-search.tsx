@@ -21,7 +21,7 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
-import { assignTiers, sortByEloWithLocalBoost } from "@/lib/hackathons/ranking";
+import { PLACEHOLDER_TIER, sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
@@ -336,31 +336,22 @@ export function HackathonSearch({
     () => filterLocalHackathonCatalog(catalog, appliedFilters, origin),
     [appliedFilters, catalog, origin]
   );
-  /* eloRating/countryCode are optional on HackathonCardData (some call sites,
-     like the admin preview card, don't have them) but always present on the
-     real catalog snapshot the grid renders — normalized here once so the
-     ranking helpers below can rely on a definite number. */
-  const rankableHackathons = useMemo(
-    () => filteredHackathons.map((hackathon) => ({ ...hackathon, eloRating: hackathon.eloRating ?? 1500 })),
-    [filteredHackathons]
-  );
   const originCountryCode = origin?.countryCode ?? null;
-  const eloRankedHackathons = useMemo(
-    () => sortByEloWithLocalBoost(rankableHackathons, originCountryCode),
-    [rankableHackathons, originCountryCode]
+  const sortedHackathons = useMemo(
+    () => sortByStartDateWithLocalBoost(filteredHackathons, originCountryCode),
+    [filteredHackathons, originCountryCode]
   );
   /* The catalog arrives with past (recurring) editions already ordered after
      everything upcoming; splitting on isPast keeps that order while letting the
-     grid draw an explicit archive divider between the two groups. The grid is
-     Elo-ranked, so the split reads off eloRankedHackathons rather than the raw
-     filtered list. */
+     grid draw an explicit archive divider between the two groups. The split
+     reads off the local-boosted sort rather than the raw filtered list. */
   const upcomingHackathons = useMemo(
-    () => eloRankedHackathons.filter((hackathon) => !hackathon.isPast),
-    [eloRankedHackathons]
+    () => sortedHackathons.filter((hackathon) => !hackathon.isPast),
+    [sortedHackathons]
   );
   const pastHackathons = useMemo(
-    () => eloRankedHackathons.filter((hackathon) => hackathon.isPast),
-    [eloRankedHackathons]
+    () => sortedHackathons.filter((hackathon) => hackathon.isPast),
+    [sortedHackathons]
   );
   const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
   const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
@@ -414,19 +405,10 @@ export function HackathonSearch({
     }),
     []
   );
-  const faceoffTiers = useMemo(
-    () =>
-      new Map(
-        assignTiers(rankableHackathons).flatMap((group) =>
-          group.hackathons.map((hackathon) => [hackathon.id, group.tier] as const)
-        )
-      ),
-    [rankableHackathons]
-  );
   const renderCardNode =
     renderCard ??
     ((hackathon: HackathonCardData) => (
-      <HackathonCard hackathon={hackathon} tier={faceoffTiers.get(hackathon.id)} />
+      <HackathonCard hackathon={hackathon} tier={PLACEHOLDER_TIER} />
     ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";

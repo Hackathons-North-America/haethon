@@ -5,7 +5,7 @@ import type { DragEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { HackathonCard } from "@/components/hackathon-card";
-import type { HackathonCardData, HackathonCardReminder } from "@/components/hackathon-card";
+import type { HackathonCardData } from "@/components/hackathon-card";
 import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
 
@@ -23,7 +23,6 @@ type PipelineCard = {
   userHackathonId: string;
   hackathonId: string;
   card: HackathonCardData;
-  reminder: HackathonCardReminder;
 };
 
 export type PipelineColumn = {
@@ -36,8 +35,8 @@ type DragState = { hackathonId: string; from: PipelineStage } | null;
 
 /* Notion-style pipeline board where each card can be dragged between the
    interested / applied / accepted / attending columns. Drops optimistically re-slot the
-   card, PATCH the tracking status, then refresh so the server recomputes the
-   reminders offered for the new stage. */
+   card, PATCH the tracking status, then refresh so the board resyncs with the
+   server. */
 export function MyPipelineBoard({ columns: initialColumns }: { columns: PipelineColumn[] }) {
   const router = useRouter();
   const [columns, setColumns] = useState(initialColumns);
@@ -71,7 +70,7 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
         }
 
         if (column.stage === to) {
-          return { ...column, cards: [...column.cards, { ...moved, reminder: { ...moved.reminder, statusLabel: column.title } }] };
+          return { ...column, cards: [...column.cards, moved] };
         }
 
         return column;
@@ -94,7 +93,7 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
         throw new Error("Could not update pipeline status.");
       }
 
-      // Pull fresh reminder options for the new stage.
+      // Resync the board with the server's view of the pipeline.
       router.refresh();
     } catch {
       setColumns(previous);
@@ -192,7 +191,6 @@ export function MyPipelineBoard({ columns: initialColumns }: { columns: Pipeline
                     hackathon={item.card}
                     key={item.userHackathonId}
                     layout="bookmark"
-                    reminder={item.reminder}
                   />
                 </div>
               ))}

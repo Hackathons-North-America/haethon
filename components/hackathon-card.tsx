@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, BellPlus, Check, ChevronDown, Swords } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
 import { FriendAvatarRow } from "@/components/hackathon-friends";
@@ -13,8 +13,6 @@ import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import type { HackathonFriend } from "@/lib/follows/activity";
 import { calendarProviderLinks } from "@/lib/hackathons/calendar-links";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
-import { formatReminderDate } from "@/lib/hackathons/reminder-labels";
-import type { SelectableReminderType } from "@/lib/hackathons/reminder-plan";
 import type { TierLabel } from "@/lib/hackathons/ranking";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
@@ -31,10 +29,6 @@ export type HackathonCardData = {
   discordUrl?: string | null;
   /** ISO end date, paired with startsAt for the calendar link. */
   endsAt?: string | null;
-  /** Face Off head-to-head rating. Undefined only for hand-built preview cards. */
-  eloRating?: number;
-  faceoffLosses?: number;
-  faceoffWins?: number;
   format?: "online" | "in_person";
   /** Approved followees of the signed-in viewer with this hackathon on their
       board — the card's "James is going" social nudge. */
@@ -51,7 +45,6 @@ export type HackathonCardData = {
   longitude?: number | null;
   location: string;
   name: string;
-  rankTier?: TierLabel;
   slug?: string | null;
   /* Catalog metadata retained for card-data compatibility; cards do not
      surface source provenance in their UI. */
@@ -325,8 +318,8 @@ function toMonthLabel(month: string) {
 }
 
 /* The card's big date block renders differently depending on the span:
-   - single    one day, one line ("Sep 30")
-   - sameMonth a range within one month — month on top, "start – end" below
+   - single    one day — month on top, day below ("Sep" / "30")
+   - sameMonth a range within one month — month on top, "start–end" below
    - multiMonth a range crossing months — "Sep 30" / "Oct 2", no dash
    - raw       anything we can't parse, shown verbatim on one line */
 type ParsedDate =
@@ -385,7 +378,8 @@ function getWeekday(startsAt?: string | null) {
 }
 
 /* Renders the big date block: weekday in small caps up top, then the bold
-   start date, with a "– end" line below it for multi-day ranges. */
+   month on its own row with the day (or "start–end" range) beneath it.
+   Cross-month ranges keep both months: "Sep 30" / "– Oct 2". */
 function CardDate({ parsed, weekday }: { parsed: ParsedDate; weekday: string | null }) {
   const lineClass = "text-[1.5rem] leading-[1.05] tracking-[-0.05em] @[26rem]:text-[1.8rem]";
 
@@ -393,9 +387,9 @@ function CardDate({ parsed, weekday }: { parsed: ParsedDate; weekday: string | n
     parsed.kind === "raw"
       ? [parsed.text]
       : parsed.kind === "single"
-        ? [`${parsed.month} ${parsed.day}`]
+        ? [parsed.month, parsed.day]
         : parsed.kind === "sameMonth"
-          ? [`${parsed.month} ${parsed.startDay}`, `– ${parsed.endDay}`]
+          ? [parsed.month, `${parsed.startDay}–${parsed.endDay}`]
           : [`${parsed.startMonth} ${parsed.startDay}`, `– ${parsed.endMonth} ${parsed.endDay}`];
 
   return (
@@ -467,26 +461,8 @@ function BookmarkCardLogo({ hackathon, preview }: { hackathon: HackathonCardData
   );
 }
 
-type ReminderOption = {
-  type: SelectableReminderType;
-  label: string;
-  /* ISO string of the send time, so this stays serializable from the server.
-     Null while the anchor date is unconfirmed — the "applications open" email
-     goes out the moment the date is known and arrives. */
-  scheduledFor: string | null;
-  enabled: boolean;
-};
-
-export type HackathonCardReminder = {
-  hackathonId: string;
-  /* The hacker's current pipeline stage — shown as the panel heading, since the
-     reminders offered depend on where they stand. */
-  statusLabel: string;
-  options: ReminderOption[];
-};
-
-/* Closes a popover on outside pointer-down or Escape. Shared by the reminder
-   picker and the cover-image action menus so they all dismiss alike. */
+/* Closes a popover on outside pointer-down or Escape. Used by the card's
+   action menus so they all dismiss alike. */
 function useDismissOnOutside(open: boolean, ref: { current: HTMLElement | null }, onDismiss: () => void) {
   /* Held in a ref so an inline arrow callback doesn't re-subscribe the document
      listeners on every render while the popover is open. */
@@ -521,194 +497,6 @@ function useDismissOnOutside(open: boolean, ref: { current: HTMLElement | null }
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, ref]);
-}
-
-/* Toggle state for one hackathon's reminders. `options` starts null on the
-   search grid, where the choices are fetched the first time the panel opens;
-   the My Hackathons board hands them in up front. */
-function useReminderToggles(hackathonId: string, initialOptions: ReminderOption[] | null) {
-  const [options, setOptions] = useState(initialOptions);
-  const [pendingType, setPendingType] = useState<SelectableReminderType | null>(null);
-  const [limitNotice, setLimitNotice] = useState(false);
-
-  async function toggleReminder(type: SelectableReminderType, enabled: boolean) {
-    if (pendingType || !options) {
-      return;
-    }
-
-    const previousOptions = options;
-    const nextOptions = options.map((option) => (option.type === type ? { ...option, enabled } : option));
-
-    setOptions(nextOptions);
-    setPendingType(type);
-    setLimitNotice(false);
-
-    try {
-      const response = await fetch(`/api/hackathons/${encodeURIComponent(hackathonId)}/notifications`, {
-        body: JSON.stringify({
-          preferences: nextOptions.map((option) => ({ type: option.type, enabled: option.enabled })),
-        }),
-        headers: { "Content-Type": "application/json" },
-        method: "PATCH",
-      });
-
-      if (response.status === 401) {
-        handleUnauthenticated();
-        return;
-      }
-
-      // The server books the change against the five-emails-per-week limit —
-      // an overflowing week comes back as a 409.
-      if (response.status === 409) {
-        setOptions(previousOptions);
-        setLimitNotice(true);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Could not update reminders.");
-      }
-    } catch {
-      setOptions(previousOptions);
-    } finally {
-      setPendingType(null);
-    }
-  }
-
-  return { limitNotice, options, pendingType, setOptions, toggleReminder };
-}
-
-/* The body of the reminder popover — one toggle row per offered reminder.
-   Callers supply their own positioned container so the same panel works inline
-   under the footer button and as a dropdown over the card. */
-function ReminderOptionsPanel({
-  limitNotice,
-  options,
-  pendingType,
-  statusLabel,
-  onToggle,
-}: {
-  limitNotice: boolean;
-  options: ReminderOption[];
-  pendingType: SelectableReminderType | null;
-  statusLabel: string;
-  onToggle: (type: SelectableReminderType, enabled: boolean) => void;
-}) {
-  return (
-    <>
-      <p className="px-1 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-pine">{statusLabel}</p>
-      {options.length ? (
-        <div className="mt-2 space-y-1.5">
-          {options.map((option) => {
-            const pending = pendingType === option.type;
-
-            return (
-              <label
-                className={`flex cursor-pointer items-center justify-between gap-3 border px-3 py-2.5 text-left transition-colors ${
-                  option.enabled ? "border-pine/35 bg-pine/5" : "border-ink/15 bg-paper hover:border-ink/40"
-                }`}
-                key={option.type}
-              >
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-ink">{option.label}</span>
-                  <span className="mt-0.5 block text-xs text-ink/55">
-                    {option.scheduledFor
-                      ? formatReminderDate(new Date(option.scheduledFor))
-                      : "Date TBA — we'll email you the moment they open"}
-                    {pending ? " · saving" : ""}
-                  </span>
-                </span>
-                <input
-                  checked={option.enabled}
-                  className="sr-only"
-                  disabled={pendingType !== null}
-                  onChange={(event) => onToggle(option.type, event.target.checked)}
-                  type="checkbox"
-                />
-                <span
-                  aria-hidden="true"
-                  className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                    option.enabled ? "border-pine bg-pine text-paper" : "border-ink/15 text-transparent"
-                  }`}
-                >
-                  <Check className="size-3.5" strokeWidth={3} />
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="mt-2 px-1 pb-1 text-xs text-ink/55">
-          No reminders are available yet. We&apos;ll offer them once this hackathon&apos;s key dates are confirmed.
-        </p>
-      )}
-      {limitNotice ? (
-        <p className="mt-2 px-1 pb-1 text-xs font-medium text-pine dark:text-moss">
-          For now, you&apos;re limited to five emails per week. Turn another reminder off to make room.
-        </p>
-      ) : null}
-    </>
-  );
-}
-
-/* Inline reminder picker used on the My Hackathons board. Clicking the footer
-   button expands a select panel below it — mirroring the search bar popovers —
-   where each reminder can be toggled on or off. Choices save instantly, and the
-   active ones surface as chips on the card once the panel is closed. */
-function ReminderControl({ hackathonId, statusLabel, options: initialOptions }: HackathonCardReminder) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const { limitNotice, options, pendingType, toggleReminder } = useReminderToggles(hackathonId, initialOptions);
-
-  useDismissOnOutside(open, rootRef, () => setOpen(false));
-
-  const enabledOptions = (options ?? []).filter((option) => option.enabled);
-
-  return (
-    <div className="relative z-10" ref={rootRef}>
-      <button
-        aria-expanded={open}
-        className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
-          open ? "text-pine" : "text-ink hover:text-pine"
-        }`}
-        onClick={() => setOpen((current) => !current)}
-        type="button"
-      >
-        <BellPlus aria-hidden="true" className="size-3.5" />
-        {enabledOptions.length ? `Reminders · ${enabledOptions.length}` : "Add Reminder"}
-        <ChevronDown
-          aria-hidden="true"
-          className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {!open && enabledOptions.length ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {enabledOptions.map((option) => (
-            <span
-              className="inline-flex items-center gap-1 bg-pine/10 px-2.5 py-1 text-xs font-medium text-pine"
-              key={option.type}
-            >
-              <BellPlus aria-hidden="true" className="size-3" />
-              {option.label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-
-      {open ? (
-        <div className="mt-2 border border-ink/15 bg-paper p-3 shadow-sm">
-          <ReminderOptionsPanel
-            limitNotice={limitNotice}
-            onToggle={toggleReminder}
-            options={options ?? []}
-            pendingType={pendingType}
-            statusLabel={statusLabel}
-          />
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 /* The band's own paper strip between the cover and the body, ruled off both in
@@ -813,112 +601,14 @@ function CardCalendarMenu({
   );
 }
 
-/* Reminder picker for grid cards, where the per-user options aren't part of the
-   shared catalog payload — the first open fetches them. */
-function CardReminderMenu({
-  hackathonId,
-  open,
-  onOpenChange,
-}: {
-  hackathonId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { limitNotice, options, pendingType, setOptions, toggleReminder } = useReminderToggles(hackathonId, null);
-  const [statusLabel, setStatusLabel] = useState("Interested");
-  const [loading, setLoading] = useState(false);
-  const [loadFailed, setLoadFailed] = useState(false);
-
-  async function handleClick() {
-    if (open) {
-      onOpenChange(false);
-      return;
-    }
-
-    onOpenChange(true);
-
-    if (options || loading) {
-      return;
-    }
-
-    setLoading(true);
-    setLoadFailed(false);
-
-    try {
-      const response = await fetch(`/api/hackathons/${encodeURIComponent(hackathonId)}/notifications`);
-
-      if (response.status === 401) {
-        handleUnauthenticated();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Could not load reminders.");
-      }
-
-      const body = (await response.json()) as {
-        data: { statusLabel: string; options: ReminderOption[] };
-      };
-
-      setStatusLabel(body.data.statusLabel);
-      setOptions(body.data.options);
-    } catch {
-      setLoadFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const enabledCount = (options ?? []).filter((option) => option.enabled).length;
-
-  return (
-    <>
-      <button aria-expanded={open} className={cardActionClassName} onClick={handleClick} type="button">
-        {enabledCount ? `Reminders · ${enabledCount}` : "Add reminder"}
-        <CardActionUnderline />
-      </button>
-      {open ? (
-        <div className={cardMenuClassName}>
-          {loadFailed ? (
-            <p className="px-1 text-xs font-medium text-pine dark:text-moss">
-              Could not load reminders. Close this and try again.
-            </p>
-          ) : options ? (
-            <ReminderOptionsPanel
-              limitNotice={limitNotice}
-              onToggle={toggleReminder}
-              options={options}
-              pendingType={pendingType}
-              statusLabel={statusLabel}
-            />
-          ) : (
-            <p className="px-1 text-xs text-ink/55">Loading reminders…</p>
-          )}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-/* The card's actions — calendar, the event's Discord channel, a Face Off
-   matchup anchored on this hackathon, and reminders — stacked at the foot of
-   the date column. Each entry lifts itself over the card-wide detail link, so
-   it stays clickable without opening the hackathon. */
-function CardActionStack({
-  hackathon,
-  preview,
-  showReminder,
-}: {
-  hackathon: HackathonCardData;
-  preview: boolean;
-  /* Suppressed on the My Hackathons board, whose footer already carries a
-     reminder picker with the options preloaded. */
-  showReminder: boolean;
-}) {
-  const [openMenu, setOpenMenu] = useState<"calendar" | "reminder" | null>(null);
+/* The card's actions — calendar and the event's Discord channel — stacked at
+   the foot of the date column. Each entry lifts itself over the card-wide
+   detail link, so it stays clickable without opening the hackathon. */
+function CardActionStack({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useDismissOnOutside(openMenu !== null, rootRef, () => setOpenMenu(null));
+  useDismissOnOutside(calendarOpen, rootRef, () => setCalendarOpen(false));
 
   /* Bottom-anchored under the date block so a row of cards lines its actions up
      on one baseline. Deliberately unpositioned: the dropdowns inside are still
@@ -928,7 +618,7 @@ function CardActionStack({
 
   /* Preview cards (the landing backdrop, admin approval previews) stand in for
      a real card, so the stack still shows — but as labels, since there is no
-     hackathon behind them to link to or set reminders on. */
+     hackathon behind them to link to. */
   if (preview) {
     return (
       <div aria-hidden="true" className={stackClassName}>
@@ -936,8 +626,6 @@ function CardActionStack({
         {hackathon.discordUrl ? (
           <span className={cardActionClassName}>Chat on Discord</span>
         ) : null}
-        <span className={cardActionClassName}>Face Off</span>
-        {showReminder ? <span className={cardActionClassName}>Add reminder</span> : null}
       </div>
     );
   }
@@ -947,8 +635,8 @@ function CardActionStack({
       {hackathon.startsAt ? (
         <CardCalendarMenu
           hackathon={hackathon}
-          onOpenChange={(open) => setOpenMenu(open ? "calendar" : null)}
-          open={openMenu === "calendar"}
+          onOpenChange={setCalendarOpen}
+          open={calendarOpen}
         />
       ) : null}
 
@@ -964,21 +652,6 @@ function CardActionStack({
         </a>
       ) : null}
 
-      <Link
-        className={cardActionClassName}
-        href={hackathon.slug ? `/face-off?hackathon=${encodeURIComponent(hackathon.slug)}` : "/face-off"}
-      >
-        Face Off
-        <CardActionUnderline />
-      </Link>
-
-      {showReminder ? (
-        <CardReminderMenu
-          hackathonId={hackathon.id}
-          onOpenChange={(open) => setOpenMenu(open ? "reminder" : null)}
-          open={openMenu === "reminder"}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1042,16 +715,163 @@ function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData;
   );
 }
 
+/* Untiered cards still get the hover wash, in a
+   warm sand that sits on the paper like the tier tints do. */
+const UNTIERED_STREAK_RGB = "214 190 150";
+
+/* Applied only on hover-capable pointers: touch screens never fire the hover
+   overlay, so they keep the plain footer links instead. */
+const hoverDeviceHidden = "[@media(hover:hover)]:hidden";
+
+const overlayEase = "ease-[cubic-bezier(0.22,1,0.36,1)]";
+
+const overlayHalfClassName =
+  "relative flex min-w-0 items-center justify-center gap-1.5 px-3 font-mono text-[11px] font-medium uppercase tracking-[0.16em] @[26rem]:text-xs";
+
+/* One half of the hover overlay. A missing destination keeps its half in
+   place, dimmed and inert, so the More info / Website split never shifts. */
+function CardOverlayHalf({
+  external,
+  href,
+  label,
+  preview,
+  title,
+}: {
+  external?: boolean;
+  href: string | null;
+  label: string;
+  preview: boolean;
+  title: string;
+}) {
+  const content = (
+    <span
+      className={`inline-flex items-center gap-1.5 opacity-0 transition-opacity delay-0 duration-200 group-hover/card:opacity-100 group-hover/card:delay-200 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:delay-0 ${
+        href ? "underline-offset-4 group-hover/half:underline" : ""
+      }`}
+    >
+      {label}
+      {external ? <ArrowUpRight aria-hidden="true" className="size-3.5" /> : null}
+    </span>
+  );
+
+  if (!href) {
+    return (
+      <span aria-disabled="true" className={`${overlayHalfClassName} cursor-not-allowed text-ink/35`}>
+        {content}
+      </span>
+    );
+  }
+
+  /* Preview cards stand in for a real listing: the label shows, nothing navigates. */
+  if (preview) {
+    return (
+      <span aria-hidden="true" className={`${overlayHalfClassName} group/half text-ink`}>
+        {content}
+      </span>
+    );
+  }
+
+  const className = `${overlayHalfClassName} group/half text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-pine`;
+
+  return external ? (
+    <a className={className} href={href} rel="noopener noreferrer" target="_blank" title={title}>
+      {content}
+    </a>
+  ) : (
+    <Link className={className} href={href} title={title}>
+      {content}
+    </Link>
+  );
+}
+
+/* Hover takeover for the card body. Two tier-tinted blooms slide in from the
+   left and right edges, meet in the middle, then a flat wash fades in behind
+   them so the whole body reads as one gradient. The surface splits into two
+   targets: More info on the left, the organizer's website on the right.
+   Keyboard users get the same overlay when one of its links has focus-visible. */
+function CardHoverOverlay({
+  hackathon,
+  preview,
+  tier,
+}: {
+  hackathon: HackathonCardData;
+  preview: boolean;
+  tier?: TierLabel;
+}) {
+  const rgb = tier ? TIER_STREAK_RGB[tier] : UNTIERED_STREAK_RGB;
+  const bloom = (edge: "0%" | "100%") =>
+    `radial-gradient(ellipse 90% 130% at ${edge} 50%, rgb(${rgb} / 0.62) 0%, rgb(${rgb} / 0.4) 55%, rgb(${rgb} / 0.22) 100%)`;
+  /* Soft leading edge so each bloom arrives as a wash, not a sliding panel. */
+  const leadingEdgeMask = (direction: "right" | "left") =>
+    `linear-gradient(to ${direction}, black 62%, transparent 100%)`;
+
+  const bloomClassName = `pointer-events-none absolute inset-0 opacity-0 transition-[translate,opacity] delay-0 duration-500 ${overlayEase} group-hover/card:translate-x-0 group-hover/card:opacity-100 group-has-[:focus-visible]/overlay:translate-x-0 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-opacity`;
+
+  return (
+    <div className="group/overlay pointer-events-none absolute inset-0 z-40 overflow-hidden group-hover/card:pointer-events-auto has-[:focus-visible]:pointer-events-auto">
+      {/* Paper backdrop hides the body's text as the blooms come in. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-paper opacity-0 transition-opacity duration-200 group-hover/card:opacity-100 group-has-[:focus-visible]/overlay:opacity-100"
+      />
+      <div
+        aria-hidden="true"
+        className={`${bloomClassName} -translate-x-full`}
+        style={{
+          backgroundImage: bloom("0%"),
+          maskImage: leadingEdgeMask("right"),
+          WebkitMaskImage: leadingEdgeMask("right"),
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className={`${bloomClassName} translate-x-full`}
+        style={{
+          backgroundImage: bloom("100%"),
+          maskImage: leadingEdgeMask("left"),
+          WebkitMaskImage: leadingEdgeMask("left"),
+        }}
+      />
+      {/* Once the blooms meet, an even wash settles over the seam. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity delay-0 duration-300 group-hover/card:opacity-100 group-hover/card:delay-300 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:delay-0"
+        style={{ backgroundColor: `rgb(${rgb} / 0.2)` }}
+      />
+      {/* Same airbrushed grain as the resting streak. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 group-hover/card:opacity-60 group-has-[:focus-visible]/overlay:opacity-60"
+        style={{ backgroundImage: STREAK_NOISE_URI }}
+      />
+
+      <div className="relative grid size-full grid-cols-2">
+        <CardOverlayHalf
+          href={hackathon.slug ? `/hackathons/${hackathon.slug}` : null}
+          label="More info"
+          preview={preview}
+          title={`View ${hackathon.name} details`}
+        />
+        <CardOverlayHalf
+          external
+          href={hackathon.websiteUrl ?? null}
+          label="Website"
+          preview={preview}
+          title={`Open the ${hackathon.name} website`}
+        />
+      </div>
+    </div>
+  );
+}
+
 function BookmarkPageCard({
   cornerAction,
   hackathon,
   preview,
-  reminder,
 }: {
   cornerAction?: ReactNode;
   hackathon: HackathonCardData;
   preview: boolean;
-  reminder?: HackathonCardReminder;
 }) {
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const location = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
@@ -1106,18 +926,8 @@ function BookmarkPageCard({
           {hackathon.beginnerFriendly ||
           hackathon.travelReimbursement ||
           hackathon.highSchoolersOnly ||
-          hackathon.hasDiscord ||
-          typeof hackathon.eloRating === "number" ? (
+          hackathon.hasDiscord ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {typeof hackathon.eloRating === "number" ? (
-                <span
-                  className="relative z-10 inline-flex items-center gap-1 bg-ink/5 px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink/55"
-                  title="Face Off Elo rating"
-                >
-                  <Swords aria-hidden="true" className="size-3" />
-                  {hackathon.eloRating}
-                </span>
-              ) : null}
               {hackathon.beginnerFriendly ? (
                 <span className="relative z-10 inline-flex items-center bg-pine/10 px-2.5 py-1 text-[11px] font-medium text-pine">
                   Beginner friendly
@@ -1144,17 +954,10 @@ function BookmarkPageCard({
         </div>
       </div>
 
-      {reminder || cornerAction ? (
+      {cornerAction ? (
         <div className="relative z-10 mt-auto pt-3 text-base leading-6">
           <div className="flex items-start justify-between gap-2">
-            {reminder ? (
-              <ReminderControl
-                hackathonId={reminder.hackathonId}
-                options={reminder.options}
-                statusLabel={reminder.statusLabel}
-              />
-            ) : null}
-            {cornerAction ? <div className="relative z-20 ml-auto shrink-0">{cornerAction}</div> : null}
+            <div className="relative z-20 ml-auto shrink-0">{cornerAction}</div>
           </div>
         </div>
       ) : null}
@@ -1168,7 +971,6 @@ export function HackathonCard({
   hackathon,
   layout = "cover",
   preview = false,
-  reminder,
   tier,
 }: {
   /* Keeps pipeline-board cards shorter while preserving the shared layout. */
@@ -1179,9 +981,6 @@ export function HackathonCard({
   /* The bookmark page keeps the original compact, square-logo card design. */
   layout?: "cover" | "bookmark";
   preview?: boolean;
-  /* When set, the footer swaps the save control for an inline reminder
-     picker that expands below the card — used on the My Hackathons board. */
-  reminder?: HackathonCardReminder;
   tier?: TierLabel;
 }) {
   if (layout === "bookmark") {
@@ -1190,7 +989,6 @@ export function HackathonCard({
         cornerAction={cornerAction}
         hackathon={hackathon}
         preview={preview}
-        reminder={reminder}
       />
     );
   }
@@ -1200,10 +998,14 @@ export function HackathonCard({
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
   const streak = tier ? getTierStreak(hackathon.name, tier) : null;
+  /* The board's remove button lives in the footer and must stay usable above
+     the hover overlay; without it, hover-capable devices drop the footer
+     entirely since its links moved into the overlay. */
+  const hasFooterControls = Boolean(cornerAction);
 
   return (
     <article
-      className={`group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
+      className={`group group/card @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
@@ -1269,7 +1071,7 @@ export function HackathonCard({
               Past edition
             </span>
           ) : null}
-          <CardActionStack hackathon={hackathon} preview={preview} showReminder={!reminder} />
+          <CardActionStack hackathon={hackathon} preview={preview} />
         </div>
 
         <div
@@ -1311,27 +1113,32 @@ export function HackathonCard({
           </p>
 
           {/* `min-h-10` keeps every card's footer the same height whether or
-              not it carries a reminder picker or a website link, so a row of
+              not it carries a remove button or a website link, so a row of
               cards still lines up. */}
-          <div className="relative z-10 mt-5 border-t border-ink/25 pt-4">
+          <div
+            className={`relative mt-5 border-t border-ink/25 pt-4 ${
+              hasFooterControls ? "z-50" : `z-10 ${hoverDeviceHidden}`
+            }`}
+          >
             <div className="flex min-h-10 items-start justify-between gap-3">
-              {reminder ? (
-                <ReminderControl
-                  hackathonId={reminder.hackathonId}
-                  options={reminder.options}
-                  statusLabel={reminder.statusLabel}
-                />
-              ) : null}
               <div className="ml-auto flex min-w-0 flex-1 items-center justify-between gap-3">
-                <CardMoreInfoLink hackathon={hackathon} preview={preview} />
+                {/* Touch-only fallback: on hover devices these two links live
+                    in the hover overlay instead. */}
+                <div className={`contents ${hoverDeviceHidden}`}>
+                  <CardMoreInfoLink hackathon={hackathon} preview={preview} />
+                </div>
                 <div className="ml-auto flex shrink-0 items-center gap-3">
-                  <CardWebsiteLink hackathon={hackathon} preview={preview} />
+                  <div className={`contents ${hoverDeviceHidden}`}>
+                    <CardWebsiteLink hackathon={hackathon} preview={preview} />
+                  </div>
                   {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        <CardHoverOverlay hackathon={hackathon} preview={preview} tier={tier} />
       </div>
     </article>
   );

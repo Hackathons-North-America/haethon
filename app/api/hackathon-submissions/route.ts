@@ -5,7 +5,6 @@ import { getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonSubmissions } from "@/lib/db/schema";
 import { createHackathonSubmission } from "@/lib/hackathons/review-service";
-import { sendSubmissionEmail } from "@/lib/notifications/submissions";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { hackathonSubmissionSchema } from "@/lib/validations/hackathon";
 
@@ -60,13 +59,6 @@ export async function POST(request: Request) {
 
   try {
     const result = await createHackathonSubmission(parsed.data, context.user, context.role);
-
-    await sendSubmissionEmail({
-      to: context.user.email,
-      status: result.publishedDirectly ? "approved" : "received",
-      hackathonName: result.submission.normalizedName,
-      hackathonUrl: result.publishedHackathonId ? "/hackathons" : null,
-    });
 
     return NextResponse.json({ data: result }, { status: result.publishedDirectly ? 201 : 202 });
   } catch (error) {

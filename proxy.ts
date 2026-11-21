@@ -5,10 +5,7 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/about",
   "/discord",
-  "/unsubscribed",
   "/hackathons(.*)",
-  "/face-off(.*)",
-  "/faceoff(.*)",
   // Shared hacker profiles. The unguessable token in the path is the
   // credential, so these render for signed-out visitors.
   "/p/(.*)",
@@ -16,11 +13,9 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/health",
   "/api/hackathons(.*)",
-  "/api/faceoff(.*)",
   "/api/cities/search",
   "/api/geo",
   "/api/cron(.*)",
-  "/api/email/unsubscribe(.*)",
   // UploadThing calls this back server-to-server (signature-verified, no Clerk
   // session). Uploads themselves are still admin-gated in the file router.
   "/api/uploadthing(.*)",

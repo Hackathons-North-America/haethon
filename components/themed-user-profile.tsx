@@ -1,10 +1,9 @@
 "use client";
 
 import { UserProfile } from "@clerk/nextjs";
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { AccountSignOutButton } from "@/components/account-sign-out-button";
-import { EmailPreferencesToggle } from "@/components/email-preferences-toggle";
 
 const lightVariables = {
   colorBackground: "#fbf7f0",
@@ -17,11 +16,7 @@ const lightVariables = {
   borderRadius: "0px",
 };
 
-export function ThemedUserProfile({
-  initialEmailNotificationsEnabled,
-}: {
-  initialEmailNotificationsEnabled: boolean;
-}) {
+export function ThemedUserProfile() {
   return (
     <UserProfile
       path="/account/settings"
@@ -44,19 +39,6 @@ export function ThemedUserProfile({
         },
       }}
     >
-      <UserProfile.Page
-        label="Notifications"
-        labelIcon={<Bell aria-hidden="true" className="size-4" />}
-        url="notifications"
-      >
-        <div>
-          <h1 className="text-lg font-semibold text-ink">Notifications</h1>
-          <p className="mt-1 text-sm text-ink/55">Manage the emails Haethon sends you.</p>
-          <div className="mt-6">
-            <EmailPreferencesToggle initialEnabled={initialEmailNotificationsEnabled} />
-          </div>
-        </div>
-      </UserProfile.Page>
       <UserProfile.Page label="Sign out" labelIcon={<LogOut aria-hidden="true" className="size-4" />} url="sign-out">
         <div className="flex flex-col gap-4">
           <div>
