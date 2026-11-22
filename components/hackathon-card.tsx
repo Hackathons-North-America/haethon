@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,7 +11,6 @@ import { FriendAvatarRow } from "@/components/hackathon-friends";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
 import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import type { HackathonFriend } from "@/lib/follows/activity";
-import { calendarProviderLinks } from "@/lib/hackathons/calendar-links";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { TierLabel } from "@/lib/hackathons/ranking";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
@@ -24,10 +23,9 @@ export type HackathonCardData = {
   countryCode?: string | null;
   date: string;
   description?: string | null;
-  /* Deep link to the event's Discord channel; drives the cover action row's
-      "Chat on Discord" entry. */
+  /* Deep link to the event's Discord channel, when available. */
   discordUrl?: string | null;
-  /** ISO end date, paired with startsAt for the calendar link. */
+  /** ISO end date. */
   endsAt?: string | null;
   format?: "online" | "in_person";
   /** Approved followees of the signed-in viewer with this hackathon on their
@@ -193,24 +191,16 @@ function getTierStreak(name: string, tier: TierLabel) {
 const cardStages: { value: TrackableStatus; label: string }[] = [
   { value: "interested", label: "Interested" },
   { value: "applied", label: "Applied" },
-  { value: "accepted", label: "Accepted" },
   { value: "attending", label: "Attending" },
 ];
 
-const cardStageOrder: Record<string, number> = {
-  interested: 0,
-  applied: 1,
-  accepted: 2,
-  attending: 3,
-  attended: 4,
-  won: 4,
-};
+const cardStatusStackClassName = "mt-auto flex min-w-0 flex-col items-start gap-1 pt-8";
 
-/* Pipeline picker, rendered as the ruled band between the cover and the card
-   body. Selecting a stage tracks the hackathon on the My Hackathons board at
-   that stage; clicking the active stage again untracks it — this replaces the
-   old bookmark toggle as the way cards are saved to the dashboard. */
-function CardStatusBar({
+const cardStatusClassName =
+  "inline-flex min-h-5 min-w-0 items-center gap-1 text-left text-[11px] font-medium leading-4";
+
+/* Selecting a stage tracks the hackathon. Selecting the same stage again removes it. */
+function CardStatusStack({
   hackathonId,
   hackathonName,
   initialStatus,
@@ -224,11 +214,10 @@ function CardStatusBar({
   const [status, setStatus] = useState(initialStatus ?? null);
   const [pending, setPending] = useState(false);
 
-  const currentOrder = status ? cardStageOrder[status] ?? -1 : -1;
   const isPastPipeline = status === "attended" || status === "won";
 
   async function selectStage(nextStatus: TrackableStatus) {
-    if (preview || pending || isPastPipeline) {
+    if (pending || isPastPipeline) {
       return;
     }
 
@@ -251,6 +240,7 @@ function CardStatusBar({
       );
 
       if (response.status === 401) {
+        setStatus(previousStatus);
         handleUnauthenticated();
         return;
       }
@@ -265,12 +255,10 @@ function CardStatusBar({
     }
   }
 
-  /* A finished pipeline has nothing left to pick, so the band collapses to a
-     single label spanning it. */
   if (isPastPipeline) {
     return (
-      <div className={cardBandClassName}>
-        <span className={`${cardBandCellClassName} text-pine`}>
+      <div className={cardStatusStackClassName}>
+        <span className={`${cardStatusClassName} text-pine`}>
           <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} />
           {status === "won" ? "Won" : "Attended"}
         </span>
@@ -278,20 +266,28 @@ function CardStatusBar({
     );
   }
 
+  if (preview) {
+    return (
+      <div aria-hidden="true" className={cardStatusStackClassName}>
+        {cardStages.map((stage) => (
+          <span className={`${cardStatusClassName} text-ink/55`} key={stage.value}>
+            {stage.label}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div aria-label={`Track ${hackathonName}`} className={cardBandClassName} role="group">
+    <div aria-label={`Track ${hackathonName}`} className={cardStatusStackClassName} role="group">
       {cardStages.map((stage) => {
         const active = status === stage.value;
-        const reached = currentOrder >= cardStageOrder[stage.value];
 
         return (
           <button
             aria-pressed={active}
-            /* Stages reached so far read in pine; the rest sit back in muted
-               ink until the pointer fills the cell. The selected stage keeps
-               that pine fill in its resting state. */
-            className={`${cardBandCellClassName} disabled:cursor-wait disabled:opacity-60 ${
-              active ? "bg-pine text-paper" : reached ? "text-pine" : "text-ink/55"
+            className={`${cardStatusClassName} group/action relative z-20 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine disabled:cursor-wait disabled:opacity-60 ${
+              active ? "text-ink" : "text-ink/55 hover:text-ink"
             }`}
             disabled={pending}
             key={stage.value}
@@ -303,8 +299,11 @@ function CardStatusBar({
             }
             type="button"
           >
-            {reached ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
-            {stage.label}
+            <span className="relative -mb-1 pb-1">
+              {stage.label}
+              <CardActionUnderline />
+            </span>
+            {active ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
           </button>
         );
       })}
@@ -461,206 +460,20 @@ function BookmarkCardLogo({ hackathon, preview }: { hackathon: HackathonCardData
   );
 }
 
-/* Closes a popover on outside pointer-down or Escape. Used by the card's
-   action menus so they all dismiss alike. */
-function useDismissOnOutside(open: boolean, ref: { current: HTMLElement | null }, onDismiss: () => void) {
-  /* Held in a ref so an inline arrow callback doesn't re-subscribe the document
-     listeners on every render while the popover is open. */
-  const dismissRef = useRef(onDismiss);
-
-  useEffect(() => {
-    dismissRef.current = onDismiss;
-  }, [onDismiss]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!ref.current?.contains(event.target as Node)) {
-        dismissRef.current();
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        dismissRef.current();
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, ref]);
-}
-
-/* The band's own paper strip between the cover and the body, ruled off both in
-   the card's black. `relative` lifts it over the card-wide detail link so the
-   stages inside it are clickable without opening the hackathon. */
-const cardBandClassName = "relative z-20 flex shrink-0 items-stretch border-b border-black bg-paper";
-
-/* One cell in the band. `flex-1 basis-0` is what evens them out: every button
-   takes an equal share whether the band offers one stage or four. Each fills
-   the band edge to edge — no padding around the strip — and is divided from its
-   neighbour by a black rule; `first:border-l-0` leaves that job to the card's
-   own left frame. Labels wrap rather than clip on the narrowest cards. The
-   colour is left to the caller so reached stages can read in pine. */
-const cardBandCellClassName =
-  "group/stage relative flex min-h-9 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-2 py-1.5 text-center text-[11px] font-medium leading-[1.2] transition-colors first:border-l-0 hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine";
-
-/* One entry in the action stack at the foot of the date column. Matches the
-   column's other metadata: small, left-aligned, muted until hovered. `relative
-   z-20` lifts each one over the card-wide detail link. */
-const cardActionClassName =
-  "group/action relative z-20 inline-flex min-h-7 min-w-0 items-center gap-1 text-left text-[11px] font-medium leading-4 text-ink/55 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
-
-/* Same slide-in underline as HoverUnderline on the home page, scoped to the
-   named `group/action` above so it only answers its own entry's hover. */
+/* The underline animates on hover and stays visible for the selected stage. */
 function CardActionUnderline() {
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] origin-left scale-x-0 bg-moss transition-transform! duration-300! ease-out! group-hover/action:scale-x-100 motion-reduce:transition-none!"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] origin-left scale-x-0 bg-moss transition-transform! duration-300! ease-out! group-hover/action:scale-x-100 group-aria-pressed/action:scale-x-100 motion-reduce:transition-none!"
     />
-  );
-}
-
-/* The stack sits at the bottom of a ~7rem column, so its dropdowns anchor to
-   the card itself rather than to the entry that opened them: bottom-aligned and
-   inset from the card's frame, they get the full width and height of the card
-   to open into. The article clips overflow, so this is what keeps a wide panel
-   inside it. */
-const cardMenuClassName =
-  "absolute inset-x-3 bottom-3 z-30 border border-ink/15 bg-paper p-3 text-left shadow-lg";
-
-/* "Add to calendar" for a card. The provider links are built only once the menu
-   opens: they embed the absolute page URL, which is unavailable during SSR. */
-function CardCalendarMenu({
-  hackathon,
-  open,
-  onOpenChange,
-}: {
-  hackathon: HackathonCardData;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const links = useMemo(() => {
-    if (!open || !hackathon.startsAt) {
-      return [];
-    }
-
-    return calendarProviderLinks({
-      title: hackathon.name,
-      startsAt: hackathon.startsAt,
-      // Matches the detail page: a missing end date makes it a single-point event.
-      endsAt: hackathon.endsAt ?? hackathon.startsAt,
-      location:
-        hackathon.format === "online"
-          ? "Online"
-          : [hackathon.location, hackathon.country].filter(Boolean).join(", "),
-      description: hackathon.description,
-      url: hackathon.slug ? `${window.location.origin}/hackathons/${hackathon.slug}` : null,
-    });
-  }, [hackathon, open]);
-
-  return (
-    <>
-      <button
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className={cardActionClassName}
-        onClick={() => onOpenChange(!open)}
-        type="button"
-      >
-        Add to calendar
-        <CardActionUnderline />
-      </button>
-      {open ? (
-        <div className={cardMenuClassName} role="menu">
-          {links.map((link) => (
-            <a
-              className="flex min-h-9 items-center px-1 text-sm text-ink/75 transition-colors hover:text-pine"
-              href={link.href}
-              key={link.label}
-              onClick={() => onOpenChange(false)}
-              rel="noopener noreferrer"
-              role="menuitem"
-              target="_blank"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-/* The card's actions — calendar and the event's Discord channel — stacked at
-   the foot of the date column. Each entry lifts itself over the card-wide
-   detail link, so it stays clickable without opening the hackathon. */
-function CardActionStack({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useDismissOnOutside(calendarOpen, rootRef, () => setCalendarOpen(false));
-
-  /* Bottom-anchored under the date block so a row of cards lines its actions up
-     on one baseline. Deliberately unpositioned: the dropdowns inside are still
-     DOM children — which is what keeps outside-click dismissal working — but
-     resolve their `absolute` against the card rather than this narrow column. */
-  const stackClassName = "mt-auto flex min-w-0 flex-col items-start gap-2.5 pt-8";
-
-  /* Preview cards (the landing backdrop, admin approval previews) stand in for
-     a real card, so the stack still shows — but as labels, since there is no
-     hackathon behind them to link to. */
-  if (preview) {
-    return (
-      <div aria-hidden="true" className={stackClassName}>
-        {hackathon.startsAt ? <span className={cardActionClassName}>Add to calendar</span> : null}
-        {hackathon.discordUrl ? (
-          <span className={cardActionClassName}>Chat on Discord</span>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className={stackClassName} ref={rootRef}>
-      {hackathon.startsAt ? (
-        <CardCalendarMenu
-          hackathon={hackathon}
-          onOpenChange={setCalendarOpen}
-          open={calendarOpen}
-        />
-      ) : null}
-
-      {hackathon.discordUrl ? (
-        <a
-          className={cardActionClassName}
-          href={hackathon.discordUrl}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Chat on Discord
-          <CardActionUnderline />
-        </a>
-      ) : null}
-
-    </div>
   );
 }
 
 const cardFooterLinkClassName =
   "relative z-20 inline-flex min-h-8 items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine @[26rem]:text-[11px]";
 
-/* Explicit route to our detail page. Keeping navigation on a named text link
-   lets the rest of the card remain a non-interactive surface. */
+/* Explicit route to our detail page, at the foot of the body under the rule. */
 function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
   if (!hackathon.slug) {
     return null;
@@ -683,7 +496,7 @@ function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData
 
 /* Footer link out to the organizer's own site. Rendered as a small-caps mono
    label so it reads as card metadata rather than competing with the pipeline
-   buttons. */
+   buttons. Preview cards show the label but never navigate. */
 function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
   if (!hackathon.websiteUrl) {
     return null;
@@ -696,8 +509,6 @@ function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData;
     </>
   );
 
-  /* Preview cards (landing backdrop, admin approval previews) stand in for a
-     real listing, so the label shows but never navigates. */
   return preview ? (
     <span aria-hidden="true" className={cardFooterLinkClassName}>
       {label}
@@ -712,155 +523,6 @@ function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData;
     >
       {label}
     </a>
-  );
-}
-
-/* Untiered cards still get the hover wash, in a
-   warm sand that sits on the paper like the tier tints do. */
-const UNTIERED_STREAK_RGB = "214 190 150";
-
-/* Applied only on hover-capable pointers: touch screens never fire the hover
-   overlay, so they keep the plain footer links instead. */
-const hoverDeviceHidden = "[@media(hover:hover)]:hidden";
-
-const overlayEase = "ease-[cubic-bezier(0.22,1,0.36,1)]";
-
-const overlayHalfClassName =
-  "relative flex min-w-0 items-center justify-center gap-1.5 px-3 font-mono text-[11px] font-medium uppercase tracking-[0.16em] @[26rem]:text-xs";
-
-/* One half of the hover overlay. A missing destination keeps its half in
-   place, dimmed and inert, so the More info / Website split never shifts. */
-function CardOverlayHalf({
-  external,
-  href,
-  label,
-  preview,
-  title,
-}: {
-  external?: boolean;
-  href: string | null;
-  label: string;
-  preview: boolean;
-  title: string;
-}) {
-  const content = (
-    <span
-      className={`inline-flex items-center gap-1.5 opacity-0 transition-opacity delay-0 duration-200 group-hover/card:opacity-100 group-hover/card:delay-200 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:delay-0 ${
-        href ? "underline-offset-4 group-hover/half:underline" : ""
-      }`}
-    >
-      {label}
-      {external ? <ArrowUpRight aria-hidden="true" className="size-3.5" /> : null}
-    </span>
-  );
-
-  if (!href) {
-    return (
-      <span aria-disabled="true" className={`${overlayHalfClassName} cursor-not-allowed text-ink/35`}>
-        {content}
-      </span>
-    );
-  }
-
-  /* Preview cards stand in for a real listing: the label shows, nothing navigates. */
-  if (preview) {
-    return (
-      <span aria-hidden="true" className={`${overlayHalfClassName} group/half text-ink`}>
-        {content}
-      </span>
-    );
-  }
-
-  const className = `${overlayHalfClassName} group/half text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-pine`;
-
-  return external ? (
-    <a className={className} href={href} rel="noopener noreferrer" target="_blank" title={title}>
-      {content}
-    </a>
-  ) : (
-    <Link className={className} href={href} title={title}>
-      {content}
-    </Link>
-  );
-}
-
-/* Hover takeover for the card body. Two tier-tinted blooms slide in from the
-   left and right edges, meet in the middle, then a flat wash fades in behind
-   them so the whole body reads as one gradient. The surface splits into two
-   targets: More info on the left, the organizer's website on the right.
-   Keyboard users get the same overlay when one of its links has focus-visible. */
-function CardHoverOverlay({
-  hackathon,
-  preview,
-  tier,
-}: {
-  hackathon: HackathonCardData;
-  preview: boolean;
-  tier?: TierLabel;
-}) {
-  const rgb = tier ? TIER_STREAK_RGB[tier] : UNTIERED_STREAK_RGB;
-  const bloom = (edge: "0%" | "100%") =>
-    `radial-gradient(ellipse 90% 130% at ${edge} 50%, rgb(${rgb} / 0.62) 0%, rgb(${rgb} / 0.4) 55%, rgb(${rgb} / 0.22) 100%)`;
-  /* Soft leading edge so each bloom arrives as a wash, not a sliding panel. */
-  const leadingEdgeMask = (direction: "right" | "left") =>
-    `linear-gradient(to ${direction}, black 62%, transparent 100%)`;
-
-  const bloomClassName = `pointer-events-none absolute inset-0 opacity-0 transition-[translate,opacity] delay-0 duration-500 ${overlayEase} group-hover/card:translate-x-0 group-hover/card:opacity-100 group-has-[:focus-visible]/overlay:translate-x-0 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-opacity`;
-
-  return (
-    <div className="group/overlay pointer-events-none absolute inset-0 z-40 overflow-hidden group-hover/card:pointer-events-auto has-[:focus-visible]:pointer-events-auto">
-      {/* Paper backdrop hides the body's text as the blooms come in. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-paper opacity-0 transition-opacity duration-200 group-hover/card:opacity-100 group-has-[:focus-visible]/overlay:opacity-100"
-      />
-      <div
-        aria-hidden="true"
-        className={`${bloomClassName} -translate-x-full`}
-        style={{
-          backgroundImage: bloom("0%"),
-          maskImage: leadingEdgeMask("right"),
-          WebkitMaskImage: leadingEdgeMask("right"),
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className={`${bloomClassName} translate-x-full`}
-        style={{
-          backgroundImage: bloom("100%"),
-          maskImage: leadingEdgeMask("left"),
-          WebkitMaskImage: leadingEdgeMask("left"),
-        }}
-      />
-      {/* Once the blooms meet, an even wash settles over the seam. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity delay-0 duration-300 group-hover/card:opacity-100 group-hover/card:delay-300 group-has-[:focus-visible]/overlay:opacity-100 motion-reduce:delay-0"
-        style={{ backgroundColor: `rgb(${rgb} / 0.2)` }}
-      />
-      {/* Same airbrushed grain as the resting streak. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 group-hover/card:opacity-60 group-has-[:focus-visible]/overlay:opacity-60"
-        style={{ backgroundImage: STREAK_NOISE_URI }}
-      />
-
-      <div className="relative grid size-full grid-cols-2">
-        <CardOverlayHalf
-          href={hackathon.slug ? `/hackathons/${hackathon.slug}` : null}
-          label="More info"
-          preview={preview}
-          title={`View ${hackathon.name} details`}
-        />
-        <CardOverlayHalf
-          external
-          href={hackathon.websiteUrl ?? null}
-          label="Website"
-          preview={preview}
-          title={`Open the ${hackathon.name} website`}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -998,14 +660,10 @@ export function HackathonCard({
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
   const streak = tier ? getTierStreak(hackathon.name, tier) : null;
-  /* The board's remove button lives in the footer and must stay usable above
-     the hover overlay; without it, hover-capable devices drop the footer
-     entirely since its links moved into the overlay. */
-  const hasFooterControls = Boolean(cornerAction);
 
   return (
     <article
-      className={`group group/card @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
+      className={`group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
@@ -1038,15 +696,6 @@ export function HackathonCard({
         )}
       </div>
 
-      {/* Ruled band of its own between the cover and the body, carrying the
-          pipeline stages one cell apiece. */}
-      <CardStatusBar
-        hackathonId={hackathon.id}
-        hackathonName={hackathon.name}
-        initialStatus={hackathon.trackedStatus}
-        preview={preview}
-      />
-
       {/* The tinted wash is the grid's own background so it paints under the
           columns' text; only the grain rides above as an overlay. */}
       <div
@@ -1071,7 +720,12 @@ export function HackathonCard({
               Past edition
             </span>
           ) : null}
-          <CardActionStack hackathon={hackathon} preview={preview} />
+          <CardStatusStack
+            hackathonId={hackathon.id}
+            hackathonName={hackathon.name}
+            initialStatus={hackathon.trackedStatus}
+            preview={preview}
+          />
         </div>
 
         <div
@@ -1105,40 +759,28 @@ export function HackathonCard({
 
           <FriendAvatarRow friends={hackathon.friends} />
 
-          {/* `mt-auto` bottom-anchors the blurb so descriptions of different
-              lengths all end on the same line above the footer rule, rather
-              than trailing off at different heights across a row of cards. */}
-          <p className="mt-auto line-clamp-4 pt-6 text-[13px] leading-[19px] text-ink/70">
+          {/* The blurb sits directly under the location; the footer below takes
+              `mt-auto`, so the leftover height falls between the two and the
+              footer rule still lines up across a row of cards. `mb-5` is the
+              minimum gap when the body is full. */}
+          <p className="mb-5 mt-3 line-clamp-4 text-[13px] leading-[19px] text-ink/70">
             {cardDescription(hackathon)}
           </p>
 
-          {/* `min-h-10` keeps every card's footer the same height whether or
-              not it carries a remove button or a website link, so a row of
-              cards still lines up. */}
-          <div
-            className={`relative mt-5 border-t border-ink/25 pt-4 ${
-              hasFooterControls ? "z-50" : `z-10 ${hoverDeviceHidden}`
-            }`}
-          >
+          {/* Ruled footer: More info on the left, the organizer's site (and the
+              board's remove button, when present) on the right. `min-h-10`
+              keeps every card's footer one height whether or not those links
+              exist, so a row of cards still lines up. */}
+          <div className="relative z-20 mt-auto border-t border-ink/25 pt-4">
             <div className="flex min-h-10 items-start justify-between gap-3">
-              <div className="ml-auto flex min-w-0 flex-1 items-center justify-between gap-3">
-                {/* Touch-only fallback: on hover devices these two links live
-                    in the hover overlay instead. */}
-                <div className={`contents ${hoverDeviceHidden}`}>
-                  <CardMoreInfoLink hackathon={hackathon} preview={preview} />
-                </div>
-                <div className="ml-auto flex shrink-0 items-center gap-3">
-                  <div className={`contents ${hoverDeviceHidden}`}>
-                    <CardWebsiteLink hackathon={hackathon} preview={preview} />
-                  </div>
-                  {cornerAction ? <div className="relative z-20 shrink-0">{cornerAction}</div> : null}
-                </div>
+              <CardMoreInfoLink hackathon={hackathon} preview={preview} />
+              <div className="ml-auto flex shrink-0 items-center gap-3">
+                <CardWebsiteLink hackathon={hackathon} preview={preview} />
+                {cornerAction ? <div className="shrink-0">{cornerAction}</div> : null}
               </div>
             </div>
           </div>
         </div>
-
-        <CardHoverOverlay hackathon={hackathon} preview={preview} tier={tier} />
       </div>
     </article>
   );

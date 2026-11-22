@@ -62,8 +62,7 @@ type PublicHackathonCard = {
   countryCode: string | null;
   date: string;
   description: string | null;
-  /* Deep link to the event's Discord channel, when one exists — powers the
-     card's "Chat on Discord" action without a per-card lookup. */
+  /* Deep link to the event's Discord channel, when available. */
   discordUrl: string | null;
   format: "online" | "in_person";
   hasDiscord: boolean;
@@ -85,8 +84,7 @@ type PublicHackathonCard = {
   isPast: boolean;
   source: HackathonSourceBadge | null;
   startsAt: string | null;
-  /* Paired with startsAt for the card's calendar link; null when only a start
-     date is known. */
+  /* Null when only a start date is known. */
   endsAt: string | null;
   tags: string[];
   travelReimbursement: boolean;

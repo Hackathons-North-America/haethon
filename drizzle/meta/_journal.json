@@ -239,6 +239,20 @@
       "when": 1795241237857,
       "tag": "0033_remove_faceoff_and_email",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795308369522,
+      "tag": "0034_remove_attending_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1795308668140,
+      "tag": "0035_rename_accepted_to_attending",
+      "breakpoints": true
     }
   ]
 }

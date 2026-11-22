@@ -92,8 +92,8 @@ export function HeroSplit() {
                 weight, same cream as the headline, and a 3.68vw (47px) gap up
                 to it. The paragraph runs the full column width. */}
             <p className="mt-[clamp(1.75rem,3.68vw,3.5rem)] text-[clamp(1.0625rem,1.62vw,1.75rem)] font-light leading-[1.3] text-paper">
-              The most comprehensive hackathon list anywhere — follow every
-              application on one board, from interested to accepted.
+              The most comprehensive hackathon list anywhere. Track events you&apos;re
+              interested in, have applied to, or plan to attend on one board.
             </p>
           </LandingReveal>
 

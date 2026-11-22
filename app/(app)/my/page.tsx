@@ -17,7 +17,7 @@ import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
 export const metadata: Metadata = {
   title: "My Hackathons | Hackathons North America",
-  description: "Track where you stand with every hackathon, from interested to attending.",
+  description: "Track where you stand with every hackathon, from Interested to Attending.",
 };
 
 type PipelineRow = {
@@ -42,12 +42,11 @@ type PipelineRow = {
   endsAt: Date | null;
 };
 
-const stageOrder = ["interested", "applied", "accepted", "attending"] as const;
+const stageOrder = ["interested", "applied", "attending"] as const;
 
 const stageTitles: Record<(typeof stageOrder)[number], string> = {
   interested: "Interested",
   applied: "Applied",
-  accepted: "Accepted",
   attending: "Attending",
 };
 

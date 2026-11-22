@@ -8,7 +8,7 @@ import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 
 /* Trash button + a self-contained confirmation dialog used on the My Hackathons
    cards. Confirming hits DELETE /api/hackathons/{id}/track, which drops the
-   tracking row entirely — undoing the interested/applied/accepted tag — then
+   tracking row entirely — undoing the interested/applied/attending tag — then
    calls onRemoved so the parent can drop the card from view. The dialog is portaled to <body> so it escapes the card's
    hover:scale transform (a transformed ancestor would otherwise trap a fixed
    overlay) and any overflow clipping. */
@@ -22,7 +22,7 @@ export function RemoveHackathonControl({
   className?: string;
   hackathonId: string;
   hackathonName: string;
-  /* The list the card currently sits in — "Interested", "Applied", "Accepted",
+  /* The list the card currently sits in — "Interested", "Applied", "Attending",
      or "Past" — surfaced in the confirmation copy. */
   listLabel: string;
   onRemoved?: () => void;

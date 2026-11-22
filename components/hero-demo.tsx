@@ -9,14 +9,14 @@ const easeOut = [0.22, 1, 0.36, 1] as const;
 
 /* The hero's product demo, staged like Federato's agent walkthrough: a step
    pill up top — Track hackathon — and below it the app acting the step out. A
-   scripted cursor marks the card Applied, then Accepted, and the reel loops.
+   scripted cursor marks the card Applied, then Attending, and the reel loops.
    The scene is decorative (inert, hidden from assistive tech) and
    pixel-styled after the real HackathonCard so the mock stays honest — only
    the step pill is a real control. */
 
 /* Where the cursor is headed during a step. "rest" is an off-card parking
    spot; the rest resolve to live DOM nodes measured at step entry. */
-type TargetKey = "rest" | "applied" | "accepted";
+type TargetKey = "rest" | "applied" | "attending";
 
 type Step = {
   target: TargetKey;
@@ -28,20 +28,20 @@ type Step = {
    cursor's ~0.85s glide during the preceding approach step has landed. */
 const STEPS: Step[] = [
   { target: "rest", duration: 1000 }, // 0 settle on the untouched card
-  { target: "applied", duration: 1100 }, // 1 glide to the status band
-  { target: "applied", duration: 800, click: true }, // 2 click — Applied fills
+  { target: "applied", duration: 1100 }, // 1 glide to Applied
+  { target: "applied", duration: 800, click: true }, // 2 click — select Applied
   { target: "applied", duration: 1400 }, // 3 hold on the tracked card
-  { target: "accepted", duration: 1100 }, // 4 glide to the next stage
-  { target: "accepted", duration: 800, click: true }, // 5 click — Accepted fills
-  { target: "rest", duration: 2200 }, // 6 hold on the accepted card, then loop
+  { target: "attending", duration: 1100 }, // 4 glide to the next stage
+  { target: "attending", duration: 800, click: true }, // 5 click — select Attending
+  { target: "rest", duration: 2200 }, // 6 hold on Attending, then loop
 ];
 
 const CLICK_APPLIED = 2;
-const CLICK_ACCEPTED = 5;
+const CLICK_ATTENDING = 5;
 
 const DEMO_STAGE = { label: "Track hackathon", icon: ClipboardCheck, disc: "bg-ember text-paper" } as const;
 
-const stages = ["Interested", "Applied", "Accepted", "Attending"] as const;
+const stages = ["Interested", "Applied", "Attending"] as const;
 
 /* Classic pointer arrow, ink-filled with a paper outline so it reads on both
    the card and the panel. The path's tip sits at the svg's 0,0 corner, which
@@ -75,10 +75,10 @@ export function HeroDemo() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const appliedRef = useRef<HTMLSpanElement>(null);
-  const acceptedRef = useRef<HTMLSpanElement>(null);
+  const attendingRef = useRef<HTMLSpanElement>(null);
 
   /* With motion stilled the reel never runs; the card holds its final pose. */
-  const reachedIndex = still || step >= CLICK_ACCEPTED ? 2 : step >= CLICK_APPLIED ? 1 : -1;
+  const activeIndex = still || step >= CLICK_ATTENDING ? 2 : step >= CLICK_APPLIED ? 1 : -1;
   const clicking = !still && Boolean(STEPS[step].click);
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export function HeroDemo() {
   }, [step, still]);
 
   /* Cursor targets are measured from the live DOM at each step change (and on
-     resize), so the glide lands on the real cells however the demo scales. */
+     resize), so the glide lands on the status labels however the demo scales. */
   useEffect(() => {
     if (still) {
       return;
@@ -116,7 +116,7 @@ export function HeroDemo() {
         return;
       }
 
-      const element = key === "applied" ? appliedRef.current : acceptedRef.current;
+      const element = key === "applied" ? appliedRef.current : attendingRef.current;
 
       if (!element) {
         return;
@@ -185,32 +185,8 @@ export function HeroDemo() {
               />
             </div>
 
-            {/* Pipeline band — the cursor's clicks land on "Applied", then
-                "Accepted". */}
-            <div className="flex shrink-0 items-stretch border-b border-black bg-paper">
-              {stages.map((stage, index) => {
-                const isCurrent = index === reachedIndex;
-                const reached = index <= reachedIndex;
-
-                return (
-                  <span
-                    className={`flex min-h-10 min-w-0 flex-1 basis-0 items-center justify-center gap-1 border-l border-black px-2 py-1.5 text-center text-[11px] font-medium leading-[1.2] transition-colors duration-300 first:border-l-0 ${
-                      isCurrent ? "bg-pine text-paper" : reached ? "text-pine" : "text-ink/55"
-                    }`}
-                    key={stage}
-                    ref={stage === "Applied" ? appliedRef : stage === "Accepted" ? acceptedRef : undefined}
-                  >
-                    {reached ? (
-                      <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} />
-                    ) : null}
-                    {stage}
-                  </span>
-                );
-              })}
-            </div>
-
             <div className="grid min-w-0 flex-1 grid-cols-[6rem_minmax(0,1fr)] sm:grid-cols-[7rem_minmax(0,1fr)]">
-              {/* Date column with the action stack at its foot. */}
+              {/* Date column with the status picker at its foot. */}
               <div className="flex min-w-0 flex-col border-r border-ink/35 px-3.5 py-5 sm:px-4 sm:py-6">
                 <div>
                   <span className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink/60">
@@ -226,13 +202,23 @@ export function HeroDemo() {
                   </div>
                 </div>
 
-                <div className="mt-auto flex min-w-0 flex-col items-start gap-2.5 pt-7">
-                  <span className="text-[11px] font-medium leading-4 text-ink/55">
-                    Add to calendar
-                  </span>
-                  <span className="text-[11px] font-medium leading-4 text-ink/55">
-                    Chat on Discord
-                  </span>
+                <div className="mt-auto flex min-w-0 flex-col items-start gap-2.5 pt-8">
+                  {stages.map((stage, index) => {
+                    const active = index === activeIndex;
+
+                    return (
+                      <span
+                        className={`inline-flex min-h-7 items-center gap-1 text-[11px] font-medium leading-4 transition-colors ${active ? "text-ink" : "text-ink/55"}`}
+                        key={stage}
+                        ref={stage === "Applied" ? appliedRef : stage === "Attending" ? attendingRef : undefined}
+                      >
+                        <span className={`relative -mb-1 pb-1 after:absolute after:inset-x-0 after:bottom-0 after:h-[1.5px] after:origin-left after:bg-moss after:transition-transform after:duration-300 motion-reduce:after:transition-none ${active ? "after:scale-x-100" : "after:scale-x-0"}`}>
+                          {stage}
+                        </span>
+                        {active ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
 

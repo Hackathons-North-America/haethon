@@ -6,6 +6,7 @@ import {
   Archive,
   CalendarDays,
   Check,
+  ChevronDown,
   Globe2,
   LocateFixed,
   MapPin,
@@ -1182,28 +1183,23 @@ export function HackathonSearch({
                 </div>
               ) : null}
 
-              {/* Past recurring editions sit below a labeled rule so the cutoff
-                  between live events and the archive is unmistakable. */}
               {pastHackathons.length ? (
-                <>
-                  <div
-                    aria-label="Archived hackathons"
-                    className={`flex items-center gap-4 ${upcomingHackathons.length ? "mt-14" : "mt-2"}`}
-                    role="separator"
-                  >
+                <details className={`group/archive ${upcomingHackathons.length ? "mt-14" : "mt-2"}`}>
+                  <summary className="group/trigger flex cursor-pointer list-none items-center gap-4 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 [&::-webkit-details-marker]:hidden">
                     <span aria-hidden="true" className="h-px flex-1 bg-ink/15 dark:bg-white/15" />
-                    <span className="inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/55 dark:text-paper/55">
+                    <span className="inline-flex min-h-11 items-center gap-2 px-4 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/75 transition-colors group-hover/trigger:text-ink dark:text-paper/75 dark:group-hover/trigger:text-paper">
                       <Archive aria-hidden="true" className="size-3.5" />
-                      Archived · awaiting next edition
+                      Archived hackathons
+                      <ChevronDown aria-hidden="true" className="size-3.5 group-open/archive:rotate-180" />
                     </span>
                     <span aria-hidden="true" className="h-px flex-1 bg-ink/15 dark:bg-white/15" />
-                  </div>
-                  <div className="mt-10 grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
+                  </summary>
+                  <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
                     {pastHackathons.map((hackathon) => (
                       <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                     ))}
                   </div>
-                </>
+                </details>
               ) : null}
             </>
           ) : (

@@ -10,13 +10,12 @@ export type HackathonFriend = {
   status: string;
 };
 
-/* "attending" reads oddly next to a name ("James is attending in…"), so each
+/* Bare status words read oddly next to a name ("James is applied"), so each
    stage gets its own phrase for the friend-activity surfaces. */
 export const friendStatusPhrases: Record<string, string> = {
   interested: "is interested",
   applied: "has applied",
-  accepted: "was accepted",
-  attending: "is going",
+  attending: "is attending",
   attended: "attended",
   won: "won here",
 };
