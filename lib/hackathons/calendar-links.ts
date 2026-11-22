@@ -1,7 +1,5 @@
 /**
- * Google/Outlook "add event" deep links. Shared by the detail page's
- * AddToCalendarButton and the card's overlay action bar so both produce the
- * same event, with the same title/description shape.
+ * Google/Outlook "add event" deep links for the hackathon detail page.
  */
 export type CalendarEvent = {
   title: string;

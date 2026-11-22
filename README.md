@@ -36,13 +36,13 @@ without maintaining a separate spreadsheet or calendar.
 - **Discover events** across North America, international regions, and online
   formats using keyword, country, date, format, feature, and proximity filters.
 - **Manage an application pipeline** with stages for interested, applied,
-  accepted, attending, attended, and won.
+  attending, attended, and won.
 - **Build a public profile** with skills, activity, attended events, awards, and
   pinned highlights.
 - **Import Devpost history** through a verification flow instead of entering
   every past project and event manually.
-- **Follow other hackers** and see which friends are interested, applying, or
-  attending an event.
+- **Follow other hackers** and see which friends are interested, have applied, or
+  plan to attend.
 - **Jump to the right place** with calendar links, official websites, source
   attribution, and event-specific Discord channels.
 
