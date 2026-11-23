@@ -19,8 +19,8 @@ export function WatercolorBackdrop({ className = "", dome = false }: { className
 
           <filter height="100%" id="watercolor-wash" width="100%" x="0" y="0">
             <feTurbulence baseFrequency="0.0032 0.0065" numOctaves="4" seed="11" type="fractalNoise" />
-            <feColorMatrix values="0 0 0 0 1  0 0 0 0 0.98  0 0 0 0 0.95  2.2 0 0 0 -1.05" />
-            <feGaussianBlur stdDeviation="6" />
+            <feColorMatrix values="0 0 0 0 1  0 0 0 0 0.99  0 0 0 0 0.97  3 0 0 0 -1.35" />
+            <feGaussianBlur stdDeviation="5" />
           </filter>
 
           <filter height="100%" id="watercolor-blotch" width="100%" x="0" y="0">
@@ -32,7 +32,7 @@ export function WatercolorBackdrop({ className = "", dome = false }: { className
 
         <rect fill="url(#watercolor-base)" height="480" width="1600" />
         <rect filter="url(#watercolor-blotch)" height="480" width="1600" />
-        <rect filter="url(#watercolor-wash)" height="480" opacity="0.5" width="1600" />
+        <rect filter="url(#watercolor-wash)" height="480" opacity="0.55" width="1600" />
       </svg>
 
       {dome ? (
