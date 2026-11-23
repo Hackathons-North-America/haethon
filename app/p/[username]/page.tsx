@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { cache } from "react";
 
 import { AttendedHackathonsTable } from "@/components/attended-hackathons-table";
-import { PrimaryNav } from "@/components/primary-nav";
 import { ProfileActivity } from "@/components/profile-activity";
 import {
   buildProfileLinks,
@@ -126,8 +125,6 @@ export default async function SharedProfilePage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <PrimaryNav />
-
       <div className="px-5 pb-16 pt-28 sm:px-8 sm:pt-32 lg:px-12">
         <div className="mx-auto w-full max-w-[840px] space-y-10">
           <section className="py-8 sm:py-14">

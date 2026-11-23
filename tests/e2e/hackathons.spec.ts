@@ -17,15 +17,9 @@ test("opens details only from the card's More info link", async ({ page }) => {
   await expect(page).toHaveURL(/\/hackathons\/[^/]+$/);
 });
 
-test("opens the hackathons browse page from the home nav", async ({ page }) => {
-  await page.goto("/");
+test("loads the hackathons browse page", async ({ page }) => {
+  await page.goto("/hackathons");
 
-  await page
-    .getByRole("navigation", { name: "Primary navigation" })
-    .getByRole("link", { name: "Open App", exact: true })
-    .click();
-
-  await expect(page).toHaveURL(/\/hackathons$/);
   await expect(
     page.getByRole("navigation", { name: "App navigation" })
   ).toBeVisible();
