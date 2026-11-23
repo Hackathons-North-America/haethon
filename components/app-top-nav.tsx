@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { useAppNavSlotRef } from "@/components/app-nav-slot";
+import { BrandLogo } from "@/components/brand-logo";
 import { LoginRequiredLink } from "@/components/login-required-dialog";
 import { NavUnderline } from "@/components/nav-underline";
 
@@ -243,7 +244,7 @@ export function AppTopNav({
       >
         <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-x-4 px-5 sm:px-8 lg:grid lg:min-h-20 lg:has-[[data-nav-slot]:not(:empty)]:min-h-[68px] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-12">
           <Link className="flex min-h-16 items-center justify-self-start" href={isSignedIn ? "/hackathons" : "/"}>
-            <span className="whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-ink">HNA</span>
+            <BrandLogo />
           </Link>
 
           {/* Below lg the center content wraps onto its own row; empty, it

@@ -671,8 +671,10 @@ export function HackathonSearch({
 
           <form
             /* Narrower than the 1800px results grid on purpose — a full-width
-               pill stretches the three fields far past the text they hold. */
-            className="relative z-30 mx-auto w-full max-w-[56rem]"
+               pill stretches the three fields far past the text they hold.
+               At md+ it's a row: the card plus the More toggle beside it, so
+               the cap is the old 56rem card plus room for the toggle. */
+            className="relative z-30 mx-auto w-full max-w-[61rem] md:flex md:items-start md:gap-2"
             ref={filterFormRef}
             onSubmit={(event) => {
               event.preventDefault();
@@ -685,9 +687,9 @@ export function HackathonSearch({
                 pill radius only applies while collapsed — a rounded-full corner
                 on a two-row card reads as a lozenge. */}
             <div
-              className={`flex flex-col rounded-[2rem] border border-ink/12 dark:border-white/12 bg-white dark:bg-white/[0.04] p-2 shadow-[0_6px_20px_-6px_rgba(29,42,68,0.18)] md:p-0 ${
+              className={`flex min-w-0 flex-col rounded-[2rem] border border-ink/12 dark:border-white/12 bg-white dark:bg-white/[0.04] p-2 shadow-[0_6px_20px_-6px_rgba(29,42,68,0.18)] md:p-0 ${
                 moreFiltersOpen ? "" : "md:rounded-full"
-              }`}
+              } md:flex-1`}
             >
             <div className="flex flex-col gap-1 md:flex-row md:items-center">
             <div className="relative min-h-16 min-w-0 flex-[1.25]">
@@ -1221,17 +1223,17 @@ export function HackathonSearch({
             ) : null}
             </div>
 
-            {/* More sits under the bar, centered below the Location field.
-                Location is flex 1.25 of the row's 4.75 flex units, so its
-                midpoint lands at ~12% of the bar's width at every md+ size
-                (it drifts ~10px when the clear button shows). It's absolute
-                so it lives inside the band's existing bottom padding instead
-                of adding a row; with the second row open it rides down with
-                the card. Muted like the inactive region tabs. */}
+            {/* At md+ More sits outside the card, just right of the Search
+                button: it's a flex sibling of the card, as tall as the
+                primary row (4rem + the card's 1px borders) so it stays
+                level with Search even when the second row opens below.
+                On phones the card stacks into a column, so More stays
+                absolute under the bar inside the band's bottom padding.
+                Muted like the inactive region tabs. */}
             <button
               aria-controls={moreFiltersId}
               aria-expanded={moreFiltersOpen}
-              className="absolute left-4 top-full mt-0.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink/55 dark:text-paper/55 transition-colors hover:text-ink dark:hover:text-paper md:left-[12%] md:-translate-x-1/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
+              className="absolute left-4 top-full mt-0.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink/55 dark:text-paper/55 transition-colors hover:text-ink dark:hover:text-paper md:static md:mt-0 md:flex md:h-[calc(4rem+2px)] md:min-w-[4.5rem] md:shrink-0 md:items-center md:justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
               onClick={() => setMoreFiltersOpen((open) => !open)}
               type="button"
             >
@@ -1240,8 +1242,10 @@ export function HackathonSearch({
           </form>
 
           <div
-            /* Indented past the More button, on the same line as it. */
-            className={`pl-24 pr-2 text-sm text-ink/55 dark:text-paper/55 ${
+            /* Phones: indented past the More button, on the same line as it.
+               md+: More moved beside the card, so line up with the Location
+               field's text instead. */
+            className={`mx-auto max-w-[61rem] pl-24 pr-2 md:pl-7 text-sm text-ink/55 dark:text-paper/55 ${
               searchError || !hasSearched ? "mt-2 min-h-6" : ""
             }`}
             role="status"

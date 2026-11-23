@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AlertTriangle, Building2, CalendarDays, CalendarPlus, Inbox, MessagesSquare, Upload } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
+
 const items = [
   { href: "/admin/hackathons", icon: CalendarDays, label: "Hackathons" },
   { href: "/admin/hackathons/new", icon: CalendarPlus, label: "Add hackathon" },
@@ -20,8 +22,8 @@ export function AdminSidebar() {
   return (
     <aside className="border-b border-ink/15 bg-paper p-4 lg:min-h-screen lg:w-64 lg:border-b-0 lg:border-r lg:p-5">
       <div className="lg:sticky lg:top-5">
-        <Link className="text-2xl font-medium tracking-tight text-ink" href="/">
-          HNA
+        <Link className="inline-flex" href="/">
+          <BrandLogo />
         </Link>
         <nav aria-label="Admin navigation" className="mt-6 flex gap-2 lg:flex-col">
           {items.map(({ href, icon: Icon, label }) => {

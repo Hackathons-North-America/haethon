@@ -18,6 +18,15 @@
   --font-sans: var(--font-geist);
   --font-serif: var(--font-geist);
   --font-mono: var(--font-geist-mono);
+
+  /* Text-cursor blink for the landing hero's TypewriterWord. */
+  --animate-caret-blink: caret-blink 1s step-end infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 /* Hackathon cover cards (HackathonCard). The 1px outline is painted as
