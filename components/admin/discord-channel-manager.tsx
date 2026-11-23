@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Pencil, Pin, PinOff, Trash2, X } from "lucide-react";
+import { Check, Copy, Pencil, Pin, PinOff, Trash2, X } from "lucide-react";
 
 import type {
   AdminDiscordChannel,
   AdminDiscordGuildChannel,
   AdminDiscordOverview,
 } from "@/lib/discord/channel-admin";
+import type { DiscordChannelDuplicate } from "@/lib/discord/duplicates";
 
 async function patchChannel(channelId: string, name: string | null) {
   const response = await fetch(`/api/admin/discord/channels/${channelId}`, {
@@ -204,6 +205,48 @@ function DiscordChannelCard({
   );
 }
 
+/* Report-only: the sync never deletes either channel. The admin decides which to keep. */
+function DuplicateChannelsNotice({ duplicates }: { duplicates: DiscordChannelDuplicate[] }) {
+  return (
+    <section className="rounded-xl border border-[#B54708]/30 bg-[#FFFAEB] p-5 dark:border-[#FDB022]/30 dark:bg-[#FDB022]/[0.08]">
+      <div className="flex items-center gap-2">
+        <Copy aria-hidden="true" className="size-4 text-[#B54708] dark:text-[#FDB022]" />
+        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-[#B54708] dark:text-[#FDB022]">
+          Possible duplicates · {duplicates.length}
+        </h2>
+      </div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/65 dark:text-paper/65">
+        These hackathons have a channel the sync manages and an untracked channel with a matching name, usually one
+        made by hand. Nothing is deleted automatically. To keep the hand-made one, attach its channel ID in the
+        hackathon&apos;s edit form, then delete the other on Discord. To keep the tracked one, delete the hand-made
+        channel on Discord.
+      </p>
+      <ul className="mt-4 space-y-2">
+        {duplicates.map((duplicate) => (
+          <li
+            className="rounded-lg border border-ink/10 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.06]"
+            key={duplicate.tracked.channelSnowflake}
+          >
+            <span className="font-semibold text-ink dark:text-paper">{duplicate.hackathonName}</span>
+            <span className="text-ink/55 dark:text-paper/55">
+              {" · tracked "}
+              <span className="font-mono">#{duplicate.tracked.name}</span>
+              {" · also "}
+              {duplicate.duplicates.map((channel, index) => (
+                <span key={channel.channelSnowflake}>
+                  {index > 0 ? ", " : null}
+                  <span className="font-mono">#{channel.name}</span>
+                  {channel.categoryName ? ` in ${channel.categoryName}` : null}
+                </span>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function DiscordChannelManager({ overview }: { overview: AdminDiscordOverview }) {
   const [groups, setGroups] = useState(overview.groups);
 
@@ -243,6 +286,8 @@ export function DiscordChannelManager({ overview }: { overview: AdminDiscordOver
           filed them into.
         </p>
       ) : null}
+
+      {overview.duplicates.length ? <DuplicateChannelsNotice duplicates={overview.duplicates} /> : null}
 
       {groups.map((group) => (
         <section
