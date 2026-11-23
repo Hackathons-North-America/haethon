@@ -17,6 +17,11 @@ import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
 import { isVotingClosed, type VoteValue } from "@/lib/hackathons/vote-state";
 
+/* Card voting is switched off for now and will come back later. Flip this to
+   true to restore the ▲ score ▼ in every card footer. The detail page's vote
+   control and the "Top voted" sort don't read it. */
+const SHOW_CARD_VOTES = false;
+
 export type HackathonCardData = {
   /** Search metadata sent with the cached catalog snapshot. */
   beginnerFriendly?: boolean;
@@ -599,7 +604,7 @@ function CardStretchedLink({ hackathon, preview }: { hackathon: HackathonCardDat
    data, so admin and marketing previews built from bare payloads skip it.
    Ended events keep their final score but no longer take votes. */
 function CardVotes({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
-  if (hackathon.upvotes === undefined) {
+  if (!SHOW_CARD_VOTES || hackathon.upvotes === undefined) {
     return null;
   }
 
@@ -711,7 +716,7 @@ function BookmarkPageCard({
         </div>
       </div>
 
-      {cornerAction || hackathon.upvotes !== undefined ? (
+      {cornerAction || (SHOW_CARD_VOTES && hackathon.upvotes !== undefined) ? (
         <div className="relative z-10 mt-auto pt-3 text-base leading-6">
           <div className="flex items-center justify-between gap-2">
             <CardVotes hackathon={hackathon} preview={preview} />

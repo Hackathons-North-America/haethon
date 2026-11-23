@@ -41,6 +41,10 @@ const formatPopoverId = "hackathon-format-popover";
 const featurePopoverId = "hackathon-feature-popover";
 const sortPopoverId = "hackathon-sort-popover";
 const moreFiltersId = "hackathon-more-filters";
+/* The More toggle under the search bar is hidden for now and will come back
+   later. Without it the Name/Format row only shows when the URL presets one
+   of those filters. Flip this to true to restore the toggle. */
+const SHOW_MORE_FILTERS_TOGGLE = false;
 const SEARCH_PAGE_SIZE = 30;
 
 type OpenPopover = "location" | "date" | "format" | "features" | "sort" | null;
@@ -1228,20 +1232,23 @@ export function HackathonSearch({
                 so it lives inside the band's existing bottom padding instead
                 of adding a row; with the second row open it rides down with
                 the card. Muted like the inactive region tabs. */}
-            <button
-              aria-controls={moreFiltersId}
-              aria-expanded={moreFiltersOpen}
-              className="absolute left-4 top-full mt-0.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink/55 dark:text-paper/55 transition-colors hover:text-ink dark:hover:text-paper md:left-[12%] md:-translate-x-1/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
-              onClick={() => setMoreFiltersOpen((open) => !open)}
-              type="button"
-            >
-              {moreFiltersOpen ? "Fewer" : "More"}
-            </button>
+            {SHOW_MORE_FILTERS_TOGGLE ? (
+              <button
+                aria-controls={moreFiltersId}
+                aria-expanded={moreFiltersOpen}
+                className="absolute left-4 top-full mt-0.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink/55 dark:text-paper/55 transition-colors hover:text-ink dark:hover:text-paper md:left-[12%] md:-translate-x-1/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
+                onClick={() => setMoreFiltersOpen((open) => !open)}
+                type="button"
+              >
+                {moreFiltersOpen ? "Fewer" : "More"}
+              </button>
+            ) : null}
           </form>
 
           <div
-            /* Indented past the More button, on the same line as it. */
-            className={`pl-24 pr-2 text-sm text-ink/55 dark:text-paper/55 ${
+            /* Indented past the More button, on the same line as it. With
+               the toggle hidden it lines up with the bar's field labels. */
+            className={`${SHOW_MORE_FILTERS_TOGGLE ? "pl-24" : "pl-7"} pr-2 text-sm text-ink/55 dark:text-paper/55 ${
               searchError || !hasSearched ? "mt-2 min-h-6" : ""
             }`}
             role="status"
