@@ -22,11 +22,12 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
-import { PLACEHOLDER_TIER, sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
+import { sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
 import type {
+  CatalogSort,
   DatePeriod,
   DistanceFilter,
   FeatureFilter,
@@ -92,7 +93,8 @@ function replaceSearchUrl(
     travelReimbursement,
   }: HackathonSearchFilters,
   basePath: string,
-  searched: boolean
+  searched: boolean,
+  sort: CatalogSort
 ) {
   const params = new URLSearchParams();
 
@@ -126,6 +128,10 @@ function replaceSearchUrl(
     params.set("highSchoolersOnly", highSchoolersOnly);
   }
 
+  if (sort !== "soonest") {
+    params.set("sort", sort);
+  }
+
   if (searched) {
     params.set("search", "1");
   }
@@ -141,12 +147,49 @@ export type HackathonCardHelpers = {
   removeCard: (id: string) => void;
 };
 
+const sortOptions: { label: string; value: CatalogSort }[] = [
+  { label: "Soonest", value: "soonest" },
+  { label: "Top voted", value: "top" },
+];
+
+/* Segmented Soonest / Top voted switch beside the grid heading. */
+function CatalogSortToggle({ onChange, sort }: { onChange: (next: CatalogSort) => void; sort: CatalogSort }) {
+  return (
+    <div
+      aria-label="Sort hackathons"
+      className="inline-flex items-center rounded-full border border-ink/15 p-0.5 dark:border-white/15"
+      role="group"
+    >
+      {sortOptions.map((option) => {
+        const active = option.value === sort;
+
+        return (
+          <button
+            aria-pressed={active}
+            className={`min-h-9 rounded-full px-4 font-mono text-[11px] font-medium uppercase tracking-[0.12em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
+              active
+                ? "bg-ink text-paper dark:bg-paper dark:text-ink"
+                : "text-ink/60 hover:text-ink dark:text-paper/60 dark:hover:text-paper"
+            }`}
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function HackathonSearch({
   initialFilters,
   initialHasMore = false,
   initialHasSearched = false,
   initialHackathons,
   basePath = "/hackathons",
+  initialSort = "soonest",
   renderCard,
 }: {
   initialFilters: HackathonSearchFilters;
@@ -156,6 +199,8 @@ export function HackathonSearch({
   /* Path the filter state is written back to via history.replaceState. Defaults
      to the public page; the admin view passes its own route. */
   basePath?: string;
+  /* Grid order from the ?sort= URL param: soonest start, or top voted. */
+  initialSort?: CatalogSort;
   /* Overrides how each grid card renders. Defaults to a plain HackathonCard; the
      admin view wraps it with edit/delete controls. */
   renderCard?: (hackathon: HackathonCardData, helpers: HackathonCardHelpers) => ReactNode;
@@ -173,6 +218,7 @@ export function HackathonSearch({
   const [highSchoolersOnly, setHighSchoolersOnly] = useState<FeatureFilter>(initialFilters.highSchoolersOnly);
   const [catalog, setCatalog] = useState(initialHackathons);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [sort, setSort] = useState<CatalogSort>(initialSort);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [hasSearched, setHasSearched] = useState(initialHasSearched);
   const [isSearching, setIsSearching] = useState(false);
@@ -338,9 +384,11 @@ export function HackathonSearch({
     [appliedFilters, catalog, origin]
   );
   const originCountryCode = origin?.countryCode ?? null;
+  /* "Top voted" pages arrive already ranked by the server, which is the only
+     place that can order across pages, so they are shown as-is. */
   const sortedHackathons = useMemo(
-    () => sortByStartDateWithLocalBoost(filteredHackathons, originCountryCode),
-    [filteredHackathons, originCountryCode]
+    () => (sort === "top" ? filteredHackathons : sortByStartDateWithLocalBoost(filteredHackathons, originCountryCode)),
+    [filteredHackathons, originCountryCode, sort]
   );
   /* The catalog arrives with past (recurring) editions already ordered after
      everything upcoming; splitting on isPast keeps that order while letting the
@@ -358,8 +406,8 @@ export function HackathonSearch({
   const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
 
   useEffect(() => {
-    replaceSearchUrl(appliedFilters, basePath, hasSearched);
-  }, [appliedFilters, basePath, hasSearched]);
+    replaceSearchUrl(appliedFilters, basePath, hasSearched, sort);
+  }, [appliedFilters, basePath, hasSearched, sort]);
 
   /* Watch the sentinel rather than the scroll position so nested scroll
      containers and the page itself both work. The margin starts the fetch a
@@ -409,7 +457,7 @@ export function HackathonSearch({
   const renderCardNode =
     renderCard ??
     ((hackathon: HackathonCardData) => (
-      <HackathonCard hackathon={hackathon} tier={PLACEHOLDER_TIER} />
+      <HackathonCard hackathon={hackathon} tier={hackathon.tier ?? "unranked"} />
     ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
@@ -421,6 +469,16 @@ export function HackathonSearch({
         ? "Location unavailable"
         : `Within ${distanceKm} km`;
   const selectedFeatureLabels = featureTags.filter((tag) => tag.value === "on").map((tag) => tag.label);
+
+  function changeSort(next: CatalogSort) {
+    if (next === sort) {
+      return;
+    }
+
+    setSort(next);
+    // A different order means different pages, so restart from the top.
+    void searchHackathons(appliedFilters, 0, false, next);
+  }
 
   function selectCountry(country: string) {
     setCountries((selectedCountries) =>
@@ -476,7 +534,12 @@ export function HackathonSearch({
     void searchHackathons(nextFilters);
   }
 
-  async function searchHackathons(filters: HackathonSearchFilters, offset = 0, append = false) {
+  async function searchHackathons(
+    filters: HackathonSearchFilters,
+    offset = 0,
+    append = false,
+    sortOrder: CatalogSort = sort
+  ) {
     /* A new filter search supersedes any in-flight infinite-scroll request (or
        an earlier rapid preset click). Only responses from the current
        generation may update the catalog and URL. */
@@ -499,6 +562,8 @@ export function HackathonSearch({
       limit: String(SEARCH_PAGE_SIZE),
       offset: String(offset),
     });
+
+    if (sortOrder !== "soonest") params.set("sort", sortOrder);
     const dateRange = dateRangeForPeriod(filters.datePeriod);
 
     if (filters.name.trim()) params.set("q", filters.name.trim());
@@ -1157,9 +1222,10 @@ export function HackathonSearch({
             <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em] text-ink dark:text-paper sm:text-4xl">
               Upcoming hackathons
             </h1>
+            {hasSearched ? <CatalogSortToggle onChange={changeSort} sort={sort} /> : null}
           </div>
 
-          {!activeFilters && originCountryCode ? (
+          {!activeFilters && originCountryCode && sort === "soonest" ? (
             <p className="mb-6 -mt-3 text-sm leading-5 text-ink/50 dark:text-paper/50">
               Hackathons near you first.
             </p>

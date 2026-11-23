@@ -3,14 +3,12 @@
 import {
   CalendarDays,
   CircleUser,
-  Compass,
   Globe2,
   LogIn,
   MapPin,
   PlusSquare,
   Search,
   Settings2,
-  Users,
 } from "lucide-react";
 
 import { HackathonCard } from "@/components/hackathon-card";
@@ -91,9 +89,8 @@ const queryFields = [
 ];
 
 const appNavItems = [
-  { Icon: Compass, label: "Hackathons DB", active: true },
+  { Icon: Search, label: "Search", active: true },
   { Icon: CalendarDays, label: "My Hackathons" },
-  { Icon: Users, label: "Friends" },
   { Icon: CircleUser, label: "Hacker Profile" },
   { Icon: LogIn, label: "Login" },
 ];

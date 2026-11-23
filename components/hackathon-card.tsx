@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
-import { FriendAvatarRow } from "@/components/hackathon-friends";
+import { HackathonVoteControl } from "@/components/hackathon-vote-control";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
+import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
 import { showLoginRequiredDialog } from "@/components/login-required-dialog";
-import type { HackathonFriend } from "@/lib/follows/activity";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
-import type { TierLabel } from "@/lib/hackathons/ranking";
+import type { CardTier, TierLabel } from "@/lib/hackathons/ranking";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
+import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
+import { isVotingClosed, type VoteValue } from "@/lib/hackathons/vote-state";
 
 export type HackathonCardData = {
   /** Search metadata sent with the cached catalog snapshot. */
@@ -28,9 +30,6 @@ export type HackathonCardData = {
   /** ISO end date. */
   endsAt?: string | null;
   format?: "online" | "in_person";
-  /** Approved followees of the signed-in viewer with this hackathon on their
-      board — the card's "James is going" social nudge. */
-  friends?: HackathonFriend[];
   hasDiscord?: boolean;
   highSchoolersOnly?: boolean;
   id: string;
@@ -52,9 +51,16 @@ export type HackathonCardData = {
   /** The signed-in user's pipeline stage for this hackathon (null/undefined
       when it isn't on their My Hackathons board). */
   trackedStatus?: string | null;
+  /** Vote-derived tier; null while the hackathon has too few votes to rank. */
+  tier?: TierLabel | null;
+  /** Live vote totals and the viewer's own vote. Cards render the vote
+      control only when these are present (catalog, board, detail). */
+  upvotes?: number;
+  downvotes?: number;
+  viewerVote?: VoteValue | null;
   travelReimbursement?: boolean;
-  /** The organizer's own site. Drives the footer's "Visit website" link; the
-      link is omitted entirely when the listing has no website of its own. */
+  /** The organizer's own site. Clicking anywhere on a cover card opens it in a
+      new tab; cards without one link to our detail page instead. */
   websiteUrl?: string | null;
 };
 
@@ -139,6 +145,34 @@ const TIER_STREAK_RGB: Record<TierLabel, string> = {
   D: "96 165 250",
 };
 
+/* Hover color for the card's lines: the cursor spotlight lights the outline and
+   inner divider lines near the pointer in the streak's own tint. */
+function getTierAccentStyle(tier: TierLabel) {
+  return {
+    "--card-accent": `rgb(${TIER_STREAK_RGB[tier]})`,
+  } as CSSProperties;
+}
+
+/* Moves the invisible spotlight circle with the pointer. Coordinates are set
+   per element (the card's outline, and each inner rule under the cover,
+   between the columns and above the footer) because each paints its
+   radial-gradient in its own box. Writes CSS variables
+   directly so mouse movement never re-renders React. Touch has no hover, so it is skipped. */
+function trackCardSpotlight(event: PointerEvent<HTMLElement>) {
+  if (event.pointerType === "touch") {
+    return;
+  }
+
+  const card = event.currentTarget;
+  const targets = [card, ...card.querySelectorAll<HTMLElement>("[data-card-rule]")];
+
+  for (const target of targets) {
+    const rect = target.getBoundingClientRect();
+    target.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+    target.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+  }
+}
+
 /* Tiling grayscale noise: desaturated feTurbulence pushed to high contrast so
    the speckle survives overlay-blending onto a pale tint. Masked to the
    streak's own shape so the grain rides the tinted area and dissolves with it. */
@@ -196,8 +230,11 @@ const cardStages: { value: TrackableStatus; label: string }[] = [
 
 const cardStatusStackClassName = "mt-auto flex min-w-0 flex-col items-start gap-1 pt-8";
 
+const cardLabelClassName =
+  "font-mono text-[10px] font-medium uppercase tracking-[0.12em] @[26rem]:text-[11px]";
+
 const cardStatusClassName =
-  "inline-flex min-h-5 min-w-0 items-center gap-1 text-left text-[11px] font-medium leading-4";
+  `inline-flex min-h-5 w-max items-center gap-0.5 text-left leading-4 @[26rem]:gap-1 ${cardLabelClassName}`;
 
 /* Selecting a stage tracks the hackathon. Selecting the same stage again removes it. */
 function CardStatusStack({
@@ -213,6 +250,9 @@ function CardStatusStack({
 }) {
   const [status, setStatus] = useState(initialStatus ?? null);
   const [pending, setPending] = useState(false);
+
+  // Follow changes made from the side panel's tracker for this hackathon.
+  useHackathonStatusListener(hackathonId, setStatus);
 
   const isPastPipeline = status === "attended" || status === "won";
 
@@ -248,6 +288,8 @@ function CardStatusStack({
       if (!response.ok) {
         throw new Error("Could not update status.");
       }
+
+      announceHackathonStatus(hackathonId, untracking ? null : nextStatus);
     } catch {
       setStatus(previousStatus);
     } finally {
@@ -303,7 +345,7 @@ function CardStatusStack({
               {stage.label}
               <CardActionUnderline />
             </span>
-            {active ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
+            {active ? <Check aria-hidden="true" className="size-2.5 shrink-0 @[26rem]:size-3" strokeWidth={3} /> : null}
           </button>
         );
       })}
@@ -471,40 +513,21 @@ function CardActionUnderline() {
 }
 
 const cardFooterLinkClassName =
-  "relative z-20 inline-flex min-h-8 items-center gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine @[26rem]:text-[11px]";
+  `relative z-20 inline-flex min-h-8 items-center gap-1 text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${cardLabelClassName}`;
 
-/* Explicit route to our detail page, at the foot of the body under the rule. */
+/* Route to our detail page, on the right of the footer under the rule. Inside
+   the app the navigation is intercepted and opens the side panel over the
+   list (app/(app)/@panel). Preview cards show the label but never navigate. */
 function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
+  const panelOpen = useHackathonPanelOpen();
+
   if (!hackathon.slug) {
-    return null;
-  }
-
-  return preview ? (
-    <span aria-hidden="true" className={cardFooterLinkClassName}>
-      More info
-    </span>
-  ) : (
-    <Link
-      className={cardFooterLinkClassName}
-      href={`/hackathons/${hackathon.slug}`}
-      title={`View ${hackathon.name} details`}
-    >
-      More info
-    </Link>
-  );
-}
-
-/* Footer link out to the organizer's own site. Rendered as a small-caps mono
-   label so it reads as card metadata rather than competing with the pipeline
-   buttons. Preview cards show the label but never navigate. */
-function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
-  if (!hackathon.websiteUrl) {
     return null;
   }
 
   const label = (
     <>
-      Visit website
+      More info
       <ArrowUpRight aria-hidden="true" className="size-3" />
     </>
   );
@@ -514,15 +537,84 @@ function CardWebsiteLink({ hackathon, preview }: { hackathon: HackathonCardData;
       {label}
     </span>
   ) : (
-    <a
+    <Link
       className={cardFooterLinkClassName}
-      href={hackathon.websiteUrl}
-      rel="noopener noreferrer"
-      target="_blank"
-      title={`Open the ${hackathon.name} website`}
+      href={`/hackathons/${hackathon.slug}`}
+      // Swapping hackathons replaces the open panel's history entry, so
+      // closing it always goes straight back to the list.
+      replace={panelOpen}
+      scroll={false}
+      title={`View ${hackathon.name} details`}
     >
       {label}
-    </a>
+    </Link>
+  );
+}
+
+/* Makes the whole cover card clickable: an empty link stretched over the card
+   at z-[1], under the status buttons and footer (z-20), which stay clickable
+   on their own. Opens the organizer's site in a new tab so the user keeps
+   their place in the results; listings with no site fall back to our detail
+   page. Preview cards never navigate. */
+function CardStretchedLink({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
+  const panelOpen = useHackathonPanelOpen();
+
+  if (preview) {
+    return null;
+  }
+
+  const className =
+    "absolute inset-0 z-[1] rounded-[7px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine";
+
+  if (hackathon.websiteUrl) {
+    return (
+      <a
+        aria-label={`Open the ${hackathon.name} website`}
+        className={className}
+        draggable={false}
+        href={hackathon.websiteUrl}
+        rel="noopener noreferrer"
+        target="_blank"
+      />
+    );
+  }
+
+  if (!hackathon.slug) {
+    return null;
+  }
+
+  return (
+    <Link
+      aria-label={`View ${hackathon.name} details`}
+      className={className}
+      draggable={false}
+      href={`/hackathons/${hackathon.slug}`}
+      replace={panelOpen}
+      scroll={false}
+    />
+  );
+}
+
+/* The footer's ▲ score ▼. Only rendered when the card was loaded with vote
+   data, so admin and marketing previews built from bare payloads skip it.
+   Ended events keep their final score but no longer take votes. */
+function CardVotes({ hackathon, preview }: { hackathon: HackathonCardData; preview: boolean }) {
+  if (hackathon.upvotes === undefined) {
+    return null;
+  }
+
+  return (
+    <HackathonVoteControl
+      closed={Boolean(hackathon.isPast) || isVotingClosed(hackathon.endsAt)}
+      hackathonId={hackathon.id}
+      hackathonName={hackathon.name}
+      initialState={{
+        upvotes: hackathon.upvotes,
+        downvotes: hackathon.downvotes ?? 0,
+        viewerVote: hackathon.viewerVote ?? null,
+      }}
+      preview={preview}
+    />
   );
 }
 
@@ -535,6 +627,7 @@ function BookmarkPageCard({
   hackathon: HackathonCardData;
   preview: boolean;
 }) {
+  const panelOpen = useHackathonPanelOpen();
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const location = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
 
@@ -551,6 +644,8 @@ function BookmarkPageCard({
           className="absolute inset-0 z-[1]"
           draggable={false}
           href={`/hackathons/${hackathon.slug}`}
+          replace={panelOpen}
+          scroll={false}
         />
       ) : null}
 
@@ -616,10 +711,11 @@ function BookmarkPageCard({
         </div>
       </div>
 
-      {cornerAction ? (
+      {cornerAction || hackathon.upvotes !== undefined ? (
         <div className="relative z-10 mt-auto pt-3 text-base leading-6">
-          <div className="flex items-start justify-between gap-2">
-            <div className="relative z-20 ml-auto shrink-0">{cornerAction}</div>
+          <div className="flex items-center justify-between gap-2">
+            <CardVotes hackathon={hackathon} preview={preview} />
+            {cornerAction ? <div className="relative z-20 ml-auto shrink-0">{cornerAction}</div> : null}
           </div>
         </div>
       ) : null}
@@ -643,7 +739,9 @@ export function HackathonCard({
   /* The bookmark page keeps the original compact, square-logo card design. */
   layout?: "cover" | "bookmark";
   preview?: boolean;
-  tier?: TierLabel;
+  /* A tier label above the name, or "unranked" for too few votes (grey label,
+     no tier wash). Omitted entirely on surfaces that don't rank. */
+  tier?: CardTier;
 }) {
   if (layout === "bookmark") {
     return (
@@ -659,19 +757,27 @@ export function HackathonCard({
   const weekday = getWeekday(hackathon.startsAt);
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
-  const streak = tier ? getTierStreak(hackathon.name, tier) : null;
+  const rankedTier = tier && tier !== "unranked" ? tier : null;
+  const streak = rankedTier ? getTierStreak(hackathon.name, rankedTier) : null;
 
   return (
     <article
-      className={`group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden border border-black bg-paper ${
+      className={`card-spotlight group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden rounded-lg ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
         hackathon.isPast ? "opacity-70 hover:opacity-100 focus-within:opacity-100" : ""
       }`}
+      onPointerMove={trackCardSpotlight}
+      style={rankedTier ? getTierAccentStyle(rankedTier) : undefined}
     >
+      <CardStretchedLink hackathon={hackathon} preview={preview} />
+
+      {/* The cover rounds all four corners with no outline of its own. 7px is
+          the card's 8px radius less its 1px border, so the top corners follow
+          the card's inner edge exactly. */}
       <div
-        className={`relative w-full shrink-0 overflow-hidden border-b border-black ${
+        className={`relative shrink-0 overflow-hidden rounded-[7px] ${
           compact ? "aspect-[5/2]" : "aspect-[2/1]"
         }`}
       >
@@ -697,9 +803,14 @@ export function HackathonCard({
       </div>
 
       {/* The tinted wash is the grid's own background so it paints under the
-          columns' text; only the grain rides above as an overlay. */}
+          columns' text; only the grain rides above as an overlay. The grid's
+          top rule is the line under the cover: drawn here rather than on the
+          cover, it stays straight below the cover's rounded bottom corners. A
+          shade darker than the card's other lines so it reads as the main
+          divide. Like every inner line it is a spotlight rule laid over a
+          transparent border, so layout keeps the border's 1px. */}
       <div
-        className="relative grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] @[26rem]:grid-cols-[8.5rem_minmax(0,1fr)]"
+        className="relative grid min-w-0 flex-1 grid-cols-[6.5rem_minmax(0,1fr)] border-t border-transparent @[26rem]:grid-cols-[8.5rem_minmax(0,1fr)]"
         style={streak ? { backgroundImage: streak.wash } : undefined}
       >
         {streak ? (
@@ -713,7 +824,17 @@ export function HackathonCard({
             }}
           />
         ) : null}
-        <div className="flex min-w-0 flex-col border-r border-ink/35 px-4 py-6 @[26rem]:px-5 @[26rem]:py-7">
+        <span
+          aria-hidden="true"
+          className="card-spotlight-rule pointer-events-none absolute inset-x-0 -top-px h-px"
+          data-card-rule="strong"
+        />
+        <div className="relative flex min-w-0 flex-col border-r border-transparent px-4 py-6 @[26rem]:px-5 @[26rem]:py-7">
+          <span
+            aria-hidden="true"
+            className="card-spotlight-rule pointer-events-none absolute inset-y-0 -right-px w-px"
+            data-card-rule
+          />
           <CardDate parsed={date} weekday={weekday} />
           {hackathon.isPast ? (
             <span className="mt-4 block font-mono text-[10px] uppercase tracking-[0.12em] text-ink/45">
@@ -729,15 +850,22 @@ export function HackathonCard({
         </div>
 
         <div
-          className={`flex min-w-0 flex-col px-5 pb-5 pt-6 @[26rem]:px-7 @[26rem]:pt-7 ${
+          className={`flex min-w-0 flex-col px-5 pb-4 pt-6 @[26rem]:px-7 @[26rem]:pt-7 ${
             compact ? "min-h-48" : "min-h-72"
           }`}
         >
-          {tier ? (
+          {rankedTier ? (
             <span
-              className={`mb-2.5 block font-mono text-[11px] font-medium uppercase tracking-[0.1em] ${TIER_TEXT_STYLES[tier]}`}
+              className={`mb-2.5 block font-mono text-[11px] font-medium uppercase tracking-[0.1em] ${TIER_TEXT_STYLES[rankedTier]}`}
             >
-              Tier {tier}
+              Tier {rankedTier}
+            </span>
+          ) : tier === "unranked" ? (
+            <span
+              className="mb-2.5 block font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-ink/45"
+              title="Needs a few more votes to be ranked"
+            >
+              Unranked
             </span>
           ) : null}
 
@@ -757,8 +885,6 @@ export function HackathonCard({
             </p>
           ) : null}
 
-          <FriendAvatarRow friends={hackathon.friends} />
-
           {/* The blurb sits directly under the location; the footer below takes
               `mt-auto`, so the leftover height falls between the two and the
               footer rule still lines up across a row of cards. `mb-5` is the
@@ -767,17 +893,24 @@ export function HackathonCard({
             {cardDescription(hackathon)}
           </p>
 
-          {/* Ruled footer: More info on the left, the organizer's site (and the
-              board's remove button, when present) on the right. `min-h-10`
-              keeps every card's footer one height whether or not those links
-              exist, so a row of cards still lines up. */}
-          <div className="relative z-20 mt-auto border-t border-ink/25 pt-4">
-            <div className="flex min-h-10 items-start justify-between gap-3">
-              <CardMoreInfoLink hackathon={hackathon} preview={preview} />
-              <div className="ml-auto flex shrink-0 items-center gap-3">
-                <CardWebsiteLink hackathon={hackathon} preview={preview} />
-                {cornerAction ? <div className="shrink-0">{cornerAction}</div> : null}
+          {/* Ruled footer: votes on the left; More info (and the board's
+              remove button, when present) on the right. The rule is its own element so the cursor
+              spotlight can light the stretch under the pointer. `min-h-8`
+              matches the link's and the remove button's own height, so every
+              card's footer is one height whether or not either exists and a
+              row of cards still lines up. */}
+          <div className="relative z-20 mt-auto pt-4">
+            <span
+              aria-hidden="true"
+              className="card-spotlight-rule pointer-events-none absolute inset-x-0 top-0 h-px"
+              data-card-rule
+            />
+            <div className="flex min-h-8 items-start justify-end gap-3">
+              <div className="mr-auto">
+                <CardVotes hackathon={hackathon} preview={preview} />
               </div>
+              <CardMoreInfoLink hackathon={hackathon} preview={preview} />
+              {cornerAction ? <div className="shrink-0">{cornerAction}</div> : null}
             </div>
           </div>
         </div>

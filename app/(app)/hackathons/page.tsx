@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { HackathonSearch } from "@/components/hackathon-search";
 import { getCurrentUserId } from "@/lib/auth";
 import { applyUserCardState, getPublicHackathonCatalog } from "@/lib/hackathons/catalog";
-import { dateRangeForPeriod, normalizeSearchFilters } from "@/lib/hackathons/search-filters";
+import { dateRangeForPeriod, normalizeCatalogSort, normalizeSearchFilters } from "@/lib/hackathons/search-filters";
 
 export const metadata: Metadata = {
   title: "Hackathons | Hackathons North America",
@@ -18,6 +18,7 @@ export default async function HackathonsPage({
   const rawSearchParams = (await searchParams) ?? {};
   const filters = normalizeSearchFilters(rawSearchParams);
   const dateRange = dateRangeForPeriod(filters.datePeriod);
+  const sort = normalizeCatalogSort(rawSearchParams.sort);
 
   /* First visits receive one bounded catalog page immediately. Search URLs use
      the same query with their filters applied, so reloads remain shareable. */
@@ -33,6 +34,7 @@ export default async function HackathonsPage({
       startsAfter: dateRange?.startsAfter,
       startsBefore: dateRange?.startsBefore,
       limit: 30,
+      sort,
     }),
     getCurrentUserId(),
   ]);
@@ -46,6 +48,7 @@ export default async function HackathonsPage({
         initialHackathons={hackathonCards}
         initialHasMore={hasMore}
         initialHasSearched
+        initialSort={sort}
       />
     </main>
   );

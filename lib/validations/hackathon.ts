@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { normalizeCountrySelections } from "@/lib/hackathons/countries";
+import { CATALOG_SORTS } from "@/lib/hackathons/search-filters";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { normalizeCountry, normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
 import { HACKATHON_SOURCES } from "@/lib/hackathons/source-provenance";
@@ -161,6 +162,7 @@ export const hackathonSearchSchema = z
     startsBefore: z.coerce.date().optional(),
     limit: z.coerce.number().int().min(1).max(50).default(12),
     offset: z.coerce.number().int().min(0).max(10_000).default(0),
+    sort: z.enum(CATALOG_SORTS).default("soonest"),
   })
   .strip()
   .transform(({ country, countries, ...filters }) => ({
@@ -427,6 +429,11 @@ export const userHackathonUpdateSchema = z.object({
 
 export const hackathonTrackSchema = z.object({
   applicationStatus: z.enum(["interested", "applied", "attending"]),
+});
+
+/* +1 upvote, -1 downvote. Clearing a vote is a DELETE, not a 0. */
+export const hackathonVoteSchema = z.object({
+  value: z.union([z.literal(1), z.literal(-1)]),
 });
 
 export const hackathonCheckinRedeemSchema = z.object({

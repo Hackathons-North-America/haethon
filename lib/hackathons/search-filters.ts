@@ -15,6 +15,17 @@ export type HackathonFormatFilter = "any" | "online" | "in_person";
    ephemeral browser state (IP lookup or geolocation), never part of the URL. */
 export type DistanceFilter = "any" | number;
 
+/* Catalog grid order. "soonest" is start date (with the local-country boost);
+   "top" is the vote ranking. Kept out of HackathonSearchFilters because it
+   reorders results rather than narrowing them. */
+export const CATALOG_SORTS = ["soonest", "top"] as const;
+export type CatalogSort = (typeof CATALOG_SORTS)[number];
+
+export function normalizeCatalogSort(value: string | string[] | undefined): CatalogSort {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === "top" ? "top" : "soonest";
+}
+
 export type HackathonSearchFilters = {
   beginnerFriendly: FeatureFilter;
   countries: string[];

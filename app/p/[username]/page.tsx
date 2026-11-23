@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { cache } from "react";
 
 import { AttendedHackathonsTable } from "@/components/attended-hackathons-table";
-import { FollowButton } from "@/components/follow-button";
 import { PrimaryNav } from "@/components/primary-nav";
 import { ProfileActivity } from "@/components/profile-activity";
 import {
@@ -14,10 +13,8 @@ import {
   ProfileSkillsSection,
   ProfileSocialsSection,
 } from "@/components/profile/profile-sections";
-import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
-import { getFollowState } from "@/lib/follows/queries";
 import { loadProfilePageData, type ProfilePageData } from "@/lib/profile/profile-page-data";
 import { PUBLIC_PROFILE_CACHE_TAG } from "@/lib/profile/public-profile-cache";
 import { sanitizeSkills } from "@/lib/profile/skills";
@@ -62,7 +59,7 @@ async function loadSharedProfile(username: string) {
 /* Everything on this page that isn't viewer-specific — the profile row plus
    the whole hackathon-history fan-out — cached across requests per username,
    so a shared profile link stops re-running four join-heavy queries on every
-   view. Only the follow state and the viewer lookup stay per-request. */
+   view. */
 const getCachedPublicProfile = unstable_cache(
   async (username: string) => {
     const profile = await loadSharedProfile(username);
@@ -116,17 +113,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function SharedProfilePage({ params }: PageProps) {
   const { username } = await params;
-  const [data, viewerId] = await Promise.all([getPublicProfile(username), getCurrentUserId()]);
+  const data = await getPublicProfile(username);
 
   if (!data) {
     notFound();
   }
 
   const { profile, profileData } = data;
-  // Signed-out visitors still get the button; their follow attempt 401s into
-  // the sign-in flow. Only the profile's owner has nothing to follow here.
-  const isOwnProfile = viewerId === profile.userId;
-  const followState = viewerId && !isOwnProfile ? await getFollowState(viewerId, profile.userId) : null;
   const displayName = [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim();
   const links = buildProfileLinks(profile);
   const skills = sanitizeSkills(profile.skills ?? []);
@@ -146,12 +139,6 @@ export default async function SharedProfilePage({ params }: PageProps) {
             ) : null}
             {profile.bio ? (
               <p className="mt-8 max-w-xl text-base leading-7 text-ink/55 sm:text-lg">{profile.bio}</p>
-            ) : null}
-
-            {!isOwnProfile ? (
-              <div className="mt-8">
-                <FollowButton initialFollow={followState} username={username} />
-              </div>
             ) : null}
 
             <ProfileSocialsSection emptyText="No social profiles yet." links={links} />

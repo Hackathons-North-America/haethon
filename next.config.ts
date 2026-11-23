@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/saved", destination: "/my", permanent: false },
       { source: "/reminders", destination: "/my", permanent: false },
+      { source: "/friends", destination: "/hackathons", permanent: false },
     ];
   },
   async headers() {

@@ -11,6 +11,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -50,7 +51,6 @@ export const attendanceSourceEnum = pgEnum("attendance_source", [
   "admin_verified",
 ]);
 export const organizationMembershipRoleEnum = pgEnum("organization_membership_role", ["owner", "admin", "editor"]);
-export const followStatusEnum = pgEnum("follow_status", ["pending", "approved"]);
 export const organizationMembershipStatusEnum = pgEnum("organization_membership_status", ["pending", "approved", "rejected"]);
 export const submissionStatusEnum = pgEnum("submission_status", ["pending", "approved", "rejected", "merged", "withdrawn"]);
 export const submitterTypeEnum = pgEnum("submitter_type", ["organizer", "community"]);
@@ -105,32 +105,6 @@ export const userProfiles = pgTable("user_profiles", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
-/* One-way follow edges ("starring" a hacker), Instagram-style: a pending row
-   is a request awaiting the followee's decision on /friends. Approval gates
-   only whose hackathon activity the follower gets shown — profiles themselves
-   stay public. Rejection deletes the row (re-requests are allowed; the request
-   endpoint is rate-limited instead of tombstoning). */
-export const userFollows = pgTable(
-  "user_follows",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    followerId: uuid("follower_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    followeeId: uuid("followee_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    status: followStatusEnum("status").notNull().default("pending"),
-    respondedAt: timestamp("responded_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("user_follows_pair_idx").on(table.followerId, table.followeeId),
-    index("user_follows_followee_status_idx").on(table.followeeId, table.status),
-    check("user_follows_no_self_follow", sql`${table.followerId} <> ${table.followeeId}`),
-  ]
-);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -332,6 +306,29 @@ export const userHackathons = pgTable(
   (table) => [
     uniqueIndex("user_hackathons_user_event_idx").on(table.userId, table.hackathonId),
     index("user_hackathons_event_status_user_idx").on(table.hackathonId, table.applicationStatus, table.userId),
+  ]
+);
+
+/* One up (+1) or down (-1) vote per user per hackathon edition. Clearing a vote
+   deletes the row. Totals are aggregated on read; the (hackathon_id, value)
+   index serves both per-card counts and the catalog's "Top voted" sort. */
+export const hackathonVotes = pgTable(
+  "hackathon_votes",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    value: smallint("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.hackathonId] }),
+    index("hackathon_votes_hackathon_value_idx").on(table.hackathonId, table.value),
+    check("hackathon_votes_value_check", sql`${table.value} in (-1, 1)`),
   ]
 );
 
@@ -592,21 +589,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   organizationMemberships: many(organizationMemberships),
   hackathonSubmissions: many(hackathonSubmissions),
   attendanceDays: many(userHackathonAttendanceDays),
-  following: many(userFollows, { relationName: "follower" }),
-  followers: many(userFollows, { relationName: "followee" }),
-}));
-
-export const userFollowsRelations = relations(userFollows, ({ one }) => ({
-  follower: one(users, {
-    fields: [userFollows.followerId],
-    references: [users.id],
-    relationName: "follower",
-  }),
-  followee: one(users, {
-    fields: [userFollows.followeeId],
-    references: [users.id],
-    relationName: "followee",
-  }),
 }));
 
 export const hackathonsRelations = relations(hackathons, ({ one, many }) => ({

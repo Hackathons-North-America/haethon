@@ -5,25 +5,22 @@ import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { Fragment, useState, type ElementType, type FocusEvent } from "react";
 
-import { DiscordIcon } from "@/components/discord-icon";
 import { LoginRequiredLink } from "@/components/login-required-dialog";
 import {
   Building2,
   CalendarDays,
   CircleUser,
-  Compass,
   LogIn,
   PlusSquare,
+  Search,
   Settings,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 
 type SidebarLink = {
   href: string;
   icon: ElementType;
   label: string;
-  external?: boolean;
   requiresAuth?: boolean;
   // Featured entries render like the other rows but add a small muted
   // description under the label, separated from neighbours by dividers.
@@ -31,9 +28,8 @@ type SidebarLink = {
 };
 
 const items: SidebarLink[] = [
-  { href: "/hackathons", icon: Compass, label: "Hackathons DB" },
+  { href: "/hackathons", icon: Search, label: "Search" },
   { href: "/my", icon: CalendarDays, label: "My Hackathons", requiresAuth: true },
-  { href: "/friends", icon: Users, label: "Friends", requiresAuth: true },
   { href: "/account", icon: CircleUser, label: "Hacker Profile", requiresAuth: true },
 ];
 
@@ -91,12 +87,6 @@ export function AppSidebar({
       description:
         "Enter a new hackathon — one you just spotted or one you're organizing yourself.",
     },
-    {
-      href: "/discord",
-      icon: DiscordIcon,
-      label: "Join our Discord",
-      external: true,
-    },
     ...(isOrganizer ? [{ href: "/organizer", icon: Building2, label: "Organizer" }] : []),
   ];
 
@@ -105,10 +95,6 @@ export function AppSidebar({
   const activeHref = links
     .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
-
-  // The phone bar is icons only and has no room for an outbound link, so
-  // Discord stays a desktop-rail affordance.
-  const barLinks = links.filter(({ external }) => !external);
 
   return (
     <>
@@ -152,7 +138,7 @@ export function AppSidebar({
             aria-label="App navigation"
             className="flex gap-1 overflow-x-auto px-3 py-3 lg:mt-6 lg:flex-col lg:overflow-visible lg:px-0 lg:py-0"
           >
-            {links.map(({ href, icon: Icon, label, external, description, requiresAuth }) => {
+            {links.map(({ href, icon: Icon, label, description, requiresAuth }, index) => {
               const active = href === activeHref;
               const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
               const labelTransition = prefersReducedMotion
@@ -212,7 +198,10 @@ export function AppSidebar({
                         </span>
                       </motion.span>
                     </NavigationLink>
-                    <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
+                    {/* Skip the closing divider when nothing follows it. */}
+                    {index < links.length - 1 ? (
+                      <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10 lg:mx-6" />
+                    ) : null}
                   </Fragment>
                 );
               }
@@ -226,8 +215,6 @@ export function AppSidebar({
                   href={href}
                   key={href}
                   {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
-                  rel={external ? "noreferrer" : undefined}
-                  target={external ? "_blank" : undefined}
                 >
                   <Icon aria-hidden="true" className="size-4 shrink-0 lg:size-5" />
                   <motion.span
@@ -258,7 +245,7 @@ export function AppSidebar({
         transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <ul className="flex items-stretch">
-          {barLinks.map(({ href, icon: Icon, label, requiresAuth }) => {
+          {links.map(({ href, icon: Icon, label, requiresAuth }) => {
             const active = href === activeHref;
             const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
 

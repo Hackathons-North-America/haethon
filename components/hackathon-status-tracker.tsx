@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 
 import { showLoginRequiredDialog } from "@/components/login-required-dialog";
+import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
 
 export type TrackableStatus = "interested" | "applied" | "attending";
 
@@ -39,6 +40,9 @@ export function HackathonStatusTracker({
   const [status, setStatus] = useState(initialStatus);
   const [pending, setPending] = useState(false);
 
+  // Follow changes made from this hackathon's card while the side panel is open.
+  useHackathonStatusListener(hackathonId, setStatus);
+
   const currentOrder = status ? stageOrder[status] ?? -1 : -1;
   const isPastPipeline = status === "attended" || status === "won";
 
@@ -68,6 +72,7 @@ export function HackathonStatusTracker({
         throw new Error("Could not update status.");
       }
 
+      announceHackathonStatus(hackathonId, nextStatus);
       router.refresh();
     } catch {
       setStatus(previousStatus);

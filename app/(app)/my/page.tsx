@@ -11,6 +11,7 @@ import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonDates, hackathonLocations, hackathons, userHackathons } from "@/lib/db/schema";
 import { formatDateRange, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
+import { cardVoteFields, loadCardVotes } from "@/lib/hackathons/catalog";
 import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
 import { getPrimarySourceByHackathon } from "@/lib/hackathons/source-badges";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
@@ -138,9 +139,11 @@ export default async function MyHackathonsPage() {
   pastRows.sort((a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0));
 
   const activeCount = stageOrder.reduce((total, stage) => total + (byStage.get(stage)?.length ?? 0), 0);
-  const [discordLinks, sourceByHackathon] = await Promise.all([
+  const boardHackathonIds = stageOrder.flatMap((stage) => (byStage.get(stage) ?? []).map((row) => row.hackathonId));
+  const [discordLinks, sourceByHackathon, votes] = await Promise.all([
     getDiscordLinksByHackathon(rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))),
     getPrimarySourceByHackathon(rows.map((row) => row.hackathonId)),
+    loadCardVotes(boardHackathonIds, userId),
   ]);
 
   const pipelineColumns: PipelineColumn[] = stageOrder.map((stage) => ({
@@ -149,7 +152,10 @@ export default async function MyHackathonsPage() {
     cards: (byStage.get(stage) ?? []).map((row) => ({
       userHackathonId: row.id,
       hackathonId: row.hackathonId,
-      card: toCardData(row, discordLinks.get(row.hackathonId) ?? null, sourceByHackathon.get(row.hackathonId) ?? null),
+      card: {
+        ...toCardData(row, discordLinks.get(row.hackathonId) ?? null, sourceByHackathon.get(row.hackathonId) ?? null),
+        ...cardVoteFields(row.hackathonId, votes),
+      },
     })),
   }));
 
@@ -166,7 +172,7 @@ export default async function MyHackathonsPage() {
               className="mt-6 inline-flex min-h-10 items-center justify-center rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
               href="/hackathons"
             >
-              Browse the Hackathons DB
+              Browse hackathons
             </Link>
           </div>
         ) : (
