@@ -195,7 +195,8 @@ export function AppTopNav({
       {/* Airbnb-style header: logo left, the page's center content (region
           tabs on /hackathons) in the middle, actions right. When a page fills
           the center slot it also continues the band below with its own search
-          bar and bottom rule, so the header drops its own rule (the :has()).
+          bar and bottom rule, so the header drops its own rule and its paper
+          background (the :has()), letting the band's backdrop show through.
           The side columns are minmax(0,1fr) so they always stay equal and the
           center sits on the page's true midline, even when the actions are
           wider than the logo. With the search bar below, the header also
@@ -203,7 +204,7 @@ export function AppTopNav({
           so the row sits midway between the page top and the bar's top. */}
       <motion.header
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-5"
+        className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent has-[[data-nav-slot]:not(:empty)]:bg-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-5"
         initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
         transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
