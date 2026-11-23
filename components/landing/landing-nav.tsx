@@ -9,10 +9,11 @@ import { DiscordGlyph } from "@/components/discord-glyph";
 
 type MenuItem = { description: string; href: string; label: string };
 
-/* About us and Resources have no pages yet, so they point at "#" until they
-   do. */
+const DISCORD_INVITE_URL = "https://discord.gg/JHYC8ThcnX";
+
+/* Resources has no page yet, so it points at "#" until it does. */
 const plainLinks = [
-  { label: "About us", href: "#" },
+  { label: "About us", href: "/about" },
   { label: "Resources", href: "#" },
 ];
 
@@ -152,13 +153,15 @@ export function LandingNav() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* /discord is a route handler that redirects to the server invite,
-              so this is a plain anchor rather than a Link. Below md it shrinks
-              to the icon alone. */}
+          {/* The public server invite, so visitors who aren't members yet can
+              join. External, so a plain anchor rather than a Link. Below md it
+              shrinks to the icon alone. */}
           <a
             aria-label="Join our Discord"
             className="inline-flex size-10 items-center justify-center gap-2 rounded-full text-[17px] font-medium text-black transition-colors hover:bg-black/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black md:w-auto md:px-[15px]"
-            href="/discord"
+            href={DISCORD_INVITE_URL}
+            rel="noopener noreferrer"
+            target="_blank"
           >
             <DiscordGlyph className="size-[18px] shrink-0" />
             <span className="hidden md:inline">Join our Discord</span>
