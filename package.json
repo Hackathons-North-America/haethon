@@ -31,7 +31,6 @@
     "@sentry/nextjs": "^10.78.0",
     "@uploadthing/react": "^7.3.3",
     "discord-api-types": "0.38.49",
-    "dotted-map": "^3.1.0",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",
