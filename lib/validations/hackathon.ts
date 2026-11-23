@@ -223,6 +223,9 @@ export const normalizedHackathonPayloadSchema = normalizedHackathonPayloadBaseSc
 export const adminHackathonImportPayloadSchema = normalizedHackathonPayloadBaseSchema
   .extend({
     externalId: optionalString(200),
+    // Every feed id the scraper saw this event under (externalId among them).
+    // Stored in hackathon_external_ids so a re-import updates the same event.
+    externalIds: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
     shortDescription: truncatedOptionalString(500),
     // Provenance comes from the scraper/feed, not necessarily the event URL
     // (an MLH calendar entry may link to Devpost, for example).

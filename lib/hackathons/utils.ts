@@ -152,7 +152,15 @@ function jaccardSimilarity(left: string, right: string) {
   return intersection / union;
 }
 
-function sameCalendarDay(left: Date | string, right: Date | string) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/* Start days within one calendar day of each other count as the same start.
+   Older scraper exports took Luma and Cerebral Valley dates in UTC, which put
+   evening starts in the Americas on the next day; the corrected dates must
+   still match those records. */
+export const START_DAY_TOLERANCE = 1;
+
+export function startDaysMatch(left: Date | string, right: Date | string) {
   const leftDate = left instanceof Date ? left : new Date(left);
   const rightDate = right instanceof Date ? right : new Date(right);
 
@@ -160,7 +168,9 @@ function sameCalendarDay(left: Date | string, right: Date | string) {
     return false;
   }
 
-  return toDateOnly(leftDate).getTime() === toDateOnly(rightDate).getTime();
+  const days = Math.abs(toDateOnly(leftDate).getTime() - toDateOnly(rightDate).getTime()) / DAY_MS;
+
+  return days <= START_DAY_TOLERANCE;
 }
 
 export function calculateDuplicateScore(input: {
@@ -182,12 +192,13 @@ export function calculateDuplicateScore(input: {
   const domainMatch = [...candidateDomains].some((domain) => existingDomains.has(domain));
 
   // When the incoming record carries a start date (bulk import, organizer submissions), a
-  // duplicate now requires BOTH a real name overlap AND the same start day. A shared domain
+  // duplicate now requires BOTH a real name overlap AND the same start day (±1 day, see
+  // START_DAY_TOLERANCE). A shared domain
   // is only a tie-breaker that reinforces a name match — it can no longer flag a duplicate on
   // its own (which used to catch unrelated events that merely share a host like events.mlh.io).
   if (input.candidateStartDate != null) {
     const sameDay =
-      input.existingStartDate != null && sameCalendarDay(input.candidateStartDate, input.existingStartDate);
+      input.existingStartDate != null && startDaysMatch(input.candidateStartDate, input.existingStartDate);
 
     if (!sameDay || nameScore === 0) {
       return 0;

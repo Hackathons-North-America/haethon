@@ -3,7 +3,15 @@
    A hackathon's source is compiled once from explicit feed provenance or,
    when that is absent, the import URL. It is stored on hackathons.source,
    never re-derived on reads, and remains admin-editable. */
-export type HackathonSource = "devpost" | "mlh" | "luma" | "cerebral_valley" | "organizer_site" | "manual" | "other";
+export type HackathonSource =
+  | "devpost"
+  | "mlh"
+  | "luma"
+  | "cerebral_valley"
+  | "hackclub"
+  | "organizer_site"
+  | "manual"
+  | "other";
 
 export type HackathonSourceBadge = {
   label: string;
@@ -15,7 +23,7 @@ export type HackathonSourceBadge = {
 export const COMMUNITY_FORM_SOURCE_URL = "https://haethon.local/submissions/community-form";
 
 /* Dropdown order for the admin edit dialog. */
-export const HACKATHON_SOURCES = ["mlh", "luma", "cerebral_valley", "devpost", "organizer_site", "manual", "other"] as const;
+export const HACKATHON_SOURCES = ["mlh", "luma", "cerebral_valley", "devpost", "hackclub", "organizer_site", "manual", "other"] as const;
 
 const SOURCE_HOST_HINTS: Array<{ hint: string; source: HackathonSource }> = [
   { hint: "mlh.com", source: "mlh" },
@@ -25,6 +33,7 @@ const SOURCE_HOST_HINTS: Array<{ hint: string; source: HackathonSource }> = [
   { hint: "luma.com", source: "luma" },
   { hint: "cerebralvalley.ai", source: "cerebral_valley" },
   { hint: "devpost.com", source: "devpost" },
+  { hint: "hackclub.com", source: "hackclub" },
 ];
 
 const SOURCE_LABELS: Record<HackathonSource, string> = {
@@ -32,6 +41,7 @@ const SOURCE_LABELS: Record<HackathonSource, string> = {
   luma: "Luma",
   cerebral_valley: "Cerebral Valley",
   devpost: "Devpost",
+  hackclub: "Hack Club",
   organizer_site: "Organizer",
   manual: "Community",
   other: "Website",
@@ -50,7 +60,7 @@ function sourceHost(url: string) {
 }
 
 /**
- * MLH, Luma, Cerebral Valley, and Devpost are recognized by host. Only the
+ * MLH, Luma, Cerebral Valley, Devpost, and Hack Club are recognized by host. Only the
  * community-form URL resolves to `manual`; other sites become `other`. Runs
  * once when a hackathon is created from an import or approved submission —
  * never on reads.

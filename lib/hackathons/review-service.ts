@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { previewHackathonDiscordChannel, syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
 import {
   hackathonDates,
+  hackathonExternalIds,
   hackathonLocations,
   hackathons,
   hackathonSeries,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/db/schema";
 import type { SelectUser } from "@/lib/db/schema";
 import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
+import { DATE_FIELDS, externalIdsOf, feedChanges, LOCATION_FIELDS, type FeedField } from "@/lib/hackathons/external-ids";
 import { verifiedImageUrl } from "@/lib/hackathons/image-ingest";
 import { normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
 import {
@@ -192,7 +194,7 @@ function findBestDuplicateInCandidates(
   return best && best.score >= 0.55 ? best : null;
 }
 
-// At 0.95+ the match carries same start day, real name overlap, and (usually) the same
+// At 0.95+ the match carries the same start day (±1), real name overlap, and (usually) the same
 // website domain — treated as certain enough to merge without an admin decision. Scores
 // between 0.55 and 0.95 still go through the manual duplicate flows. The same-day signal
 // only counts when the import actually carried a date: fix items that fell back to a
@@ -202,6 +204,176 @@ const AUTO_MERGE_SCORE = 0.95;
 async function findBestDuplicate(payload: { name: string; websiteUrl?: string | null; sourceUrl?: string | null }) {
   return findBestDuplicateInCandidates(payload, await listDuplicateCandidates());
 }
+
+/* The hackathon a feed id was last imported into, with the payload imported
+   then. When an event's ids point at different rows (should not happen), the
+   most recently imported wins. */
+async function findLinkedHackathon(externalIds: string[]) {
+  if (!externalIds.length) {
+    return null;
+  }
+
+  const [linked] = await db
+    .select({
+      hackathonId: hackathonExternalIds.hackathonId,
+      lastPayload: hackathonExternalIds.lastPayload,
+      name: hackathons.name,
+    })
+    .from(hackathonExternalIds)
+    .innerJoin(hackathons, eq(hackathons.id, hackathonExternalIds.hackathonId))
+    .where(inArray(hackathonExternalIds.externalId, externalIds))
+    .orderBy(desc(hackathonExternalIds.updatedAt))
+    .limit(1);
+
+  return linked ?? null;
+}
+
+async function linkExternalIds(hackathonId: string, externalIds: string[], payload: Record<string, unknown>) {
+  if (!externalIds.length) {
+    return;
+  }
+
+  const now = new Date();
+
+  await db
+    .insert(hackathonExternalIds)
+    .values(externalIds.map((externalId) => ({ externalId, hackathonId, lastPayload: payload, updatedAt: now })))
+    .onConflictDoUpdate({
+      target: hackathonExternalIds.externalId,
+      set: { hackathonId, lastPayload: payload, updatedAt: now },
+    });
+}
+
+/**
+ * Applies the fields a feed changed since its last import to a published
+ * hackathon. Everything else keeps its current value, including admin edits.
+ * Returns the fields actually written (a date change that would end the event
+ * before it starts is skipped).
+ */
+async function applyFeedUpdate(hackathonId: string, payload: NormalizedHackathonPayload, changed: FeedField[]) {
+  const applied = new Set<FeedField>();
+  const has = (field: FeedField) => changed.includes(field);
+  const now = new Date();
+  const hackathonValues: Partial<typeof hackathons.$inferInsert> = {};
+
+  for (const field of [
+    "name",
+    "shortDescription",
+    "websiteUrl",
+    "applicationUrl",
+    "venue",
+    "format",
+    "beginnerFriendly",
+    "travelReimbursement",
+    "highSchoolersOnly",
+    "prizeAmountUsd",
+  ] as const) {
+    if (has(field)) {
+      Object.assign(hackathonValues, { [field]: payload[field] });
+      applied.add(field);
+    }
+  }
+
+  if (has("imageUrl")) {
+    const imageUrl = await verifiedImageUrl(payload.imageUrl);
+
+    if (imageUrl) {
+      hackathonValues.imageUrl = imageUrl;
+      applied.add("imageUrl");
+    }
+  }
+
+  if (DATE_FIELDS.some(has)) {
+    const [existingDates] = await db.select().from(hackathonDates).where(eq(hackathonDates.hackathonId, hackathonId)).limit(1);
+    const startsAt = has("startDate") ? payload.startDate : existingDates?.startsAt ?? payload.startDate;
+    const endsAt = has("endDate") ? payload.endDate : existingDates?.endsAt ?? payload.endDate;
+
+    if (endsAt >= startsAt) {
+      const dateValues = {
+        startsAt,
+        endsAt,
+        applicationOpensAt: has("applicationOpensAt") ? payload.applicationOpensAt : existingDates?.applicationOpensAt,
+        applicationClosesAt: has("applicationClosesAt") ? payload.applicationClosesAt : existingDates?.applicationClosesAt,
+        acceptanceAt: has("acceptanceAt") ? payload.acceptanceAt : existingDates?.acceptanceAt,
+      };
+
+      if (existingDates) {
+        await db.update(hackathonDates).set(dateValues).where(eq(hackathonDates.id, existingDates.id));
+      } else {
+        await db.insert(hackathonDates).values({ hackathonId, ...dateValues });
+      }
+
+      hackathonValues.status = deriveHackathonStatus(startsAt, endsAt, now);
+      DATE_FIELDS.filter(has).forEach((field) => applied.add(field));
+    }
+  }
+
+  if (LOCATION_FIELDS.some(has)) {
+    const [existingLocation] = await db
+      .select()
+      .from(hackathonLocations)
+      .where(eq(hackathonLocations.hackathonId, hackathonId))
+      .limit(1);
+    const placeChanged = has("city") || has("region") || has("country");
+    const coordinatesChanged = has("latitude") && has("longitude");
+    const keptLatitude = existingLocation?.latitude == null ? undefined : Number(existingLocation.latitude);
+    const keptLongitude = existingLocation?.longitude == null ? undefined : Number(existingLocation.longitude);
+    const location = await hackathonLocationValues({
+      city: has("city") ? payload.city : existingLocation?.city ?? payload.city,
+      region: has("region") ? payload.region : existingLocation?.region ?? payload.region,
+      country: has("country") ? payload.country : existingLocation?.country ?? payload.country,
+      countryCode: has("countryCode") ? payload.countryCode : existingLocation?.countryCode ?? payload.countryCode,
+      // New coordinates from the feed win. A moved city without them is
+      // re-resolved from the cities table rather than keeping the old point.
+      latitude: coordinatesChanged ? payload.latitude : placeChanged ? undefined : keptLatitude,
+      longitude: coordinatesChanged ? payload.longitude : placeChanged ? undefined : keptLongitude,
+    });
+
+    if (existingLocation) {
+      await db.update(hackathonLocations).set(location).where(eq(hackathonLocations.id, existingLocation.id));
+    } else {
+      await db.insert(hackathonLocations).values({ hackathonId, ...location });
+    }
+
+    LOCATION_FIELDS.filter(has).forEach((field) => applied.add(field));
+  }
+
+  await db
+    .update(hackathons)
+    .set({ ...hackathonValues, lastVerifiedAt: now, updatedAt: now })
+    .where(eq(hackathons.id, hackathonId));
+
+  if (applied.size) {
+    await syncHackathonDiscordChannelSafely(hackathonId);
+  }
+
+  return FEED_FIELDS_IN_ORDER.filter((field) => applied.has(field));
+}
+
+const FEED_FIELDS_IN_ORDER: readonly FeedField[] = [
+  "name",
+  "startDate",
+  "endDate",
+  "applicationOpensAt",
+  "applicationClosesAt",
+  "acceptanceAt",
+  "format",
+  "venue",
+  "city",
+  "region",
+  "country",
+  "countryCode",
+  "latitude",
+  "longitude",
+  "websiteUrl",
+  "applicationUrl",
+  "imageUrl",
+  "shortDescription",
+  "prizeAmountUsd",
+  "beginnerFriendly",
+  "travelReimbursement",
+  "highSchoolersOnly",
+];
 
 export async function createPublishedHackathon(
   payload: NormalizedHackathonPayload,
@@ -675,13 +847,66 @@ export async function importAdminHackathons(input: {
     matchedHackathonId?: string;
     matchedName?: string | null;
     name: string;
-    status: "imported" | "duplicate_flagged" | "auto_merged";
+    status: "imported" | "duplicate_flagged" | "auto_merged" | "updated";
     submissionId?: string;
+    updatedFields?: FeedField[];
   }> = [];
   const duplicateCandidates = await listDuplicateCandidates();
+  let feedUpdates = 0;
 
   for (const [index, rawPayload] of input.payloads.entries()) {
     const payload = payloadWithValidOrganizationId(rawPayload);
+    const externalIds = externalIdsOf(rawPayload);
+    const feedPayload = payloadForJson(payload);
+    const linked = await findLinkedHackathon(externalIds);
+
+    if (linked) {
+      // Sent by the scraper before: update that hackathon with what the feed
+      // changed since, instead of name/date duplicate matching.
+      const changed = feedChanges(linked.lastPayload, feedPayload);
+      const updatedFields = changed.length ? await applyFeedUpdate(linked.hackathonId, payload, changed) : [];
+      await linkExternalIds(linked.hackathonId, externalIds, feedPayload);
+      let submissionId: string | undefined;
+
+      if (updatedFields.length) {
+        feedUpdates += 1;
+        const [submission] = await db
+          .insert(hackathonSubmissions)
+          .values({
+            submittedByUserId: input.reviewerUserId,
+            submitterType: "community",
+            organizationId: payload.organizationId ?? null,
+            matchedHackathonId: linked.hackathonId,
+            approvedHackathonId: linked.hackathonId,
+            status: "merged",
+            payload: payloadForJson({ ...payload, submitterType: "community", origin: "admin_import" }),
+            normalizedName: payload.name,
+            websiteUrl: payload.websiteUrl,
+            sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
+            duplicateScore: "1.00",
+            reviewerNotes: `Updated from the feed (${externalIds.join(", ")}): ${updatedFields.join(", ")}.`,
+            reviewedByUserId: input.reviewerUserId,
+            reviewedAt: new Date(),
+          })
+          .returning({ id: hackathonSubmissions.id });
+        submissionId = submission.id;
+      }
+
+      results.push({
+        duplicateScore: 1,
+        externalId: rawPayload.externalId,
+        hackathonId: linked.hackathonId,
+        index,
+        matchedHackathonId: linked.hackathonId,
+        matchedName: linked.name,
+        name: payload.name,
+        status: "updated",
+        submissionId,
+        updatedFields,
+      });
+      continue;
+    }
+
     // "Import as new anyway" re-submits the same card with ignoreDuplicates so it bypasses
     // the check entirely and publishes (then flows into the normal Discord prompt).
     const duplicate = input.ignoreDuplicates ? null : findBestDuplicateInCandidates(payload, duplicateCandidates);
@@ -694,6 +919,8 @@ export async function importAdminHackathons(input: {
         // A near-certain match needs no decision: merge the import into the existing
         // hackathon, using its data only to fill fields the existing record is missing.
         await mergeIntoHackathon(duplicate.id, payload);
+        // Later imports of this event then match by feed id.
+        await linkExternalIds(duplicate.id, externalIds, feedPayload);
 
         const [submission] = await db
           .insert(hackathonSubmissions)
@@ -750,6 +977,7 @@ export async function importAdminHackathons(input: {
       syncDiscord: false,
     });
     duplicateCandidates.unshift({ id: hackathonId, name: payload.name, websiteUrl: payload.websiteUrl, startsAt: payload.startDate });
+    await linkExternalIds(hackathonId, externalIds, feedPayload);
     const [submission] = await db
       .insert(hackathonSubmissions)
       .values({
@@ -785,7 +1013,7 @@ export async function importAdminHackathons(input: {
     (result): result is typeof result & { hackathonId: string } => result.status === "imported" && Boolean(result.hackathonId)
   );
 
-  if (importedResults.length > 0) {
+  if (importedResults.length > 0 || feedUpdates > 0) {
     revalidateHackathonCaches();
   }
 
@@ -805,6 +1033,7 @@ export async function importAdminHackathons(input: {
     duplicateCount: results.filter((result) => result.status === "duplicate_flagged").length,
     importedCount: results.filter((result) => result.status === "imported").length,
     mergedCount: results.filter((result) => result.status === "auto_merged").length,
+    updatedCount: results.filter((result) => result.status === "updated").length,
     results,
     total: results.length,
   };

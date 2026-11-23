@@ -38,6 +38,7 @@ export const sourceTypeEnum = pgEnum("source_type", [
   "mlh",
   "luma",
   "cerebral_valley",
+  "hackclub",
   "organizer_site",
   "manual",
   "other",
@@ -193,6 +194,26 @@ export const hackathons = pgTable(
     index("hackathons_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
     uniqueIndex("hackathons_name_slug_idx").on(table.name, table.slug),
   ]
+);
+
+/* Feed identities (scraper externalIds such as "luma:evt-…" or "devpost:123")
+   of a published hackathon. A re-import carrying any of them updates that
+   hackathon instead of going through name/date duplicate matching.
+   lastPayload is the feed's payload as last imported under the id: fields
+   the feed has changed since then are applied, fields it has not changed
+   keep whatever an admin may have edited. */
+export const hackathonExternalIds = pgTable(
+  "hackathon_external_ids",
+  {
+    externalId: varchar("external_id", { length: 200 }).primaryKey(),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    lastPayload: jsonb("last_payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("hackathon_external_ids_hackathon_idx").on(table.hackathonId)]
 );
 
 export const hackathonLocations = pgTable(

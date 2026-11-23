@@ -29,8 +29,9 @@ type ImportResult = {
   matchedHackathonId?: string;
   matchedName?: string | null;
   name: string;
-  status: "imported" | "duplicate_flagged" | "auto_merged";
+  status: "imported" | "duplicate_flagged" | "auto_merged" | "updated";
   submissionId?: string;
+  updatedFields?: string[];
 };
 
 type DiscordSyncResult =
@@ -47,6 +48,7 @@ type ImportResponse = {
     duplicateCount: number;
     importedCount: number;
     mergedCount: number;
+    updatedCount: number;
     results: ImportResult[];
     total: number;
   };
@@ -69,6 +71,10 @@ const sampleJson = `[
     "shortDescription": "A weekend hackathon for students building useful software."
   }
 ]`;
+
+function feedFieldLabel(field: string) {
+  return field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+}
 
 function stringifyError(error: unknown) {
   return typeof error === "string" ? error : JSON.stringify(error, null, 2);
@@ -179,6 +185,19 @@ export function HackathonJsonImporter() {
       return;
     }
 
+    // The scraper sent this event before (same feed id): it was updated in place.
+    if (first?.status === "updated") {
+      const target = first.matchedName ? `"${first.matchedName}"` : "the existing hackathon";
+      setStatus("success");
+      setMessage(
+        first.updatedFields?.length
+          ? `Already imported as ${target}. Updated what the feed changed since the last import: ${first.updatedFields.map(feedFieldLabel).join(", ")}.`
+          : `Already imported as ${target}. Nothing changed in the feed since the last import.`
+      );
+      setCurrentIndex((current) => current + 1);
+      return;
+    }
+
     // A likely duplicate pauses here so the admin can decide right away instead of hunting
     // for it in the Submissions queue later.
     if (first?.status === "duplicate_flagged") {
@@ -280,7 +299,8 @@ export function HackathonJsonImporter() {
   if (queue.length) {
     const complete = !activePayload;
     const importedCount = results.filter((result) => result.status === "imported").length;
-    const mergedCount = results.length - importedCount;
+    const updatedCount = results.filter((result) => result.status === "updated").length;
+    const mergedCount = results.length - importedCount - updatedCount;
 
     return (
       <div className="space-y-4">
@@ -290,8 +310,8 @@ export function HackathonJsonImporter() {
             <h2 className="mt-1 text-2xl font-semibold text-ink dark:text-paper">{complete ? "Import review complete" : "Approve imported card"}</h2>
             <p className="mt-1 text-sm text-ink/55 dark:text-paper/55">
               {complete
-                ? `${importedCount} approved, ${mergedCount} merged, ${skippedCount} skipped.`
-                : `${remainingCount} remaining · ${importedCount} approved · ${mergedCount} merged · ${skippedCount} skipped`}
+                ? `${importedCount} approved, ${mergedCount} merged, ${updatedCount} updated, ${skippedCount} skipped.`
+                : `${remainingCount} remaining · ${importedCount} approved · ${mergedCount} merged · ${updatedCount} updated · ${skippedCount} skipped`}
             </p>
           </div>
           <button
@@ -531,11 +551,19 @@ export function HackathonJsonImporter() {
             <span>Duplicate</span>
           </div>
           <div className="divide-y divide-ink/10 dark:divide-white/10 bg-white dark:bg-white/[0.06]">
-            {results.map((result) => (
-              <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3 text-sm" key={`${result.status}-${result.submissionId}`}>
+            {results.map((result, position) => (
+              // Cards are imported one at a time, so the list position is the
+              // stable identity; an unchanged feed update has no submission id.
+              <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3 text-sm" key={`${position}-${result.status}`}>
                 <span className="font-semibold text-ink dark:text-paper">{result.name}</span>
                 <span className={result.status === "duplicate_flagged" ? "text-[#B54708]" : "text-[#362519]"}>
-                  {result.status === "imported" ? "Imported" : result.status === "auto_merged" ? "Merged" : "Flagged"}
+                  {result.status === "imported"
+                    ? "Imported"
+                    : result.status === "auto_merged"
+                      ? "Merged"
+                      : result.status === "updated"
+                        ? "Updated"
+                        : "Flagged"}
                 </span>
                 <span className="text-ink/55 dark:text-paper/55">{result.duplicateScore.toFixed(2)}</span>
               </div>

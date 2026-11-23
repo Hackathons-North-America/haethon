@@ -289,6 +289,21 @@ describe("adminHackathonImportSchema", () => {
     expect(result.hackathons[0].highSchoolersOnly).toBe(true);
   });
 
+  it("keeps the scraper's feed ids and Hack Club provenance", () => {
+    const result = adminHackathonImportSchema.parse([
+      { ...payload, source: "hackclub", externalId: "hackclub:7", externalIds: ["hackclub:7", "luma:evt-1"] },
+    ]);
+
+    expect(result.hackathons[0].source).toBe("hackclub");
+    expect(result.hackathons[0].externalIds).toEqual(["hackclub:7", "luma:evt-1"]);
+  });
+
+  it("rejects more than 20 feed ids on one hackathon", () => {
+    const externalIds = Array.from({ length: 21 }, (_, index) => `luma:${index}`);
+
+    expect(adminHackathonImportSchema.safeParse([{ ...payload, externalIds }]).success).toBe(false);
+  });
+
   it("treats older imports without a high-school classification as false", () => {
     const result = adminHackathonImportSchema.parse([payload]);
 

@@ -19,6 +19,7 @@ describe("hackathon source badges", () => {
     expect(deriveSourceType("https://events.cerebralvalley.ai/example")).toBe("cerebral_valley");
     expect(deriveSourceType("https://devpost.com/hackathons/example")).toBe("devpost");
     expect(deriveSourceType("https://example-hackathon.devpost.com")).toBe("devpost");
+    expect(deriveSourceType("https://counterspell.hackclub.com/boston")).toBe("hackclub");
     expect(deriveSourceType("https://example.edu/events/hackathon")).toBe("other");
     expect(deriveSourceType(COMMUNITY_FORM_SOURCE_URL)).toBe("manual");
   });
@@ -39,6 +40,7 @@ describe("hackathon source badges", () => {
       { type: "luma", label: "Luma" },
       { type: "cerebral_valley", label: "Cerebral Valley" },
       { type: "devpost", label: "Devpost" },
+      { type: "hackclub", label: "Hack Club" },
       { type: "organizer_site", label: "Organizer" },
       { type: "manual", label: "Community" },
       { type: "other", label: "Website" },
