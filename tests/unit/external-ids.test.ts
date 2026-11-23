@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { externalIdsOf, feedChanges } from "@/lib/hackathons/external-ids";
+import { externalIdsOf, feedChanges, importPayloadExternalIds } from "@/lib/hackathons/external-ids";
 
 describe("feed identities", () => {
   it("collects externalId and externalIds once each, in order", () => {
@@ -46,9 +46,30 @@ describe("feed changes", () => {
     expect(feedChanges(previous, { ...previous, venue: null })).toEqual([]);
   });
 
+  it("only ever turns the event flags on", () => {
+    const flagged = { ...previous, travelReimbursement: true, beginnerFriendly: true };
+    expect(feedChanges(flagged, { ...flagged, travelReimbursement: false, beginnerFriendly: false })).toEqual([]);
+    expect(feedChanges(previous, { ...previous, beginnerFriendly: true })).toEqual(["beginnerFriendly"]);
+  });
+
   it("ignores identity and provenance fields", () => {
     expect(feedChanges(previous, { ...previous, externalId: "devpost:9", source: "devpost", organizationName: "X" })).toEqual(
       []
     );
+  });
+});
+
+describe("past import payloads", () => {
+  it("reads feed ids from rows the JSON importer wrote", () => {
+    expect(
+      importPayloadExternalIds({ origin: "admin_import", externalId: "luma:evt-1", externalIds: ["luma:evt-1", "mlh:2", 7] })
+    ).toEqual(["luma:evt-1", "mlh:2"]);
+  });
+
+  it("ignores community submissions, fix-queue items and malformed payloads", () => {
+    expect(importPayloadExternalIds({ submitterType: "community", externalId: "luma:evt-1" })).toEqual([]);
+    expect(importPayloadExternalIds({ origin: "admin_import", needsFix: true, externalId: "evt-1" })).toEqual([]);
+    expect(importPayloadExternalIds(null)).toEqual([]);
+    expect(importPayloadExternalIds(["luma:evt-1"])).toEqual([]);
   });
 });

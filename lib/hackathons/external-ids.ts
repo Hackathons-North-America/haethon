@@ -37,6 +37,12 @@ export type FeedField = (typeof FEED_FIELDS)[number];
 
 export const MAX_EXTERNAL_IDS = 20;
 
+/* The scraper leaves these out when it cannot tell (a failed page fetch), and
+   the import schema reads a missing flag as false. A feed going quiet is not
+   evidence that an event stopped offering travel money, so feed updates only
+   ever turn these on. */
+const ONLY_TURNS_ON: readonly FeedField[] = ["beginnerFriendly", "travelReimbursement", "highSchoolersOnly"];
+
 /** Every feed id an import payload carries: externalId first, then externalIds. */
 export function externalIdsOf(payload: { externalId?: string | null; externalIds?: readonly string[] | null }) {
   const ids = [payload.externalId, ...(payload.externalIds ?? [])]
@@ -57,13 +63,18 @@ function comparable(value: unknown) {
 /**
  * Feed fields whose incoming value differs from the value last imported under
  * the same feed id. A field the feed no longer sends is not a change: the feed
- * dropping a value never clears what the website shows.
+ * dropping a value never clears what the website shows, and the boolean flags
+ * in ONLY_TURNS_ON only ever change to true.
  */
 export function feedChanges(previous: Record<string, unknown>, incoming: Record<string, unknown>): FeedField[] {
   return FEED_FIELDS.filter((field) => {
     const next = incoming[field];
 
     if (next === undefined || next === null) {
+      return false;
+    }
+
+    if (ONLY_TURNS_ON.includes(field) && next !== true) {
       return false;
     }
 
@@ -79,3 +90,30 @@ export const DATE_FIELDS: readonly FeedField[] = [
   "applicationClosesAt",
   "acceptanceAt",
 ];
+
+/**
+ * Feed ids recorded in a past bulk import's submission payload. Only rows the
+ * admin JSON importer wrote (origin "admin_import") count: their payload is
+ * the scraper row exactly as it was imported. Fix-queue items are excluded,
+ * because their payload holds stand-in values the reviewer replaced by hand.
+ */
+export function importPayloadExternalIds(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return [];
+  }
+
+  const record = payload as Record<string, unknown>;
+
+  if (record.origin !== "admin_import" || record.needsFix) {
+    return [];
+  }
+
+  const externalIds = Array.isArray(record.externalIds)
+    ? record.externalIds.filter((id): id is string => typeof id === "string")
+    : [];
+
+  return externalIdsOf({
+    externalId: typeof record.externalId === "string" ? record.externalId : undefined,
+    externalIds,
+  });
+}

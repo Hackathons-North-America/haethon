@@ -194,7 +194,7 @@ function findBestDuplicateInCandidates(
   return best && best.score >= 0.55 ? best : null;
 }
 
-// At 0.95+ the match carries the same start day (±1), real name overlap, and (usually) the same
+// At 0.95+ the match carries same start day, real name overlap, and (usually) the same
 // website domain — treated as certain enough to merge without an admin decision. Scores
 // between 0.55 and 0.95 still go through the manual duplicate flows. The same-day signal
 // only counts when the import actually carried a date: fix items that fell back to a
@@ -919,7 +919,10 @@ export async function importAdminHackathons(input: {
         // A near-certain match needs no decision: merge the import into the existing
         // hackathon, using its data only to fill fields the existing record is missing.
         await mergeIntoHackathon(duplicate.id, payload);
-        // Later imports of this event then match by feed id.
+        // Later imports of this event then match by feed id. The existing
+        // hackathon was not created from this feed (earlier scraper imports
+        // are linked by scripts/backfill-external-ids.ts and take the update
+        // path above), so its values stay and only later feed changes apply.
         await linkExternalIds(duplicate.id, externalIds, feedPayload);
 
         const [submission] = await db

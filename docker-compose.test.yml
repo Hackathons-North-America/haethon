@@ -1,0 +1,33 @@
+# Throwaway database for `pnpm test:integration`. The app talks to Postgres
+# through Neon's HTTP driver, so a local Neon HTTP proxy sits in front of a
+# plain PostGIS container. Nothing here touches a real Neon project.
+#
+#   docker compose -f docker-compose.test.yml up -d
+#   pnpm test:integration
+#   docker compose -f docker-compose.test.yml down -v
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main
+    ports:
+      - "55432:5432"
+    healthcheck:
+      # TCP, not the socket: during first-start initialisation Postgres runs a
+      # socket-only server, and the proxy's setup step needs the real one.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d main"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  neon-proxy:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    environment:
+      PG_CONNECTION_STRING: postgres://postgres:postgres@postgres:5432/main
+    ports:
+      - "4444:4444"
+    depends_on:
+      postgres:
+        condition: service_healthy
