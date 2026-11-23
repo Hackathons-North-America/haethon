@@ -86,7 +86,14 @@ export function channelNameForHackathon(input: {
   return `${month}-${day}-${eventName}`.slice(0, 100);
 }
 
-const channelDatePrefixPattern = new RegExp(`^(?:${monthAbbreviations.join("|")})-\\d{2}-`);
+/* Display names of the two active categories. They are also how the sync finds
+   them when no category ID is configured. */
+export const activeCategoryDisplayNames = {
+  canada: "Canadian Hackathons",
+  us: "US Hackathons",
+} as const;
+
+const channelDatePrefixPattern =new RegExp(`^(?:${monthAbbreviations.join("|")})-\\d{2}-`);
 
 /**
  * Key used to match a retired channel to a new edition of the same event.
@@ -101,6 +108,23 @@ export function channelReuseKey(channelName: string) {
     .replace(/(?:19|20)\d{2}/g, "")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Looser form of the reuse key for matching channels that were made by hand.
+ * Separators, punctuation, emoji, and accents are dropped too, so
+ * "hackthenorth", "hack-the-north-2026", and "sep-12-hack-the-north" all reduce
+ * to "hackthenorth". Like the reuse key, an empty result must not be matched on.
+ */
+export function channelMatchKey(channelName: string) {
+  return channelReuseKey(channelName.toLowerCase())
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/* The match key a hackathon's channel would have, whatever its date or edition. */
+export function hackathonChannelMatchKey(hackathonName: string) {
+  return channelMatchKey(channelNameForHackathon({ name: hackathonName, startsAt: null }));
 }
 
 /**

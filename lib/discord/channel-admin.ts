@@ -4,10 +4,12 @@ import { ChannelType, Routes } from "discord-api-types/v10";
 import { db } from "@/lib/db";
 import { discordChannels, discordGuilds, hackathons, hackathonSeries } from "@/lib/db/schema";
 import {
+  activeCategoryDisplayNames,
   normalizeChannelName,
   pastCategoryDiscordName,
   type PastDiscordCategoryKey,
 } from "@/lib/discord/channel-rules";
+import { type DiscordChannelDuplicate, findDuplicateChannels, hackathonCategoryIds } from "@/lib/discord/duplicates";
 import { discordRest, isUnknownChannelError } from "@/lib/discord/rest";
 import { syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
 import { env } from "@/lib/env";
@@ -75,6 +77,9 @@ export type AdminDiscordCategoryGroup = {
 };
 
 export type AdminDiscordOverview = {
+  /* Hackathons with both a tracked channel and a matching untracked one. Only
+     computed from the live listing, so always empty when Discord is unreachable. */
+  duplicates: DiscordChannelDuplicate[];
   groups: AdminDiscordCategoryGroup[];
   /* True when the groups mirror the live guild listing; false when Discord was
      unreachable and only tracked records (grouped by recorded category) show. */
@@ -93,12 +98,8 @@ type GuildChannelListing = {
 };
 
 function recordedCategoryName(category: string | null) {
-  if (category === "canada") {
-    return "Canadian Hackathons";
-  }
-
-  if (category === "us") {
-    return "US Hackathons";
+  if (category === "canada" || category === "us") {
+    return activeCategoryDisplayNames[category];
   }
 
   if (category && /^past-h[12]-\d{4}$/.test(category)) {
@@ -131,6 +132,7 @@ function overviewFromTrackedOnly(tracked: AdminDiscordChannel[]): AdminDiscordOv
   }
 
   return {
+    duplicates: [],
     groups: [...groups.values()],
     live: false,
     totalCount: tracked.length,
@@ -214,6 +216,12 @@ export async function listAdminDiscordOverview(): Promise<AdminDiscordOverview> 
   }
 
   return {
+    duplicates: findDuplicateChannels({
+      categoryIds: hackathonCategoryIds(listing, [env.DISCORD_CANADA_CATEGORY_ID, env.DISCORD_US_CATEGORY_ID]),
+      channels: listing,
+      liveSnowflakes,
+      tracked,
+    }),
     groups,
     live: true,
     totalCount: textChannels.length + missing.length,

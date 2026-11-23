@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   categoryForHackathon,
+  channelMatchKey,
   channelNameForHackathon,
   channelReuseKey,
+  hackathonChannelMatchKey,
   insertionIndexByDate,
   isArchiveCategoryName,
   normalizeChannelName,
@@ -109,6 +111,28 @@ describe("Discord channel reuse key", () => {
 
   it("returns an empty key when nothing but a date or year remains", () => {
     expect(channelReuseKey("sep-13-2026")).toBe("");
+  });
+});
+
+describe("Discord channel match key", () => {
+  it("ignores dashes so hand-made names match generated ones", () => {
+    const key = hackathonChannelMatchKey("Hack the North 2026");
+
+    expect(key).toBe("hackthenorth");
+    expect(channelMatchKey("hackthenorth")).toBe(key);
+    expect(channelMatchKey("hack-the-north-2026")).toBe(key);
+    expect(channelMatchKey("sep-12-hack-the-north")).toBe(key);
+  });
+
+  it("ignores case, emoji, punctuation, and accents", () => {
+    expect(channelMatchKey("Hack-The-North-🍁")).toBe("hackthenorth");
+    expect(channelMatchKey("hack_the.north")).toBe("hackthenorth");
+    expect(channelMatchKey("québec-hacks")).toBe("quebechacks");
+  });
+
+  it("returns an empty key when nothing but a date, year, or symbols remains", () => {
+    expect(channelMatchKey("sep-13-2026")).toBe("");
+    expect(channelMatchKey("🍁")).toBe("");
   });
 });
 
