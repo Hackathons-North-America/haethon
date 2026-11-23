@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import { HackathonResultActions } from "@/components/hackathon-result-actions";
+import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
 
@@ -34,6 +35,7 @@ export function PastHackathonCard({
   userHackathonId: string;
 }) {
   const [removed, setRemoved] = useState(false);
+  const panelOpen = useHackathonPanelOpen();
 
   if (removed) {
     return null;
@@ -49,6 +51,8 @@ export function PastHackathonCard({
           <Link
             className="text-lg font-semibold text-ink dark:text-paper underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
             href={`/hackathons/${slug}`}
+            replace={panelOpen}
+            scroll={false}
           >
             {hackathonName}
           </Link>

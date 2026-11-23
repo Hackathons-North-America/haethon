@@ -7,15 +7,19 @@ import {
   hackathonDates,
   hackathonLocations,
   hackathonTags,
+  hackathonVotes,
   hackathons,
   hackathonSeries,
   tags as hackathonTagDefinitions,
   userHackathons,
 } from "@/lib/db/schema";
-import { getFriendActivityByHackathon, type HackathonFriend } from "@/lib/follows/queries";
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
 import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
+import type { TierLabel } from "@/lib/hackathons/ranking";
+import type { CatalogSort } from "@/lib/hackathons/search-filters";
+import { EMPTY_VOTE_STATE, type HackathonVoteState } from "@/lib/hackathons/vote-state";
+import { getVoteStates, getVoteTiers } from "@/lib/hackathons/votes";
 import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
 /* One page of catalog results. The listing page and the search API both read
@@ -48,6 +52,7 @@ type CatalogQuery = {
   startsBefore: string | null;
   limit: number;
   offset: number;
+  sort: CatalogSort;
 };
 
 /* The user-independent portion of a hackathon card. Everything here is
@@ -127,6 +132,37 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
   // stale — fine at whole-day event granularity.
   const now = new Date();
 
+  /* Per-hackathon vote totals, joined only to order "Top voted" pages. The
+     displayed counts are NOT read from here — this page is cached, so cards
+     get live totals from applyUserCardState instead. */
+  const voteTotals = db
+    .select({
+      hackathonId: hackathonVotes.hackathonId,
+      upvotes: sql<number>`count(*) filter (where ${hackathonVotes.value} = 1)`.as("upvotes"),
+      downvotes: sql<number>`count(*) filter (where ${hackathonVotes.value} = -1)`.as("downvotes"),
+    })
+    .from(hackathonVotes)
+    .groupBy(hackathonVotes.hackathonId)
+    .as("vote_totals");
+  const ups = sql`coalesce(${voteTotals.upvotes}, 0)::float8`;
+  const downs = sql`coalesce(${voteTotals.downvotes}, 0)::float8`;
+  const total = sql`(${ups} + ${downs})`;
+  /* Wilson lower bound at 95% (z = 1.96: z²/2 = 1.9208, z²/4 = 0.9604,
+     z² = 3.8416) — the same score as wilsonLowerBound() in ranking.ts, which
+     also drives the tiers, so sort order and tiers agree. */
+  const wilsonScore = sql`case when ${total} = 0 then 0 else (
+      ${ups} / ${total} + 1.9208 / ${total}
+      - 1.96 * sqrt((${ups} / ${total}) * (1 - ${ups} / ${total}) / ${total} + 0.9604 / (${total} * ${total}))
+    ) / (1 + 3.8416 / ${total}) end`;
+  const pastGroup = sql`case when coalesce(${hackathonDates.endsAt}, ${hackathonDates.startsAt}) < ${now} then 1 else 0 end`;
+  const startsAtOrder = sql`${hackathonDates.startsAt} asc nulls last`;
+  // Past (recurring) editions stay grouped after everything upcoming in both
+  // orders, mirroring the archive split below the grid.
+  const orderBy =
+    query.sort === "top"
+      ? [pastGroup, sql`${wilsonScore} desc`, sql`${ups} - ${downs} desc`, startsAtOrder, asc(hackathons.id)]
+      : [pastGroup, startsAtOrder, asc(hackathons.id)];
+
   const rows = await db
     .select({
       id: hackathons.id,
@@ -157,6 +193,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
+    .leftJoin(voteTotals, eq(voteTotals.hackathonId, hackathons.id))
     .where(
       and(
         isNotNull(hackathons.publishedAt),
@@ -178,17 +215,12 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         startsBefore ? lte(hackathonDates.startsAt, startsBefore) : undefined
       )
     )
-    // The catalog grid presents cards soonest-start first, so pagination must
-    // hand out pages in that same order — the client re-sorts only what it has
-    // loaded and cannot pull the true first card out of a page it hasn't
-    // fetched yet. Dates-TBA rows sort last and the id tiebreak matches the
-    // client's sortByStartDate(); past (recurring) editions group after
-    // everything upcoming, mirroring the archive split below the grid.
-    .orderBy(
-      sql`case when coalesce(${hackathonDates.endsAt}, ${hackathonDates.startsAt}) < ${now} then 1 else 0 end`,
-      sql`${hackathonDates.startsAt} asc nulls last`,
-      asc(hackathons.id)
-    )
+    // Pagination must hand out pages in the grid's own order — the client
+    // re-sorts only what it has loaded and cannot pull the true first card out
+    // of a page it hasn't fetched yet. For "soonest", dates-TBA rows sort last
+    // and the id tiebreak matches the client's sortByStartDate(). "Top voted"
+    // is ordered here only; the client keeps the server order as-is.
+    .orderBy(...orderBy)
     .limit(query.limit + 1)
     .offset(query.offset);
 
@@ -309,6 +341,7 @@ export function getPublicHackathonCatalog(input: {
   startsBefore?: Date | string | null;
   limit?: number;
   offset?: number;
+  sort?: CatalogSort;
 }): Promise<CatalogPage> {
   return getCachedCatalogPage({
     /* ILIKE is case-insensitive, so normalize equivalent searches onto one
@@ -323,19 +356,51 @@ export function getPublicHackathonCatalog(input: {
     startsBefore: roundDownToHourIso(input.startsBefore),
     limit: Math.min(Math.max(input.limit ?? CATALOG_PAGE_SIZE, 1), 50),
     offset: Math.min(Math.max(input.offset ?? 0, 0), 10_000),
+    sort: input.sort === "top" ? "top" : "soonest",
   });
 }
 
 /**
- * Overlays the signed-in user's pipeline stage — and their approved friends'
- * activity — onto cached public cards. These are the only per-request queries
- * the catalog surfaces need; the tracked lookup hits the unique index on
+ * Live vote totals, the viewer's own vote, and the vote tier for a set of
+ * hackathons. Vote counts change far more often than the catalog, so they are
+ * read per request (one grouped query) instead of from the cached page. Like
+ * the rest of the personalization, a failure degrades to empty votes rather
+ * than breaking the page.
+ */
+export async function loadCardVotes(
+  hackathonIds: string[],
+  userId: string | null | undefined
+): Promise<{ states: Map<string, HackathonVoteState>; tiers: Record<string, TierLabel> }> {
+  const [states, tiers] = await Promise.all([
+    getVoteStates(hackathonIds, userId).catch((error: unknown) => {
+      Sentry.captureException(error, { tags: { feature: "catalog-votes" } });
+      return new Map<string, HackathonVoteState>();
+    }),
+    getVoteTiers(),
+  ]);
+
+  return { states, tiers };
+}
+
+export type CardVoteFields = HackathonVoteState & { tier: TierLabel | null };
+
+export function cardVoteFields(
+  id: string,
+  votes: Awaited<ReturnType<typeof loadCardVotes>>
+): CardVoteFields {
+  return { ...(votes.states.get(id) ?? EMPTY_VOTE_STATE), tier: votes.tiers[id] ?? null };
+}
+
+/**
+ * Overlays the signed-in user's pipeline stage onto cached public cards, plus
+ * live vote totals and tiers. These are the only per-request queries the
+ * catalog surfaces need; the tracked lookup hits the unique index on
  * (user_id, hackathon_id).
  */
 export async function applyUserCardState<Card extends { id: string }>(
   cards: Card[],
   userId: string | null | undefined
-): Promise<(Card & { trackedStatus: string | null; friends: HackathonFriend[] })[]> {
+): Promise<(Card & CardVoteFields & { trackedStatus: string | null })[]> {
   const hackathonIds = cards.map((card) => card.id);
 
   async function loadTrackedRows() {
@@ -361,11 +426,9 @@ export async function applyUserCardState<Card extends { id: string }>(
     }
   }
 
-  const [trackedRows, friendsByHackathon] = await Promise.all([
+  const [trackedRows, votes] = await Promise.all([
     loadTrackedRows(),
-    userId
-      ? getFriendActivityByHackathon(userId, hackathonIds)
-      : Promise.resolve(new Map<string, HackathonFriend[]>()),
+    loadCardVotes(hackathonIds, userId),
   ]);
 
   // Mirrors the My Hackathons visibility rule: an unsaved row still at the
@@ -379,7 +442,7 @@ export async function applyUserCardState<Card extends { id: string }>(
 
   return cards.map((card) => ({
     ...card,
+    ...cardVoteFields(card.id, votes),
     trackedStatus: statusByHackathon.get(card.id) ?? null,
-    friends: friendsByHackathon.get(card.id) ?? [],
   }));
 }

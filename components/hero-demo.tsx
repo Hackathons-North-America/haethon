@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, ClipboardCheck } from "lucide-react";
+import { ArrowUpRight, Check, ClipboardCheck } from "lucide-react";
 
 const easeOut = [0.22, 1, 0.36, 1] as const;
 
@@ -208,14 +208,14 @@ export function HeroDemo() {
 
                     return (
                       <span
-                        className={`inline-flex min-h-7 items-center gap-1 text-[11px] font-medium leading-4 transition-colors ${active ? "text-ink" : "text-ink/55"}`}
+                        className={`inline-flex min-h-7 w-max items-center gap-0.5 font-mono text-[10px] font-medium uppercase leading-4 tracking-[0.12em] transition-colors ${active ? "text-ink" : "text-ink/55"}`}
                         key={stage}
                         ref={stage === "Applied" ? appliedRef : stage === "Attending" ? attendingRef : undefined}
                       >
                         <span className={`relative -mb-1 pb-1 after:absolute after:inset-x-0 after:bottom-0 after:h-[1.5px] after:origin-left after:bg-moss after:transition-transform after:duration-300 motion-reduce:after:transition-none ${active ? "after:scale-x-100" : "after:scale-x-0"}`}>
                           {stage}
                         </span>
-                        {active ? <Check aria-hidden="true" className="size-3 shrink-0" strokeWidth={3} /> : null}
+                        {active ? <Check aria-hidden="true" className="size-2.5 shrink-0" strokeWidth={3} /> : null}
                       </span>
                     );
                   })}
@@ -237,9 +237,9 @@ export function HeroDemo() {
                 </p>
 
                 <div className="mt-4 border-t border-ink/25 pt-3.5">
-                  <div className="flex items-center justify-between gap-3 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70">
+                  <div className="flex items-center justify-end gap-1 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-ink/70">
                     <span>More info</span>
-                    <span>Visit website</span>
+                    <ArrowUpRight aria-hidden="true" className="size-3" />
                   </div>
                 </div>
               </div>

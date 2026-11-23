@@ -40,3 +40,75 @@
   /* Editorial display serif, reserved for the landing hero's headline. */
   --font-display: var(--font-instrument-serif);
 }
+
+/* Hackathon cover cards (HackathonCard). The 1px outline is painted as
+   background layers under a transparent border, and the inner divider lines
+   (under the cover, between the columns, above the footer) are their own
+   `.card-spotlight-rule` elements. On hover a cursor-following radial
+   "spotlight" recolors only the stretch of outline and inner lines near the
+   pointer in the tier's tint; everything outside the circle stays ink. The card
+   and each rule get the pointer position in their own coordinates. Keyboard
+   focus has no pointer, so it tints the whole outline instead. The colors are
+   registered so hover can fade them instead of snapping; `--card-accent` comes
+   from the card's tier (inline style) and defaults to pine for untiered
+   cards. */
+@property --card-edge {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --card-spot {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+@layer components {
+  .card-spotlight {
+    --card-accent: color-mix(in oklab, --theme(--color-pine) 45%, transparent);
+    --card-edge: color-mix(in oklab, --theme(--color-ink) 15%, transparent);
+    --card-spot: transparent;
+    /* Spotlight radius, shared by the outline and the inner rules. */
+    --spot-size: 11.25rem;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(--theme(--color-paper), --theme(--color-paper)) padding-box,
+      radial-gradient(
+          circle var(--spot-size) at var(--spot-x, -100rem) var(--spot-y, -100rem),
+          var(--card-spot),
+          transparent
+        )
+        border-box,
+      linear-gradient(var(--card-edge), var(--card-edge)) border-box;
+    transition:
+      --card-edge 200ms ease-out,
+      --card-spot 200ms ease-out,
+      opacity 150ms ease-out;
+  }
+
+  .card-spotlight:has(:focus-visible) {
+    --card-edge: var(--card-accent);
+  }
+
+  .card-spotlight:hover {
+    --card-spot: var(--card-accent);
+  }
+
+  .card-spotlight-rule {
+    background:
+      radial-gradient(
+        circle var(--spot-size) at var(--spot-x, -100rem) var(--spot-y, -100rem),
+        var(--card-spot),
+        transparent
+      ),
+      var(--rule-base);
+    --rule-base: color-mix(in oklab, --theme(--color-ink) 15%, transparent);
+  }
+
+  /* The line under the cover sits a shade darker than the other dividers so it
+     reads as the main divide; it shares the same spotlight. */
+  .card-spotlight-rule[data-card-rule="strong"] {
+    --rule-base: color-mix(in oklab, --theme(--color-ink) 20%, transparent);
+  }
+}

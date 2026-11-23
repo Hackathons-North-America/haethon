@@ -1,0 +1,274 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
+import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useId, useRef, useState, type ElementType } from "react";
+import {
+  Building2,
+  CalendarDays,
+  CircleUser,
+  LogIn,
+  Menu,
+  PlusSquare,
+  Search,
+  Settings,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+
+import { useAppNavSlotRef } from "@/components/app-nav-slot";
+import { LoginRequiredLink } from "@/components/login-required-dialog";
+
+type NavLink = {
+  href: string;
+  icon: ElementType;
+  label: string;
+  requiresAuth?: boolean;
+};
+
+function buildLinks({
+  isAdmin,
+  isOrganizer,
+  isSignedIn,
+}: {
+  isAdmin: boolean;
+  isOrganizer: boolean;
+  isSignedIn: boolean;
+}): NavLink[] {
+  return [
+    ...(isAdmin ? [{ href: "/admin", icon: ShieldCheck, label: "Admin" }] : []),
+    { href: "/hackathons", icon: Search, label: "Search" },
+    { href: "/my", icon: CalendarDays, label: "My Hackathons", requiresAuth: true },
+    { href: "/account", icon: CircleUser, label: "Hacker Profile", requiresAuth: true },
+    isSignedIn
+      ? { href: "/account/settings", icon: Settings, label: "Account Settings" }
+      : { href: "/sign-in", icon: LogIn, label: "Login" },
+    { href: "/submit", icon: PlusSquare, label: "Add a hackathon", requiresAuth: true },
+    ...(isOrganizer ? [{ href: "/organizer", icon: Building2, label: "Organizer" }] : []),
+  ];
+}
+
+/* The active link is the one whose href is the longest matching prefix of the
+   current path, so /account/settings highlights Settings rather than both it
+   and Hacker Profile. */
+function activeHrefFor(links: NavLink[], pathname: string) {
+  return links
+    .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+}
+
+const circleButton =
+  "grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
+
+/* Initial-in-a-circle avatar, like Airbnb's. Signed-out visitors get a person
+   glyph that leads to sign-in instead. */
+function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
+  const { user } = useUser();
+  const initial = (
+    user?.firstName?.[0] ??
+    user?.username?.[0] ??
+    user?.primaryEmailAddress?.emailAddress[0] ??
+    ""
+  ).toUpperCase();
+
+  if (!isSignedIn) {
+    return (
+      <Link aria-label="Log in" className={`${circleButton} bg-ink/[0.06] text-ink hover:bg-ink/10`} href="/sign-in">
+        <UserRound aria-hidden="true" className="size-5" />
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      aria-label="Hacker profile"
+      className={`${circleButton} bg-moss/20 text-[15px] font-semibold text-pine hover:bg-moss/30`}
+      href="/account"
+    >
+      {initial || <UserRound aria-hidden="true" className="size-5" />}
+    </Link>
+  );
+}
+
+/* The ☰ button: a disclosure that drops down every link the old sidebar held. */
+function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSignedIn: boolean; links: NavLink[] }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        aria-controls={menuId}
+        aria-expanded={open}
+        aria-label="Menu"
+        className={`${circleButton} ${open ? "bg-ink/10" : "bg-ink/[0.06] hover:bg-ink/10"} text-ink`}
+        onClick={() => setOpen((current) => !current)}
+        ref={buttonRef}
+        type="button"
+      >
+        <Menu aria-hidden="true" className="size-[18px]" strokeWidth={2.2} />
+      </button>
+
+      {open ? (
+        <nav
+          aria-label="Menu"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 overflow-hidden rounded-2xl border border-ink/10 bg-white py-2 shadow-[0_18px_44px_-12px_rgba(27,25,23,0.3)]"
+          id={menuId}
+        >
+          <ul>
+            {links.map(({ href, icon: Icon, label, requiresAuth }) => {
+              const active = href === activeHref;
+              const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
+
+              return (
+                <li key={href}>
+                  <NavigationLink
+                    aria-current={active ? "page" : undefined}
+                    className={`flex min-h-11 items-center gap-3 px-5 text-sm font-medium transition-colors hover:bg-ink/[0.04] focus-visible:bg-ink/[0.04] focus-visible:outline-none ${
+                      active ? "text-pine" : "text-ink/75 hover:text-ink"
+                    }`}
+                    href={href}
+                    onClick={() => setOpen(false)}
+                    {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
+                  >
+                    <Icon aria-hidden="true" className="size-4 shrink-0" />
+                    {label}
+                  </NavigationLink>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      ) : null}
+    </div>
+  );
+}
+
+export function AppTopNav({
+  isAdmin,
+  isOrganizer,
+  isSignedIn,
+}: {
+  isAdmin: boolean;
+  isOrganizer: boolean;
+  isSignedIn: boolean;
+}) {
+  const pathname = usePathname();
+  const prefersReducedMotion = useReducedMotion();
+  const slotRef = useAppNavSlotRef();
+  const links = buildLinks({ isAdmin, isOrganizer, isSignedIn });
+  const activeHref = activeHrefFor(links, pathname);
+
+  return (
+    <>
+      {/* Airbnb-style header: logo left, the page's center content (region
+          tabs on /hackathons) in the middle, actions right. When a page fills
+          the center slot it also continues the band below with its own search
+          bar and bottom rule, so the header drops its own rule (the :has()).
+          The side columns are minmax(0,1fr) so they always stay equal and the
+          center sits on the page's true midline, even when the actions are
+          wider than the logo. With the search bar below, the header also
+          takes the same 1.25rem on top that the band leaves above the bar,
+          so the row sits midway between the page top and the bar's top. */}
+      <motion.header
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-5"
+        initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
+        transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-x-4 px-5 sm:px-8 lg:grid lg:min-h-20 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-12">
+          <Link className="flex min-h-16 items-center justify-self-start" href={isSignedIn ? "/?home" : "/"}>
+            <span className="whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-ink">HNA</span>
+          </Link>
+
+          {/* Below lg the center content wraps onto its own row; empty, it
+              collapses so other pages keep a single-row header. At lg it must
+              stay in the grid even when empty, or the actions would slide
+              into the middle column. */}
+          <div
+            className="order-last basis-full empty:hidden lg:order-none lg:basis-auto lg:empty:block"
+            data-nav-slot=""
+            ref={slotRef}
+          />
+
+          <div className="flex items-center gap-2 justify-self-end">
+            <LoginRequiredLink
+              className="hidden min-h-11 items-center whitespace-nowrap rounded-full px-4 text-[15px] font-semibold text-ink transition-colors hover:bg-ink/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:inline-flex lg:max-[1079px]:hidden"
+              href="/submit"
+            >
+              Add a hackathon
+            </LoginRequiredLink>
+            <ProfileCircle isSignedIn={isSignedIn} />
+            <NavMenu activeHref={activeHref} isSignedIn={isSignedIn} links={links} />
+          </div>
+        </div>
+      </motion.header>
+
+      {/* Phone tab bar: fixed to the bottom so it survives scrolling, padded for
+          the home-indicator inset, every tab sharing the width evenly. */}
+      <motion.nav
+        animate={{ opacity: 1, y: 0 }}
+        aria-label="App navigation"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/15 bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden"
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
+        transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <ul className="flex items-stretch">
+          {links.map(({ href, icon: Icon, label, requiresAuth }) => {
+            const active = href === activeHref;
+            const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
+
+            return (
+              <li className="flex-1" key={href}>
+                <NavigationLink
+                  aria-current={active ? "page" : undefined}
+                  aria-label={label}
+                  className="flex h-14 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine"
+                  href={href}
+                  {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
+                >
+                  <Icon
+                    aria-hidden="true"
+                    className={`size-6 transition-colors ${active ? "text-pine" : "text-ink/45"}`}
+                    strokeWidth={active ? 2.4 : 1.8}
+                  />
+                </NavigationLink>
+              </li>
+            );
+          })}
+        </ul>
+      </motion.nav>
+    </>
+  );
+}

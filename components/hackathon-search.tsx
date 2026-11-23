@@ -4,29 +4,27 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Archive,
-  CalendarDays,
   Check,
   ChevronDown,
   Globe2,
   LocateFixed,
-  MapPin,
   Navigation,
   Search,
-  Settings2,
   X,
 } from "lucide-react";
 
+import { AppNavCenter } from "@/components/app-nav-slot";
 import { HackathonCard } from "@/components/hackathon-card";
-import { LoginRequiredLink } from "@/components/login-required-dialog";
 import type { HackathonCardData } from "@/components/hackathon-card";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
-import { PLACEHOLDER_TIER, sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
+import { sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
 import type {
+  CatalogSort,
   DatePeriod,
   DistanceFilter,
   FeatureFilter,
@@ -39,10 +37,11 @@ const locationPopoverId = "hackathon-location-popover";
 const datePopoverId = "hackathon-date-popover";
 const formatPopoverId = "hackathon-format-popover";
 const featurePopoverId = "hackathon-feature-popover";
+const sortPopoverId = "hackathon-sort-popover";
 const moreFiltersId = "hackathon-more-filters";
 const SEARCH_PAGE_SIZE = 30;
 
-type OpenPopover = "location" | "date" | "format" | "features" | null;
+type OpenPopover = "location" | "date" | "format" | "features" | "sort" | null;
 type LocationMode = "country" | "near_me";
 
 /* The user's position for the distance filter (and, via countryCode, the
@@ -92,7 +91,8 @@ function replaceSearchUrl(
     travelReimbursement,
   }: HackathonSearchFilters,
   basePath: string,
-  searched: boolean
+  searched: boolean,
+  sort: CatalogSort
 ) {
   const params = new URLSearchParams();
 
@@ -126,6 +126,10 @@ function replaceSearchUrl(
     params.set("highSchoolersOnly", highSchoolersOnly);
   }
 
+  if (sort !== "soonest") {
+    params.set("sort", sort);
+  }
+
   if (searched) {
     params.set("search", "1");
   }
@@ -141,12 +145,19 @@ export type HackathonCardHelpers = {
   removeCard: (id: string) => void;
 };
 
+/* Grid order, picked from the search bar's Sort segment. */
+const sortOptions: { label: string; value: CatalogSort; detail: string }[] = [
+  { label: "Soonest", value: "soonest", detail: "Next start date first" },
+  { label: "Top voted", value: "top", detail: "Most upvoted by hackers first" },
+];
+
 export function HackathonSearch({
   initialFilters,
   initialHasMore = false,
   initialHasSearched = false,
   initialHackathons,
   basePath = "/hackathons",
+  initialSort = "soonest",
   renderCard,
 }: {
   initialFilters: HackathonSearchFilters;
@@ -156,6 +167,8 @@ export function HackathonSearch({
   /* Path the filter state is written back to via history.replaceState. Defaults
      to the public page; the admin view passes its own route. */
   basePath?: string;
+  /* Grid order from the ?sort= URL param: soonest start, or top voted. */
+  initialSort?: CatalogSort;
   /* Overrides how each grid card renders. Defaults to a plain HackathonCard; the
      admin view wraps it with edit/delete controls. */
   renderCard?: (hackathon: HackathonCardData, helpers: HackathonCardHelpers) => ReactNode;
@@ -173,6 +186,7 @@ export function HackathonSearch({
   const [highSchoolersOnly, setHighSchoolersOnly] = useState<FeatureFilter>(initialFilters.highSchoolersOnly);
   const [catalog, setCatalog] = useState(initialHackathons);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [sort, setSort] = useState<CatalogSort>(initialSort);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [hasSearched, setHasSearched] = useState(initialHasSearched);
   const [isSearching, setIsSearching] = useState(false);
@@ -338,9 +352,11 @@ export function HackathonSearch({
     [appliedFilters, catalog, origin]
   );
   const originCountryCode = origin?.countryCode ?? null;
+  /* "Top voted" pages arrive already ranked by the server, which is the only
+     place that can order across pages, so they are shown as-is. */
   const sortedHackathons = useMemo(
-    () => sortByStartDateWithLocalBoost(filteredHackathons, originCountryCode),
-    [filteredHackathons, originCountryCode]
+    () => (sort === "top" ? filteredHackathons : sortByStartDateWithLocalBoost(filteredHackathons, originCountryCode)),
+    [filteredHackathons, originCountryCode, sort]
   );
   /* The catalog arrives with past (recurring) editions already ordered after
      everything upcoming; splitting on isPast keeps that order while letting the
@@ -358,8 +374,8 @@ export function HackathonSearch({
   const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
 
   useEffect(() => {
-    replaceSearchUrl(appliedFilters, basePath, hasSearched);
-  }, [appliedFilters, basePath, hasSearched]);
+    replaceSearchUrl(appliedFilters, basePath, hasSearched, sort);
+  }, [appliedFilters, basePath, hasSearched, sort]);
 
   /* Watch the sentinel rather than the scroll position so nested scroll
      containers and the page itself both work. The margin starts the fetch a
@@ -409,7 +425,7 @@ export function HackathonSearch({
   const renderCardNode =
     renderCard ??
     ((hackathon: HackathonCardData) => (
-      <HackathonCard hackathon={hackathon} tier={PLACEHOLDER_TIER} />
+      <HackathonCard hackathon={hackathon} tier={hackathon.tier ?? "unranked"} />
     ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
@@ -420,7 +436,18 @@ export function HackathonSearch({
       : locationState === "error"
         ? "Location unavailable"
         : `Within ${distanceKm} km`;
+  const selectedSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? "Soonest";
   const selectedFeatureLabels = featureTags.filter((tag) => tag.value === "on").map((tag) => tag.label);
+
+  function changeSort(next: CatalogSort) {
+    if (next === sort) {
+      return;
+    }
+
+    setSort(next);
+    // A different order means different pages, so restart from the top.
+    void searchHackathons(appliedFilters, 0, false, next);
+  }
 
   function selectCountry(country: string) {
     setCountries((selectedCountries) =>
@@ -476,7 +503,12 @@ export function HackathonSearch({
     void searchHackathons(nextFilters);
   }
 
-  async function searchHackathons(filters: HackathonSearchFilters, offset = 0, append = false) {
+  async function searchHackathons(
+    filters: HackathonSearchFilters,
+    offset = 0,
+    append = false,
+    sortOrder: CatalogSort = sort
+  ) {
     /* A new filter search supersedes any in-flight infinite-scroll request (or
        an earlier rapid preset click). Only responses from the current
        generation may update the catalog and URL. */
@@ -499,6 +531,8 @@ export function HackathonSearch({
       limit: String(SEARCH_PAGE_SIZE),
       offset: String(offset),
     });
+
+    if (sortOrder !== "soonest") params.set("sort", sortOrder);
     const dateRange = dateRangeForPeriod(filters.datePeriod);
 
     if (filters.name.trim()) params.set("q", filters.name.trim());
@@ -583,14 +617,22 @@ export function HackathonSearch({
 
   return (
     <>
-      <section aria-label="Hackathon filters" className="px-5 pb-7 pt-14 sm:px-8 sm:pt-16 lg:px-12">
+      {/* Continues the top nav's band: a soft fade to a slightly deeper paper
+          and a hairline under the search bar, like Airbnb's header. */}
+      <section
+        aria-label="Hackathon filters"
+        className="border-b border-ink/10 bg-gradient-to-b from-paper to-[#f3ece2] px-5 pb-9 pt-4 dark:border-white/10 dark:to-white/[0.03] sm:px-8 sm:pt-5 lg:px-12"
+      >
         {/* Shared with the results grid below so the filter bar, the heading,
             and the card columns all line up on the same edges. */}
         <div className="mx-auto max-w-[1800px]">
-          <div className="relative mb-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+          {/* Region tabs live in the top nav's center column (Airbnb's
+              Homes / Experiences row): big icon, label, underline when
+              active. The state and handlers stay here. */}
+          <AppNavCenter>
             <div
               aria-label="Region filters"
-              className="inline-flex items-center gap-1 p-1.5"
+              className="flex items-stretch justify-center gap-4 sm:gap-8 lg:gap-10"
               role="group"
             >
               {regionPresets.map((preset) => {
@@ -599,10 +641,8 @@ export function HackathonSearch({
                 return (
                   <button
                     aria-pressed={active}
-                    className={`group inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-semibold transition-colors sm:gap-2 sm:px-5 focus-visible:outline-none focus-visible:text-pine focus-visible:underline focus-visible:underline-offset-4 ${
-                      active
-                        ? "text-pine"
-                        : "text-ink/55 hover:text-pine"
+                    className={`group relative inline-flex min-h-16 flex-col items-center justify-center gap-1 whitespace-nowrap px-[5px] py-[7.5px] text-[13px] font-semibold transition-colors sm:flex-row sm:gap-2.5 sm:text-[15px] lg:min-h-20 focus-visible:outline-none focus-visible:text-pine focus-visible:underline focus-visible:underline-offset-4 ${
+                      active ? "text-pine" : "text-ink/55"
                     }`}
                     key={preset.id}
                     onClick={() => applyRegionPreset(preset.id)}
@@ -610,26 +650,22 @@ export function HackathonSearch({
                   >
                     <span
                       aria-hidden="true"
-                      className={`text-lg leading-none transition-[transform,filter] duration-300 group-hover:scale-110 ${
-                        active ? "" : "grayscale group-hover:grayscale-0"
-                      }`}
+                      className="text-[1.45rem] leading-none sm:text-[1.75rem]"
                     >
                       {preset.emoji}
                     </span>
                     {preset.label}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-0 bottom-0 h-[3px] rounded-full transition-colors ${
+                        active ? "bg-pine" : "bg-transparent group-hover:bg-ink/15"
+                      }`}
+                    />
                   </button>
                 );
               })}
             </div>
-            <div className="flex items-center gap-1.5 sm:absolute sm:right-0">
-              <LoginRequiredLink
-                className="inline-flex min-h-10 items-center rounded-full px-4 text-sm font-semibold text-ink dark:text-paper transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
-                href="/submit"
-              >
-                Submit a hackathon
-              </LoginRequiredLink>
-            </div>
-          </div>
+          </AppNavCenter>
 
           <form
             /* Narrower than the 1800px results grid on purpose — a full-width
@@ -647,12 +683,12 @@ export function HackathonSearch({
                 pill radius only applies while collapsed — a rounded-full corner
                 on a two-row card reads as a lozenge. */}
             <div
-              className={`flex flex-col rounded-[2.25rem] border border-ink/12 dark:border-white/12 bg-white dark:bg-white/[0.04] p-2 shadow-[0_16px_44px_-20px_rgba(29,42,68,0.35)] ${
+              className={`flex flex-col rounded-[2rem] border border-ink/12 dark:border-white/12 bg-white dark:bg-white/[0.04] p-2 shadow-[0_6px_20px_-6px_rgba(29,42,68,0.18)] md:p-0 ${
                 moreFiltersOpen ? "" : "md:rounded-full"
               }`}
             >
             <div className="flex flex-col gap-1 md:flex-row md:items-center">
-            <div className="relative min-h-[4.2rem] min-w-0 flex-[1.25]">
+            <div className="relative min-h-16 min-w-0 flex-[1.25]">
               {countries.map((country) => (
                 <input key={country} name="countries" type="hidden" value={country} />
               ))}
@@ -661,7 +697,7 @@ export function HackathonSearch({
                 aria-controls={locationPopoverId}
                 aria-expanded={openPopover === "location"}
                 aria-label="Location"
-                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
+                className={`flex min-h-16 w-full min-w-0 flex-col justify-center rounded-full px-7 py-2 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
                   openPopover === "location" ? "bg-paper dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                 }`}
                 onClick={() => {
@@ -671,16 +707,15 @@ export function HackathonSearch({
                 }}
                 type="button"
               >
-                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink dark:text-paper">
-                  <Globe2 aria-hidden="true" className="size-3.5" />
+                <span className="block text-xs font-semibold leading-4 text-ink dark:text-paper">
                   Location
                 </span>
                 {countries.length ? (
-                  <span className="relative mt-1 block min-w-0">
+                  <span className="relative mt-0.5 block min-w-0">
                     <span className="flex min-w-0 flex-nowrap gap-1.5 overflow-hidden" ref={countryRowRef}>
                       {countries.map((country) => (
                         <span
-                          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] px-2.5 py-1 text-xs font-semibold text-ink dark:text-paper"
+                          className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] px-2 py-0.5 text-xs font-semibold text-ink dark:text-paper"
                           key={country}
                         >
                           <span>{country}</span>
@@ -697,16 +732,16 @@ export function HackathonSearch({
                     ) : null}
                   </span>
                 ) : distanceKm !== "any" ? (
-                  <span className="mt-1 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">
+                  <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">
                     {locationState === "locating" ? "Finding you..." : selectedDistanceLabel}
                   </span>
                 ) : (
-                  <span className="mt-1 text-sm leading-5 text-ink/55 dark:text-paper/55">Country or near me</span>
+                  <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">Country or near me</span>
                 )}
               </button>
               {openPopover === "location" ? (
                 <div
-                  className="absolute left-0 right-0 top-[calc(100%+0.9rem)] z-50 overflow-hidden rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:left-[-1rem] md:right-auto md:w-[34rem]"
+                  className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 overflow-hidden rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:left-[-1rem] md:right-auto md:w-[34rem]"
                   id={locationPopoverId}
                 >
                   {/* Segmented toggle picks which filter this tab edits. Both panels
@@ -892,29 +927,28 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
+            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
 
-            <div className="relative min-h-[4.2rem] min-w-0 flex-1">
+            <div className="relative min-h-16 min-w-0 flex-1">
               <input name="datePeriod" type="hidden" value={datePeriod} />
               <button
                 aria-controls={datePopoverId}
                 aria-expanded={openPopover === "date"}
                 aria-label="Date"
-                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
+                className={`flex min-h-16 w-full min-w-0 flex-col justify-center rounded-full px-7 py-2 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
                   openPopover === "date" ? "bg-paper dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                 }`}
                 onClick={() => setOpenPopover((current) => (current === "date" ? null : "date"))}
                 type="button"
               >
-                <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink dark:text-paper">
-                  <CalendarDays aria-hidden="true" className="size-3.5" />
+                <span className="block text-xs font-semibold leading-4 text-ink dark:text-paper">
                   Date
                 </span>
-                <span className="mt-1 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">{selectedDateLabel}</span>
+                <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">{selectedDateLabel}</span>
               </button>
               {openPopover === "date" ? (
                 <div
-                  className="absolute left-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[18rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
+                  className="absolute left-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[18rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
                   id={datePopoverId}
                 >
                   <div className="grid gap-2">
@@ -952,9 +986,9 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
+            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
 
-            <div className="relative min-h-[4.2rem] min-w-0 flex-[1.5]">
+            <div className="relative min-h-16 min-w-0 flex-[1.5]">
               {featureTags.map((tag) =>
                 tag.value !== "any" ? <input key={tag.key} name={tag.key} type="hidden" value={tag.value} /> : null
               )}
@@ -962,26 +996,25 @@ export function HackathonSearch({
                 aria-controls={featurePopoverId}
                 aria-expanded={openPopover === "features"}
                 aria-labelledby="hackathon-feature-filters-label"
-                className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
+                className={`flex min-h-16 w-full min-w-0 flex-col justify-center rounded-full px-7 py-2 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
                   openPopover === "features" ? "bg-paper dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                 }`}
                 onClick={() => setOpenPopover((current) => (current === "features" ? null : "features"))}
                 type="button"
               >
                 <span
-                  className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink dark:text-paper"
+                  className="block text-xs font-semibold leading-4 text-ink dark:text-paper"
                   id="hackathon-feature-filters-label"
                 >
-                  <Settings2 aria-hidden="true" className="size-3.5" />
                   Features
                 </span>
-                <span className="mt-1 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">
+                <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">
                   {selectedFeatureLabels.length ? selectedFeatureLabels.join(", ") : "Add features"}
                 </span>
               </button>
               {openPopover === "features" ? (
                 <div
-                  className="absolute right-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[20rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-5 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[27rem]"
+                  className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[20rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-5 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[27rem]"
                   id={featurePopoverId}
                 >
                   <div className="flex flex-wrap gap-3">
@@ -1016,21 +1049,83 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <div className="flex items-center justify-end gap-1.5 px-1 py-1 md:py-0 md:pl-1">
+            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
+
+            {/* Sort sits in the bar like Airbnb's "Who": the grid order is
+                part of the query. Picking one re-runs the search right away
+                with the filters already applied. */}
+            <div className="relative min-h-16 min-w-0 flex-1">
+              <button
+                aria-controls={sortPopoverId}
+                aria-expanded={openPopover === "sort"}
+                aria-label="Sort"
+                className={`flex min-h-16 w-full min-w-0 flex-col justify-center rounded-full px-7 py-2 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
+                  openPopover === "sort" ? "bg-paper dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
+                }`}
+                onClick={() => setOpenPopover((current) => (current === "sort" ? null : "sort"))}
+                type="button"
+              >
+                <span className="block text-xs font-semibold leading-4 text-ink dark:text-paper">Sort</span>
+                <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">{selectedSortLabel}</span>
+              </button>
+              {openPopover === "sort" ? (
+                <div
+                  className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[17rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[20rem]"
+                  id={sortPopoverId}
+                >
+                  <div className="grid gap-2">
+                    {sortOptions.map((option) => {
+                      const selected = sort === option.value;
+
+                      return (
+                        <button
+                          aria-pressed={selected}
+                          className={`flex min-h-[3.5rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
+                            selected
+                              ? "border-pine/35 dark:border-moss/40 bg-pine/5 dark:bg-moss/10"
+                              : "border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] hover:border-ink/20 hover:bg-paper dark:hover:bg-white/10"
+                          }`}
+                          key={option.value}
+                          onClick={() => {
+                            setOpenPopover(null);
+                            changeSort(option.value);
+                          }}
+                          type="button"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-ink dark:text-paper">{option.label}</span>
+                            <span className="mt-0.5 block truncate text-xs text-ink/55 dark:text-paper/55">{option.detail}</span>
+                          </span>
+                          <span
+                            className={`grid size-6 shrink-0 place-items-center rounded-full border ${
+                              selected ? "border-pine dark:border-moss/50 bg-pine text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white" : "border-ink/15 dark:border-white/15 text-transparent"
+                            }`}
+                          >
+                            <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex items-center justify-end gap-1 px-1 py-1 md:py-0 md:pl-1 md:pr-2">
               {activeFilters ? (
                 <button
                   aria-label="Clear hackathon search"
-                  className="grid size-11 min-h-11 shrink-0 place-items-center rounded-full border border-ink/15 dark:border-white/15 text-ink dark:text-paper hover:border-ink dark:hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
+                  className="grid size-10 shrink-0 place-items-center rounded-full border border-ink/15 dark:border-white/15 text-ink dark:text-paper hover:border-ink dark:hover:border-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
                   onClick={clearSearch}
                   type="button"
                 >
-                  <X aria-hidden="true" className="size-5" />
+                  <X aria-hidden="true" className="size-4" />
                 </button>
               ) : null}
               <button
                 aria-controls={moreFiltersId}
                 aria-expanded={moreFiltersOpen}
-                className="shrink-0 px-4 py-3 text-sm font-semibold text-ink dark:text-paper transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
+                className="shrink-0 px-3 py-3 text-sm font-semibold text-ink dark:text-paper transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
                 onClick={() => setMoreFiltersOpen((open) => !open)}
                 type="button"
               >
@@ -1038,7 +1133,7 @@ export function HackathonSearch({
               </button>
               <button
                 aria-label={isSearching ? "Searching hackathons" : "Search hackathons"}
-                className="grid size-11 shrink-0 place-items-center rounded-full bg-pine text-paper shadow-[0_10px_24px_-10px_rgba(54,37,25,0.65)] transition-colors hover:bg-pine/90 disabled:cursor-wait disabled:opacity-60 dark:bg-paper dark:text-[#141414] dark:hover:bg-white"
+                className="grid size-12 shrink-0 place-items-center rounded-full bg-pine text-paper shadow-[0_10px_24px_-10px_rgba(54,37,25,0.65)] transition-colors hover:bg-pine/90 disabled:cursor-wait disabled:opacity-60 dark:bg-paper dark:text-[#141414] dark:hover:bg-white"
                 disabled={isSearching}
                 type="submit"
               >
@@ -1051,11 +1146,10 @@ export function HackathonSearch({
                 toggle and separated by a hairline instead of a second card. */}
             {moreFiltersOpen ? (
               <>
-                <span aria-hidden="true" className="mx-6 my-1 h-px bg-ink/10 dark:bg-white/10" />
+                <span aria-hidden="true" className="mx-6 h-px bg-ink/10 dark:bg-white/10" />
                 <div className="flex flex-col gap-1 md:flex-row md:items-center" id={moreFiltersId}>
-                <label className="flex min-h-[4.2rem] min-w-0 flex-1 flex-col justify-start rounded-full px-6 py-3 text-left focus-within:bg-paper dark:focus-within:bg-white/10 hover:bg-paper dark:hover:bg-white/10">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink dark:text-paper">
-                    <Search aria-hidden="true" className="size-3.5" />
+                <label className="flex min-h-16 min-w-0 flex-1 flex-col justify-center rounded-full px-7 py-2 text-left focus-within:bg-paper dark:focus-within:bg-white/10 hover:bg-paper dark:hover:bg-white/10">
+                  <span className="block text-xs font-semibold leading-4 text-ink dark:text-paper">
                     Name
                   </span>
                   <input
@@ -1068,29 +1162,28 @@ export function HackathonSearch({
                   />
                 </label>
 
-                <span aria-hidden="true" className="hidden h-9 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
+                <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 dark:bg-white/10 md:block" />
 
-                <div className="relative min-h-[4.2rem] min-w-0 flex-1">
+                <div className="relative min-h-16 min-w-0 flex-1">
                   <input name="format" type="hidden" value={format} />
                   <button
                     aria-controls={formatPopoverId}
                     aria-expanded={openPopover === "format"}
                     aria-label="Format"
-                    className={`flex min-h-[4.2rem] w-full min-w-0 flex-col justify-start rounded-full px-6 py-3 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
+                    className={`flex min-h-16 w-full min-w-0 flex-col justify-center rounded-full px-7 py-2 text-left hover:bg-paper dark:hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40 ${
                       openPopover === "format" ? "bg-paper dark:bg-white/5 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]" : ""
                     }`}
                     onClick={() => setOpenPopover((current) => (current === "format" ? null : "format"))}
                     type="button"
                   >
-                    <span className="flex items-center gap-1.5 text-xs font-semibold leading-5 text-ink dark:text-paper">
-                      <MapPin aria-hidden="true" className="size-3.5" />
+                    <span className="block text-xs font-semibold leading-4 text-ink dark:text-paper">
                       Format
                     </span>
-                    <span className="mt-1 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">{selectedFormatLabel}</span>
+                    <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55 dark:text-paper/55">{selectedFormatLabel}</span>
                   </button>
                   {openPopover === "format" ? (
                     <div
-                      className="absolute left-0 top-[calc(100%+0.9rem)] z-50 w-full min-w-[19rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
+                      className="absolute left-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[19rem] rounded-[1.75rem] border border-ink/10 dark:border-white/10 bg-white dark:bg-[#1b1b1b] p-4 shadow-[0_22px_55px_rgba(0,0,0,0.2)] md:w-[24rem]"
                       id={formatPopoverId}
                     >
                       <div className="grid gap-2">
@@ -1153,13 +1246,11 @@ export function HackathonSearch({
 
       <section className="px-5 pb-16 pt-10 sm:px-8 sm:pb-20 lg:px-12">
         <div className="mx-auto max-w-[1800px]">
-          <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
-            <h1 className="font-serif text-3xl font-semibold tracking-[-0.02em] text-ink dark:text-paper sm:text-4xl">
-              Upcoming hackathons
-            </h1>
-          </div>
+          <h1 className="mb-7 font-serif text-3xl font-semibold tracking-[-0.02em] text-ink dark:text-paper sm:text-4xl">
+            Upcoming hackathons
+          </h1>
 
-          {!activeFilters && originCountryCode ? (
+          {!activeFilters && originCountryCode && sort === "soonest" ? (
             <p className="mb-6 -mt-3 text-sm leading-5 text-ink/50 dark:text-paper/50">
               Hackathons near you first.
             </p>

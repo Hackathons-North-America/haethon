@@ -313,7 +313,7 @@ export function DevpostImportDialog({
           aria-label="Import from Devpost"
         >
           <div
-            className="flex h-dvh items-center justify-center px-4 py-8 lg:pl-[17rem]"
+            className="flex h-dvh items-center justify-center px-4 py-8"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 setIsOpen(false);

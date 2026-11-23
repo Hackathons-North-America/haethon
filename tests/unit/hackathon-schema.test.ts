@@ -59,7 +59,13 @@ describe("hackathonSearchSchema", () => {
       format: "in_person",
       limit: 12,
       offset: 0,
+      sort: "soonest",
     });
+  });
+
+  it("accepts the top-voted sort and rejects unknown sorts", () => {
+    expect(hackathonSearchSchema.parse({ sort: "top" }).sort).toBe("top");
+    expect(hackathonSearchSchema.safeParse({ sort: "random" }).success).toBe(false);
   });
 
   it("normalizes country abbreviations and filters from page search params", () => {

@@ -18,6 +18,7 @@ export async function GET(request: Request) {
     startsBefore: searchParams.get("startsBefore") ?? undefined,
     limit: searchParams.get("limit") ?? undefined,
     offset: searchParams.get("offset") ?? undefined,
+    sort: searchParams.get("sort") ?? undefined,
   });
 
   if (!parsed.success) {
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
     startsBefore,
     limit,
     offset,
+    sort,
   } = parsed.data;
 
   // The heavy catalog query is served from the shared cross-request cache;
@@ -51,6 +53,7 @@ export async function GET(request: Request) {
       startsBefore: startsBefore ?? null,
       limit,
       offset,
+      sort,
     }),
     getCurrentUserId(),
   ]);
