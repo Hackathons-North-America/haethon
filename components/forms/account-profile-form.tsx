@@ -346,7 +346,7 @@ export function AccountProfileForm({ firstName, lastName, username, profile, dev
           aria-label="Edit profile"
         >
           <div
-            className="flex h-dvh items-center justify-center px-4 py-8 lg:pl-[17rem]"
+            className="flex h-dvh items-center justify-center px-4 py-8"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 setIsEditing(false);

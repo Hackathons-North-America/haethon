@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { AppNavSlotProvider } from "@/components/app-nav-slot";
 import { AppShellContent, AppShellWipe } from "@/components/app-shell-transition";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppTopNav } from "@/components/app-top-nav";
 import { isAdminRole, roleFromSessionClaims } from "@/lib/auth";
 
 export default async function AppLayout({
@@ -16,11 +17,13 @@ export default async function AppLayout({
   const role = roleFromSessionClaims(sessionClaims);
 
   return (
-    <div className="relative flex min-h-screen flex-col lg:flex-row">
-      <AppSidebar isAdmin={isAdminRole(role)} isOrganizer={role === "organizer"} isSignedIn={Boolean(userId)} />
-      <AppShellContent>{children}</AppShellContent>
-      {panel}
-      <AppShellWipe />
-    </div>
+    <AppNavSlotProvider>
+      <div className="relative flex min-h-screen flex-col">
+        <AppTopNav isAdmin={isAdminRole(role)} isOrganizer={role === "organizer"} isSignedIn={Boolean(userId)} />
+        <AppShellContent>{children}</AppShellContent>
+        {panel}
+        <AppShellWipe />
+      </div>
+    </AppNavSlotProvider>
   );
 }
