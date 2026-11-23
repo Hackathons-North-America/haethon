@@ -17,6 +17,7 @@ import { AppNavCenter } from "@/components/app-nav-slot";
 import { NavUnderline } from "@/components/nav-underline";
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
+import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
@@ -618,12 +619,19 @@ export function HackathonSearch({
 
   return (
     <>
-      {/* Continues the top nav's band: a soft fade to a slightly deeper paper
-          and a hairline under the search bar, like Airbnb's header. */}
+      {/* Continues the top nav's band, with a hairline under the search bar
+          like Airbnb's header. The landing page's beige watercolor sits behind
+          it and reaches up behind the nav, which goes transparent whenever a
+          page fills its center slot (see AppTopNav). One backdrop spanning
+          both keeps the texture from restarting at the seam; it runs past the
+          top of the page by a margin generous enough for the tallest (phone)
+          header, and the overshoot is simply off-screen. Dark mode keeps the
+          plain fade. */}
       <section
         aria-label="Hackathon filters"
-        className="border-b border-ink/10 bg-gradient-to-b from-paper to-[#f3ece2] px-5 pb-9 pt-3 dark:border-white/10 dark:to-white/[0.03] sm:px-8 sm:pt-4 lg:px-12"
+        className="relative isolate border-b border-ink/10 px-5 pb-9 pt-3 dark:border-white/10 dark:bg-gradient-to-b dark:from-paper dark:to-white/[0.03] sm:px-8 sm:pt-4 lg:px-12"
       >
+        <WatercolorBackdrop className="absolute inset-x-0 bottom-0 -z-10 h-[calc(100%+16rem)] dark:hidden" />
         {/* Shared with the results grid below so the filter bar, the heading,
             and the card columns all line up on the same edges. */}
         <div className="mx-auto max-w-[1800px]">

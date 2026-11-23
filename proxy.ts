@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/corporate",
   "/discord",
   "/hackathons(.*)",
   // Shared hacker profiles. The unguessable token in the path is the
