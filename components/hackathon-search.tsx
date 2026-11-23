@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { AppNavCenter } from "@/components/app-nav-slot";
+import { NavUnderline } from "@/components/nav-underline";
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
@@ -628,14 +629,14 @@ export function HackathonSearch({
           plain fade. */}
       <section
         aria-label="Hackathon filters"
-        className="relative isolate border-b border-ink/10 px-5 pb-9 pt-4 dark:border-white/10 dark:bg-gradient-to-b dark:from-paper dark:to-white/[0.03] sm:px-8 sm:pt-5 lg:px-12"
+        className="relative isolate border-b border-ink/10 px-5 pb-9 pt-3 dark:border-white/10 dark:bg-gradient-to-b dark:from-paper dark:to-white/[0.03] sm:px-8 sm:pt-4 lg:px-12"
       >
         <WatercolorBackdrop className="absolute inset-x-0 bottom-0 -z-10 h-[calc(100%+16rem)] dark:hidden" />
         {/* Shared with the results grid below so the filter bar, the heading,
             and the card columns all line up on the same edges. */}
         <div className="mx-auto max-w-[1800px]">
           {/* Region tabs live in the top nav's center column (Airbnb's
-              Homes / Experiences row): big icon, label, underline when
+              Homes / Experiences row): text label, underline when
               active. The state and handlers stay here. */}
           <AppNavCenter>
             <div
@@ -649,26 +650,19 @@ export function HackathonSearch({
                 return (
                   <button
                     aria-pressed={active}
-                    className={`group relative inline-flex min-h-16 flex-col items-center justify-center gap-1 whitespace-nowrap px-[5px] py-[7.5px] text-[13px] font-semibold transition-colors sm:flex-row sm:gap-2.5 sm:text-[15px] lg:min-h-20 focus-visible:outline-none focus-visible:text-pine focus-visible:underline focus-visible:underline-offset-4 ${
+                    className={`group relative inline-flex min-h-14 items-center justify-center whitespace-nowrap px-[5px] py-[7.5px] text-[13px] font-semibold transition-colors sm:text-[15px] lg:min-h-[68px] focus-visible:outline-none focus-visible:text-pine focus-visible:underline focus-visible:underline-offset-4 ${
                       active ? "text-pine" : "text-ink/55"
                     }`}
                     key={preset.id}
                     onClick={() => applyRegionPreset(preset.id)}
                     type="button"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="text-[1.45rem] leading-none sm:text-[1.75rem]"
-                    >
-                      {preset.emoji}
+                    {/* The underline hangs off the label, not the button, so it
+                        sits just under the text however tall the nav row is. */}
+                    <span className="relative">
+                      {preset.label}
+                      <NavUnderline active={active} />
                     </span>
-                    {preset.label}
-                    <span
-                      aria-hidden="true"
-                      className={`absolute inset-x-0 bottom-0 h-[3px] rounded-full transition-colors ${
-                        active ? "bg-pine" : "bg-transparent group-hover:bg-ink/15"
-                      }`}
-                    />
                   </button>
                 );
               })}
@@ -1131,15 +1125,6 @@ export function HackathonSearch({
                 </button>
               ) : null}
               <button
-                aria-controls={moreFiltersId}
-                aria-expanded={moreFiltersOpen}
-                className="shrink-0 px-3 py-3 text-sm font-semibold text-ink dark:text-paper transition-colors hover:text-pine dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
-                onClick={() => setMoreFiltersOpen((open) => !open)}
-                type="button"
-              >
-                {moreFiltersOpen ? "Fewer" : "More"}
-              </button>
-              <button
                 aria-label={isSearching ? "Searching hackathons" : "Search hackathons"}
                 className="grid size-12 shrink-0 place-items-center rounded-full bg-pine text-paper shadow-[0_10px_24px_-10px_rgba(54,37,25,0.65)] transition-colors hover:bg-pine/90 disabled:cursor-wait disabled:opacity-60 dark:bg-paper dark:text-[#141414] dark:hover:bg-white"
                 disabled={isSearching}
@@ -1235,11 +1220,29 @@ export function HackathonSearch({
               </>
             ) : null}
             </div>
+
+            {/* More sits under the bar, centered below the Location field.
+                Location is flex 1.25 of the row's 4.75 flex units, so its
+                midpoint lands at ~12% of the bar's width at every md+ size
+                (it drifts ~10px when the clear button shows). It's absolute
+                so it lives inside the band's existing bottom padding instead
+                of adding a row; with the second row open it rides down with
+                the card. Muted like the inactive region tabs. */}
+            <button
+              aria-controls={moreFiltersId}
+              aria-expanded={moreFiltersOpen}
+              className="absolute left-4 top-full mt-0.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ink/55 dark:text-paper/55 transition-colors hover:text-ink dark:hover:text-paper md:left-[12%] md:-translate-x-1/2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 dark:focus-visible:outline-paper/40"
+              onClick={() => setMoreFiltersOpen((open) => !open)}
+              type="button"
+            >
+              {moreFiltersOpen ? "Fewer" : "More"}
+            </button>
           </form>
 
           <div
-            className={`px-2 text-sm text-ink/55 dark:text-paper/55 ${
-              searchError || !hasSearched ? "mt-4 min-h-6" : ""
+            /* Indented past the More button, on the same line as it. */
+            className={`pl-24 pr-2 text-sm text-ink/55 dark:text-paper/55 ${
+              searchError || !hasSearched ? "mt-2 min-h-6" : ""
             }`}
             role="status"
           >
@@ -1252,9 +1255,9 @@ export function HackathonSearch({
         </div>
       </section>
 
-      <section className="px-5 pb-16 pt-10 sm:px-8 sm:pb-20 lg:px-12">
+      <section className="px-5 pb-16 pt-30 sm:px-8 sm:pb-20 lg:px-12">
         <div className="mx-auto max-w-[1800px]">
-          <h1 className="mb-7 font-serif text-3xl font-semibold tracking-[-0.02em] text-ink dark:text-paper sm:text-4xl">
+          <h1 className="mb-7 font-serif text-[15px] font-semibold tracking-[-0.02em] text-ink dark:text-paper sm:text-lg">
             Upcoming hackathons
           </h1>
 

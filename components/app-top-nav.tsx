@@ -13,19 +13,24 @@ import {
   Menu,
   PlusSquare,
   Search,
-  Settings,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 
 import { useAppNavSlotRef } from "@/components/app-nav-slot";
 import { LoginRequiredLink } from "@/components/login-required-dialog";
+import { NavUnderline } from "@/components/nav-underline";
 
 type NavLink = {
   href: string;
   icon: ElementType;
   label: string;
   requiresAuth?: boolean;
+  /** Only the exact path counts as active, not its sub-pages. */
+  exact?: boolean;
+  /** Menu-only callout text. A link with one renders as a featured block
+      between dividers (Airbnb's "Become a host" row) instead of a plain row. */
+  description?: string;
 };
 
 function buildLinks({
@@ -41,28 +46,34 @@ function buildLinks({
     ...(isAdmin ? [{ href: "/admin", icon: ShieldCheck, label: "Admin" }] : []),
     { href: "/hackathons", icon: Search, label: "Search" },
     { href: "/my", icon: CalendarDays, label: "My Hackathons", requiresAuth: true },
-    { href: "/account", icon: CircleUser, label: "Hacker Profile", requiresAuth: true },
-    isSignedIn
-      ? { href: "/account/settings", icon: Settings, label: "Account Settings" }
-      : { href: "/sign-in", icon: LogIn, label: "Login" },
-    { href: "/submit", icon: PlusSquare, label: "Add a hackathon", requiresAuth: true },
+    { href: "/account", icon: CircleUser, label: "My Profile", requiresAuth: true, exact: true },
+    // Account settings live on the avatar circle, so the menu only needs Login.
+    ...(isSignedIn ? [] : [{ href: "/sign-in", icon: LogIn, label: "Login" }]),
+    {
+      href: "/submit",
+      icon: PlusSquare,
+      label: "Add a hackathon",
+      requiresAuth: true,
+      description: "You don't have to be an organizer. Tell us which hackathons we're missing.",
+    },
     ...(isOrganizer ? [{ href: "/organizer", icon: Building2, label: "Organizer" }] : []),
   ];
 }
 
 /* The active link is the one whose href is the longest matching prefix of the
-   current path, so /account/settings highlights Settings rather than both it
-   and Hacker Profile. */
+   current path. An `exact` link only matches itself, so /account/settings
+   (reached from the avatar) doesn't highlight My Profile. */
 function activeHrefFor(links: NavLink[], pathname: string) {
   return links
-    .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
+    .filter(({ exact, href }) => pathname === href || (!exact && pathname.startsWith(`${href}/`)))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 }
 
 const circleButton =
   "grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
 
-/* Initial-in-a-circle avatar, like Airbnb's. Signed-out visitors get a person
+/* Initial-in-a-circle avatar, like Airbnb's; it opens account settings (the
+   profile itself is My Profile in the menu). Signed-out visitors get a person
    glyph that leads to sign-in instead. */
 function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
   const { user } = useUser();
@@ -83,9 +94,9 @@ function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
 
   return (
     <Link
-      aria-label="Hacker profile"
+      aria-label="Account settings"
       className={`${circleButton} bg-moss/20 text-[15px] font-semibold text-pine hover:bg-moss/30`}
-      href="/account"
+      href="/account/settings"
     >
       {initial || <UserRound aria-hidden="true" className="size-5" />}
     </Link>
@@ -147,9 +158,31 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
           id={menuId}
         >
           <ul>
-            {links.map(({ href, icon: Icon, label, requiresAuth }) => {
+            {links.map(({ description, href, icon: Icon, label, requiresAuth }) => {
               const active = href === activeHref;
               const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
+
+              if (description) {
+                /* Featured row: hairlines above and (unless it's last) below,
+                   with an inset like Airbnb's dividers. */
+                return (
+                  <li
+                    className="mx-5 my-2 border-t border-ink/10 pt-2 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-2"
+                    key={href}
+                  >
+                    <NavigationLink
+                      aria-current={active ? "page" : undefined}
+                      className="-mx-5 flex flex-col gap-1 px-5 py-3 transition-colors hover:bg-ink/[0.04] focus-visible:bg-ink/[0.04] focus-visible:outline-none"
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
+                    >
+                      <span className={`text-sm font-semibold ${active ? "text-pine" : "text-ink"}`}>{label}</span>
+                      <span className="text-xs leading-snug text-ink/55">{description}</span>
+                    </NavigationLink>
+                  </li>
+                );
+              }
 
               return (
                 <li key={href}>
@@ -200,16 +233,16 @@ export function AppTopNav({
           The side columns are minmax(0,1fr) so they always stay equal and the
           center sits on the page's true midline, even when the actions are
           wider than the logo. With the search bar below, the header also
-          takes the same 1.25rem on top that the band leaves above the bar,
+          takes the same 1rem on top that the band leaves above the bar,
           so the row sits midway between the page top and the bar's top. */}
       <motion.header
         animate={{ opacity: 1, y: 0 }}
-        className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent has-[[data-nav-slot]:not(:empty)]:bg-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-5"
+        className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent has-[[data-nav-slot]:not(:empty)]:bg-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-4"
         initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
         transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-x-4 px-5 sm:px-8 lg:grid lg:min-h-20 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-12">
-          <Link className="flex min-h-16 items-center justify-self-start" href={isSignedIn ? "/?home" : "/"}>
+        <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-x-4 px-5 sm:px-8 lg:grid lg:min-h-20 lg:has-[[data-nav-slot]:not(:empty)]:min-h-[68px] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-12">
+          <Link className="flex min-h-16 items-center justify-self-start" href={isSignedIn ? "/hackathons" : "/"}>
             <span className="whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-ink">HNA</span>
           </Link>
 
@@ -225,10 +258,13 @@ export function AppTopNav({
 
           <div className="flex items-center gap-2 justify-self-end">
             <LoginRequiredLink
-              className="hidden min-h-11 items-center whitespace-nowrap rounded-full px-4 text-[15px] font-semibold text-ink transition-colors hover:bg-ink/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:inline-flex lg:max-[1079px]:hidden"
+              className="group hidden min-h-11 items-center whitespace-nowrap rounded-full px-4 text-[15px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine sm:inline-flex lg:max-[1079px]:hidden"
               href="/submit"
             >
-              Add a hackathon
+              <span className="relative">
+                Add a hackathon
+                <NavUnderline />
+              </span>
             </LoginRequiredLink>
             <ProfileCircle isSignedIn={isSignedIn} />
             <NavMenu activeHref={activeHref} isSignedIn={isSignedIn} links={links} />
