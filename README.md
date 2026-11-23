@@ -9,7 +9,6 @@
 Find vetted hackathons, manage every application in one place, build a public
 hacker profile, and stay connected with the people you meet along the way.
 
-[![CI/CD](https://github.com/Hackathons-North-America/haethon/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Hackathons-North-America/haethon/actions/workflows/ci-cd.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
@@ -99,7 +98,7 @@ integrations that can be added as needed.
 | Community automation | Discord REST API |
 | Observability | PostHog and Sentry |
 | Testing | Vitest, Testing Library, Playwright |
-| Delivery | GitHub Actions and Vercel |
+| Delivery | Vercel |
 
 ## Quick start
 
@@ -359,14 +358,7 @@ The intended production target is Vercel:
 4. Apply reviewed database migrations to the production database.
 5. Deploy and verify `/api/health`, `/`, `/hackathons`, and the sign-in flow.
 
-GitHub Actions runs dependency auditing, linting, type-checking, unit tests, and
-a production build for pull requests to `main`. A successful push to `main`
-then creates the Vercel production deployment. Database migrations are
-deliberately not applied automatically.
-
-See [CI/CD with GitHub Actions and Vercel](docs/ci-cd.md) for repository secrets,
-branch protection, release flow, and rollback guidance.
-
-## Additional documentation
-
-- [CI/CD and production deployment](docs/ci-cd.md)
+Vercel's Git integration builds a preview for every pull request and creates
+the production deployment on every push to `main`. Run `pnpm lint`,
+`pnpm typecheck`, and `pnpm test` locally before merging. Database migrations
+are deliberately not applied automatically.
