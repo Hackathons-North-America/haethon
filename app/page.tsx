@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { DotsIcon, FlagsIcon, GlobeStarIcon, TicketIcon } from "@/components/landing/feature-icons";
 import { HeroToolbox } from "@/components/landing/hero-toolbox";
 import { LandingNav } from "@/components/landing/landing-nav";
+import { TypewriterWord } from "@/components/landing/typewriter-word";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
+
+const heroAudiences = ["Student", "Corporate", "Professional"] as const;
 
 const features: { icon: ReactNode; label: string }[] = [
   { icon: <FlagsIcon />, label: "Find hackathons across the US and Canada" },
@@ -28,7 +31,12 @@ export default function Home() {
         <LandingNav />
 
         <section className="relative px-6 pt-16 text-center xl:pt-[122px]">
-          <p className="text-[17px] font-medium leading-5">Every hackathon in North America</p>
+          <p className="text-[17px] font-medium leading-5">
+            <span className="sr-only">Every Student, Corporate, and Professional Hackathon in North America</span>
+            <span aria-hidden="true">
+              Every <TypewriterWord words={heroAudiences} /> Hackathon in North America
+            </span>
+          </p>
 
           <div className="relative mt-8 xl:mt-11">
             <HeroToolbox className="relative mx-auto h-auto w-[240px] xl:w-[300px]" />

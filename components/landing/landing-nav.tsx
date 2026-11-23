@@ -1,10 +1,11 @@
 "use client";
 
-import Image from "next/image";
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { DiscordGlyph } from "@/components/discord-glyph";
 
 type MenuItem = { description: string; href: string; label: string };
@@ -125,6 +126,9 @@ function ProductsMenu() {
 }
 
 export function LandingNav() {
+  // Read on the client so the landing pages that use this nav stay static.
+  const { isSignedIn } = useAuth();
+
   return (
     <header className="relative z-40">
       <nav
@@ -132,14 +136,13 @@ export function LandingNav() {
         className="mx-auto flex h-[82px] max-w-[1712px] items-center justify-between px-6"
       >
         <div className="flex items-center">
-          {/* Same "HNA" wordmark as the app's top nav, with the beaver beside
-              it. The SVG serves as-is (Next skips optimization for .svg). */}
+          {/* "?home" opts out of the proxy's signed-in redirect to /hackathons,
+              so the logo always lands on the marketing homepage from here. */}
           <Link
-            className="flex items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
-            href="/"
+            className="flex items-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
+            href="/?home"
           >
-            <Image alt="" className="h-8 w-auto" height={677} priority src="/logo-beaver.svg" width={613} />
-            <span className="whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-ink">HNA</span>
+            <BrandLogo />
           </Link>
 
           <div className="ml-20 hidden items-center gap-12 lg:flex">
@@ -166,12 +169,17 @@ export function LandingNav() {
             <DiscordGlyph className="size-[18px] shrink-0" />
             <span className="hidden md:inline">Join our Discord</span>
           </a>
-          <Link
-            className="hidden h-10 items-center rounded-full border border-black px-[15px] text-[17px] font-medium text-black transition-colors hover:bg-black/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:inline-flex"
-            href="/sign-in"
-          >
-            Sign in
-          </Link>
+          {/* Only for visitors Clerk has confirmed are signed out. While Clerk
+              is still loading, isSignedIn is undefined and the button stays
+              hidden, so signed-in users never see it flash. */}
+          {isSignedIn === false ? (
+            <Link
+              className="hidden h-10 items-center rounded-full border border-black px-[15px] text-[17px] font-medium text-black transition-colors hover:bg-black/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:inline-flex"
+              href="/sign-in"
+            >
+              Sign in
+            </Link>
+          ) : null}
           <Link
             className="inline-flex h-10 items-center rounded-full bg-black px-[15px] text-[17px] font-medium text-white transition-colors hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
             href="/hackathons"
