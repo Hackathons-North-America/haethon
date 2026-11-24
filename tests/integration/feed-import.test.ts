@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /* External side effects of an import are stubbed: Discord, Next's cache tags
    (no request context here) and image fetching (no network in tests). */
 vi.mock("@/lib/discord/sync", () => ({
+  ensureHackathonDiscordChannel: vi.fn(async () => ({ status: "skipped" })),
   previewHackathonDiscordChannel: vi.fn(async () => ({ eligible: false })),
   retireHackathonDiscordChannel: vi.fn(async () => undefined),
   syncHackathonDiscordChannelSafely: vi.fn(async () => ({ status: "skipped" })),
@@ -19,6 +20,7 @@ const { hackathonDates, hackathonExternalIds, hackathonLocations, hackathons, ha
   "@/lib/db/schema"
 );
 const { importAdminHackathons } = await import("@/lib/hackathons/review-service");
+const { ensureHackathonDiscordChannel, previewHackathonDiscordChannel } = await import("@/lib/discord/sync");
 const { backfillExternalIds } = await import("@/lib/hackathons/external-ids-backfill");
 const { adminHackathonImportSchema } = await import("@/lib/validations/hackathon");
 
@@ -80,6 +82,8 @@ beforeEach(async () => {
     .values({ clerkUserId: "user_admin", email: "admin@example.test", username: "admin", role: "admin" })
     .returning({ id: users.id });
   reviewerUserId = user.id;
+  vi.mocked(ensureHackathonDiscordChannel).mockClear();
+  vi.mocked(previewHackathonDiscordChannel).mockClear();
 });
 
 describe("feed-id imports", () => {
@@ -169,6 +173,65 @@ describe("feed-id imports", () => {
     ]);
 
     expect((await hackathonState(result.results[0].hackathonId!)).source).toBe("hackclub");
+  });
+});
+
+describe("auto-approved imports", () => {
+  it("sets up the channel of a new auto-approved import without a preview", async () => {
+    vi.mocked(ensureHackathonDiscordChannel).mockResolvedValueOnce({
+      action: "created",
+      category: "us",
+      categoryName: "US Hackathons",
+      channelSnowflake: "123",
+      name: "embodied-metal-jul-17",
+      status: "synced",
+    });
+
+    const result = await importRows([{ ...BASE, autoApprove: true }]);
+
+    expect(result.results[0]).toMatchObject({ autoApprove: true, status: "imported" });
+    expect(result.results[0].discordSync).toMatchObject({ action: "created", status: "synced" });
+    expect(ensureHackathonDiscordChannel).toHaveBeenCalledWith(result.results[0].hackathonId, { keepExisting: false });
+    expect(previewHackathonDiscordChannel).not.toHaveBeenCalled();
+  });
+
+  it("keeps asking about the channel when the flag is missing", async () => {
+    const result = await importRows([BASE]);
+
+    expect(result.results[0]).toMatchObject({ autoApprove: false, status: "imported" });
+    expect(result.results[0].discordSync).toBeUndefined();
+    expect(ensureHackathonDiscordChannel).not.toHaveBeenCalled();
+    expect(previewHackathonDiscordChannel).toHaveBeenCalledWith(result.results[0].hackathonId);
+  });
+
+  it("keeps an existing hackathon's channel when the feed sends it again", async () => {
+    const hackathonId = (await importRows([BASE])).results[0].hackathonId!;
+
+    const result = await importRows([{ ...BASE, autoApprove: true }]);
+
+    expect(result.results[0]).toMatchObject({ status: "updated", hackathonId });
+    expect(ensureHackathonDiscordChannel).toHaveBeenCalledWith(hackathonId, { keepExisting: true });
+  });
+
+  it("leaves a likely duplicate to the admin", async () => {
+    await importRows([{ ...BASE, externalId: undefined, externalIds: undefined }]);
+
+    // Same event under another name and feed: a likely match, below auto-merge.
+    const result = await importRows([
+      {
+        ...BASE,
+        name: "Embodied Metal Robotics Hackathon",
+        websiteUrl: "https://embodied.example.com",
+        sourceUrl: "https://embodied.example.com",
+        externalId: "mlh:embodied",
+        externalIds: ["mlh:embodied"],
+        autoApprove: true,
+      },
+    ]);
+
+    expect(result.results[0].status).toBe("duplicate_flagged");
+    expect(result.results[0].discordSync).toBeUndefined();
+    expect(ensureHackathonDiscordChannel).not.toHaveBeenCalled();
   });
 });
 

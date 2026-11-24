@@ -1127,6 +1127,55 @@ export async function syncHackathonDiscordChannelSafely(hackathonId: string) {
 }
 
 /**
+ * The Discord step for an auto-approved import, with no admin decision. A
+ * Canadian or US event gets its channel through the normal sync, which reuses
+ * a channel that already exists (the series' channel, a parked one, or a
+ * hand-made one with a matching name) and creates one only when none does.
+ * Other events are left alone: the sync would delete an ineligible event's
+ * channel, which is not this step's call to make.
+ *
+ * `keepExisting` is for imports that landed on a hackathon that was already in
+ * the catalog: when that hackathon already has a channel, nothing is touched.
+ */
+export async function ensureHackathonDiscordChannel(hackathonId: string, options?: { keepExisting?: boolean }) {
+  try {
+    const [row] = await db
+      .select({
+        country: hackathonLocations.country,
+        endsAt: hackathonDates.endsAt,
+        startsAt: hackathonDates.startsAt,
+        status: hackathons.status,
+      })
+      .from(hackathons)
+      .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
+      .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+      .where(eq(hackathons.id, hackathonId))
+      .limit(1);
+
+    if (!row || !categoryForHackathon(row)) {
+      return { status: "skipped" as const, reason: INELIGIBLE_REASON };
+    }
+
+    if (options?.keepExisting) {
+      const [existing] = await db
+        .select({ channelSnowflake: discordChannels.channelSnowflake })
+        .from(discordChannels)
+        .where(eq(discordChannels.hackathonId, hackathonId))
+        .limit(1);
+
+      if (existing) {
+        return { status: "unchanged" as const, channelSnowflake: existing.channelSnowflake };
+      }
+    }
+
+    return await syncHackathonDiscordChannel(hackathonId);
+  } catch (error) {
+    reportHackathonSyncFailure(hackathonId, error);
+    return { status: "failed" as const };
+  }
+}
+
+/**
  * Minimal concurrency pool: up to `limit` lanes pull items off a shared cursor
  * until the list is exhausted. @discordjs/rest queues requests and respects
  * Discord's rate limits internally, so modest parallelism here is safe.
