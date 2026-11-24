@@ -80,16 +80,16 @@ function getCountryDisplay(country: string): {
   if (key === "united states" || key === "united states of america" || key === "usa") {
     return {
       label: "United States",
-      textClass: "text-[#5A6CFF]",
-      underlineClass: "underline decoration-[#5A6CFF] underline-offset-2",
+      textClass: "text-[#5A6CFF] dark:text-[#8f9bff]",
+      underlineClass: "underline decoration-[#5A6CFF] underline-offset-2 dark:decoration-[#8f9bff]",
     };
   }
 
   if (key === "canada") {
     return {
       label: "Canada",
-      textClass: "text-[#D9043D]",
-      underlineClass: "underline decoration-[#D9043D] underline-offset-2",
+      textClass: "text-[#D9043D] dark:text-[#ff5c84]",
+      underlineClass: "underline decoration-[#D9043D] underline-offset-2 dark:decoration-[#ff5c84]",
     };
   }
 
@@ -127,11 +127,11 @@ function getAccentStyle(name: string) {
    the paper card. Each shade is the darkened step of its hue so the label keeps
    AA contrast against paper — plain yellow and green wash out. */
 const TIER_TEXT_STYLES: Record<TierLabel, string> = {
-  S: "text-[#DC2626]",
-  A: "text-[#C2410C]",
-  B: "text-[#A16207]",
-  C: "text-[#15803D]",
-  D: "text-[#1D4ED8]",
+  S: "text-[#DC2626] dark:text-[#f87171]",
+  A: "text-[#C2410C] dark:text-[#fb923c]",
+  B: "text-[#A16207] dark:text-[#facc15]",
+  C: "text-[#15803D] dark:text-[#4ade80]",
+  D: "text-[#1D4ED8] dark:text-[#60a5fa]",
 };
 
 /* Light companion tints to TIER_TEXT_STYLES, used for the body's airbrushed
@@ -494,7 +494,7 @@ function BookmarkCardLogo({ hackathon, preview }: { hackathon: HackathonCardData
           unoptimized
         />
       ) : (
-        <div className="grid size-full place-items-center bg-[rgb(var(--hackathon-accent-rgb)/0.92)] px-2 text-center text-lg font-semibold text-paper">
+        <div className="grid size-full place-items-center bg-[rgb(var(--hackathon-accent-rgb)/0.92)] px-2 text-center text-lg font-semibold text-white">
           {getInitials(hackathon.name) || "HN"}
         </div>
       )}
@@ -701,7 +701,7 @@ function BookmarkPageCard({
                 </span>
               ) : null}
               {hackathon.hasDiscord ? (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#5865F2]">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#5865F2] dark:text-[#8b93ff]">
                   <DiscordGlyph className="size-3.5" />
                   Discord
                 </span>

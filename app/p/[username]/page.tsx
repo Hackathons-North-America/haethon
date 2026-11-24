@@ -143,7 +143,7 @@ export default async function SharedProfilePage({ params }: PageProps) {
           </section>
 
           <ProfilePinnedSection
-            empty={<p className="text-sm text-ink/55 dark:text-paper/55">No pinned wins or events yet.</p>}
+            empty={<p className="text-sm text-ink/55">No pinned wins or events yet.</p>}
             items={profileData.pinnedItems}
           />
 

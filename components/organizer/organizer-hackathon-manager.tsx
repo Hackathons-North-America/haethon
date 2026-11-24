@@ -27,9 +27,9 @@ type Attendee = {
 };
 
 const inputClassName =
-  "w-full rounded-xl border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-ink dark:text-paper outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
-const checkboxClassName = "size-4 rounded border-ink/20 dark:border-white/20 text-pine dark:text-moss focus:ring-pine/20";
-const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55";
+  "w-full rounded-xl border border-ink/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
+const checkboxClassName = "size-4 rounded border-ink/20 text-pine focus:ring-pine/20";
+const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-ink/55";
 const panelTitleClassName = "flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.14em] text-pine";
 
 function itemToPreviewPayload(item: OrganizerHackathonItem): Record<string, unknown> {
@@ -129,24 +129,24 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
         <KeyRound aria-hidden="true" className="size-4" />
         Attendance check-in code
       </h3>
-      <p className="mt-2 text-sm leading-6 text-ink/55 dark:text-paper/55">
+      <p className="mt-2 text-sm leading-6 text-ink/55">
         Share this code with hackers at the venue. They enter it in the app to verify their attendance. Generating a new
         code revokes the current one.
       </p>
 
       {status === "loading" ? (
-        <p className="mt-4 text-sm text-ink/55 dark:text-paper/55">Loading code...</p>
+        <p className="mt-4 text-sm text-ink/55">Loading code...</p>
       ) : (
         <div className="mt-4 flex flex-wrap items-center gap-4">
           {code ? (
-            <span className="rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-4 py-2 font-mono text-2xl font-semibold tracking-[0.2em] text-ink dark:text-paper">
+            <span className="rounded-xl border border-ink/10 bg-paper px-4 py-2 font-mono text-2xl font-semibold tracking-[0.2em] text-ink">
               {code.code}
             </span>
           ) : (
-            <span className="text-sm font-semibold text-ink/55 dark:text-paper/55">No active code yet.</span>
+            <span className="text-sm font-semibold text-ink/55">No active code yet.</span>
           )}
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
             disabled={status === "generating"}
             onClick={generateCode}
             type="button"
@@ -158,13 +158,13 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
       )}
 
       {code ? (
-        <p className="mt-3 text-xs text-ink/55 dark:text-paper/55">
+        <p className="mt-3 text-xs text-ink/55">
           Created {new Date(code.createdAt).toLocaleString()}
           {code.expiresAt ? ` · Expires ${new Date(code.expiresAt).toLocaleString()}` : ""}
         </p>
       ) : null}
       {message ? (
-        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>{message}</p>
+        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-danger" : "text-pine"}`}>{message}</p>
       ) : null}
     </section>
   );
@@ -172,14 +172,14 @@ function CheckinCodePanel({ hackathonId }: { hackathonId: string }) {
 
 function AttendeeTierBadge({ tier }: { tier: Attendee["tier"] }) {
   if (tier === "verified") {
-    return <span className="rounded-full bg-[#362519]/10 px-2.5 py-0.5 text-xs font-semibold text-[#362519]">Verified</span>;
+    return <span className="rounded-full bg-pine/10 px-2.5 py-0.5 text-xs font-semibold text-pine">Verified</span>;
   }
 
   if (tier === "self_reported") {
-    return <span className="rounded-full bg-[#B54708]/10 px-2.5 py-0.5 text-xs font-semibold text-[#B54708]">Self-reported</span>;
+    return <span className="rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">Self-reported</span>;
   }
 
-  return <span className="rounded-full bg-ink/5 dark:bg-white/5 px-2.5 py-0.5 text-xs font-semibold text-ink/55 dark:text-paper/55">No check-in</span>;
+  return <span className="rounded-full bg-ink/5 px-2.5 py-0.5 text-xs font-semibold text-ink/55">No check-in</span>;
 }
 
 function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
@@ -294,19 +294,19 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
         <Users aria-hidden="true" className="size-4" />
         Attendees
       </h3>
-      <p className="mt-2 text-sm leading-6 text-ink/55 dark:text-paper/55">
+      <p className="mt-2 text-sm leading-6 text-ink/55">
         Hackers who checked in or marked this hackathon as attended. Select self reported attendees you can vouch for and
         mark them as organizer verified.
       </p>
 
       {status === "loading" ? (
-        <p className="mt-4 text-sm text-ink/55 dark:text-paper/55">Loading attendees...</p>
+        <p className="mt-4 text-sm text-ink/55">Loading attendees...</p>
       ) : attendees && attendees.length ? (
         <>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead>
-                <tr className="border-b border-ink/10 dark:border-white/10 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55">
+                <tr className="border-b border-ink/10 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55">
                   <th className="w-10 py-2" />
                   <th className="py-2 pr-4">Hacker</th>
                   <th className="py-2 pr-4">Email</th>
@@ -316,7 +316,7 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
               </thead>
               <tbody>
                 {attendees.map((attendee) => (
-                  <tr className="border-b border-ink/5 dark:border-white/5" key={attendee.userId}>
+                  <tr className="border-b border-ink/5" key={attendee.userId}>
                     <td className="py-2.5">
                       {attendee.tier === "self_reported" ? (
                         <input
@@ -328,9 +328,9 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
                         />
                       ) : null}
                     </td>
-                    <td className="py-2.5 pr-4 font-semibold text-ink dark:text-paper">{attendee.name}</td>
-                    <td className="py-2.5 pr-4 text-ink/70 dark:text-paper/70">{attendee.email}</td>
-                    <td className="py-2.5 pr-4 capitalize text-ink/70 dark:text-paper/70">{attendee.applicationStatus ?? "-"}</td>
+                    <td className="py-2.5 pr-4 font-semibold text-ink">{attendee.name}</td>
+                    <td className="py-2.5 pr-4 text-ink/70">{attendee.email}</td>
+                    <td className="py-2.5 pr-4 capitalize text-ink/70">{attendee.applicationStatus ?? "-"}</td>
                     <td className="py-2.5">
                       <AttendeeTierBadge tier={attendee.tier} />
                     </td>
@@ -342,7 +342,7 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
               disabled={status === "verifying" || !selected.size}
               onClick={verifySelected}
               type="button"
@@ -351,7 +351,7 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
             </button>
             {selectable.length ? (
               <button
-                className="text-sm font-semibold text-pine dark:text-moss underline-offset-4 hover:underline"
+                className="text-sm font-semibold text-pine underline-offset-4 hover:underline"
                 onClick={() => setSelected(new Set(selectable.map((attendee) => attendee.userId)))}
                 type="button"
               >
@@ -361,11 +361,11 @@ function AttendeesPanel({ hackathonId }: { hackathonId: string }) {
           </div>
         </>
       ) : status !== "error" ? (
-        <p className="mt-4 text-sm text-ink/55 dark:text-paper/55">No attendees yet.</p>
+        <p className="mt-4 text-sm text-ink/55">No attendees yet.</p>
       ) : null}
 
       {message ? (
-        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>{message}</p>
+        <p className={`mt-3 text-sm font-semibold ${status === "error" ? "text-danger" : "text-pine"}`}>{message}</p>
       ) : null}
     </section>
   );
@@ -449,20 +449,20 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
         type="button"
       >
         <span>
-          <span className="block text-lg font-semibold text-ink dark:text-paper">{item.name}</span>
-          <span className="mt-0.5 block text-sm text-ink/55 dark:text-paper/55">
+          <span className="block text-lg font-semibold text-ink">{item.name}</span>
+          <span className="mt-0.5 block text-sm text-ink/55">
             {formatDateRange(item.startsAt, item.endsAt)} · <span className="capitalize">{item.status}</span>
           </span>
         </span>
         {open ? (
-          <ChevronUp aria-hidden="true" className="size-5 text-ink/55 dark:text-paper/55" />
+          <ChevronUp aria-hidden="true" className="size-5 text-ink/55" />
         ) : (
-          <ChevronDown aria-hidden="true" className="size-5 text-ink/55 dark:text-paper/55" />
+          <ChevronDown aria-hidden="true" className="size-5 text-ink/55" />
         )}
       </button>
 
       {open ? (
-        <div className="space-y-5 border-t border-ink/10 dark:border-white/10 p-5">
+        <div className="space-y-5 border-t border-ink/10 p-5">
           <div className="grid gap-5 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.1fr)]">
             <div className="xl:sticky xl:top-6 xl:self-start">
               <HackathonCard
@@ -651,7 +651,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
                     className={inputClassName}
                   />
                 </div>
-                <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
+                <label className="flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-sm font-semibold text-ink">
                   <input
                     className={checkboxClassName}
                     defaultChecked={item.beginnerFriendly}
@@ -660,7 +660,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
                   />
                   Beginner friendly
                 </label>
-                <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
+                <label className="flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-sm font-semibold text-ink">
                   <input
                     className={checkboxClassName}
                     defaultChecked={item.travelReimbursement}
@@ -669,7 +669,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
                   />
                   Travel support
                 </label>
-                <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
+                <label className="flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-sm font-semibold text-ink">
                   <input
                     className={checkboxClassName}
                     defaultChecked={item.highSchoolersOnly}
@@ -682,14 +682,14 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <button
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
                   disabled={status === "saving"}
                   type="submit"
                 >
                   {status === "saving" ? "Saving..." : "Save changes"}
                 </button>
                 {message ? (
-                  <p className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>
+                  <p className={`text-sm font-semibold ${status === "error" ? "text-danger" : "text-pine"}`}>
                     {message}
                   </p>
                 ) : null}
@@ -722,9 +722,9 @@ export function OrganizerHackathonManager({
 
   if (!current.length && !past.length) {
     return (
-      <p className="rounded-xl p-6 text-sm leading-6 text-ink/55 dark:text-paper/55">
+      <p className="rounded-xl p-6 text-sm leading-6 text-ink/55">
         No hackathons are linked to your organizer account yet. Submit your hackathon from the{" "}
-        <a className="font-semibold text-pine dark:text-moss underline-offset-4 hover:underline" href="/submit">
+        <a className="font-semibold text-pine underline-offset-4 hover:underline" href="/submit">
           submit page
         </a>{" "}
         and it will show up here once approved.
@@ -763,7 +763,7 @@ export function OrganizerHackathonManager({
       ) : null}
 
       {normalizedQuery && !filteredCurrent.length && !filteredPast.length ? (
-        <p className="rounded-xl p-6 text-sm text-ink/55 dark:text-paper/55">
+        <p className="rounded-xl p-6 text-sm text-ink/55">
           No hackathons match &ldquo;{query}&rdquo;.
         </p>
       ) : null}

@@ -170,8 +170,8 @@ export function HackathonVoteControl({
     const active = state.viewerVote === value;
     const Icon = value === 1 ? ArrowBigUp : ArrowBigDown;
     const verb = value === 1 ? "Upvote" : "Downvote";
-    const activeColor = value === 1 ? "text-ember" : "text-[#5A6CFF]";
-    const hoverColor = value === 1 ? "hover:text-ember" : "hover:text-[#5A6CFF]";
+    const activeColor = value === 1 ? "text-ember" : "text-[#5A6CFF] dark:text-[#8f9bff]";
+    const hoverColor = value === 1 ? "hover:text-ember" : "hover:text-[#5A6CFF] dark:hover:text-[#8f9bff]";
 
     return (
       <button
@@ -209,7 +209,7 @@ export function HackathonVoteControl({
       <span
         aria-live="polite"
         className={`text-center font-sans font-semibold tabular-nums tracking-[-0.01em] ${styles.score} ${
-          state.viewerVote === 1 ? "text-ember" : state.viewerVote === -1 ? "text-[#5A6CFF]" : "text-ink"
+          state.viewerVote === 1 ? "text-ember" : state.viewerVote === -1 ? "text-[#5A6CFF] dark:text-[#8f9bff]" : "text-ink"
         }`}
         title={tally}
       >

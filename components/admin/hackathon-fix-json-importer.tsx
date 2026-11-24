@@ -170,13 +170,13 @@ export function HackathonFixJsonImporter({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Fix queue import</p>
-          <h2 className="mt-2 text-2xl font-semibold text-ink dark:text-paper">Broken scraped JSON</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/55 dark:text-paper/55">
+          <h2 className="mt-2 text-2xl font-semibold text-ink">Broken scraped JSON</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/55">
             Import records with `source`, `reason`, `sourceUrl`, and `raw`. Each item becomes a pending review card with editable fields and the fix reason attached. Items that clearly match an existing hackathon merge into it automatically instead of queueing.
           </p>
         </div>
         <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine hover:bg-pine/90 px-4 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine hover:bg-pine/90 px-4 text-sm font-semibold text-paper disabled:opacity-50"
           disabled={status === "submitting" || !jsonText.trim()}
           type="submit"
         >
@@ -187,7 +187,7 @@ export function HackathonFixJsonImporter({
 
       <textarea
         aria-label="Broken hackathon JSON"
-        className="min-h-72 w-full rounded-xl border border-ink/15 dark:border-white/15 bg-paper dark:bg-white/5 p-4 font-mono text-xs leading-5 text-ink dark:text-paper outline-none focus:border-pine focus:ring-2 focus:ring-pine/15"
+        className="min-h-72 w-full rounded-xl border border-ink/15 bg-paper p-4 font-mono text-xs leading-5 text-ink outline-none focus:border-pine focus:ring-2 focus:ring-pine/15"
         onChange={(event) => setJsonText(event.target.value)}
         placeholder={sampleFixJson}
         spellCheck={false}
@@ -195,18 +195,18 @@ export function HackathonFixJsonImporter({
       />
 
       {preview.length ? (
-        <div className="overflow-hidden rounded-xl border border-ink/10 dark:border-white/10">
-          <div className="grid grid-cols-[1fr_0.75fr_0.9fr] gap-3 border-b border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55">
+        <div className="overflow-hidden rounded-xl border border-ink/10">
+          <div className="grid grid-cols-[1fr_0.75fr_0.9fr] gap-3 border-b border-ink/10 bg-paper px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55">
             <span>Prepopulated event</span>
             <span>Source</span>
             <span>Reason</span>
           </div>
-          <div className="divide-y divide-ink/10 dark:divide-white/10 bg-white dark:bg-white/[0.06]">
+          <div className="divide-y divide-ink/10 bg-surface">
             {preview.map((item, index) => (
               <div className="grid grid-cols-[1fr_0.75fr_0.9fr] gap-3 px-4 py-3 text-sm" key={`${item.sourceUrl}-${index}`}>
-                <span className="font-semibold text-ink dark:text-paper">{item.name}</span>
-                <span className="truncate text-ink/55 dark:text-paper/55">{item.source}</span>
-                <span className="text-[#B54708]">{item.reason}</span>
+                <span className="font-semibold text-ink">{item.name}</span>
+                <span className="truncate text-ink/55">{item.source}</span>
+                <span className="text-warning">{item.reason}</span>
               </div>
             ))}
           </div>
@@ -217,8 +217,8 @@ export function HackathonFixJsonImporter({
         <div
           className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
             status === "error"
-              ? "border-[#B42318]/30 bg-[#FEF3F2] text-[#B42318]"
-              : "border-[#362519]/25 bg-[#EDE5DD] text-[#362519]"
+              ? "border-danger/30 bg-danger-soft text-danger"
+              : "border-pine/25 bg-pine-soft text-pine"
           }`}
         >
           {status === "error" ? (
@@ -231,24 +231,24 @@ export function HackathonFixJsonImporter({
       ) : null}
 
       {results.length ? (
-        <div className="overflow-hidden rounded-xl border border-ink/10 dark:border-white/10">
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-3 border-b border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55">
+        <div className="overflow-hidden rounded-xl border border-ink/10">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-3 border-b border-ink/10 bg-paper px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55">
             <span>Queued item</span>
             <span>Duplicate</span>
             <span>Reason</span>
           </div>
-          <div className="divide-y divide-ink/10 dark:divide-white/10 bg-white dark:bg-white/[0.06]">
+          <div className="divide-y divide-ink/10 bg-surface">
             {results.map((result) => (
               <div className="grid grid-cols-[1fr_auto_1fr] gap-3 px-4 py-3 text-sm" key={result.submissionId}>
-                <span className="font-semibold text-ink dark:text-paper">{result.name}</span>
-                <span className="text-ink/55 dark:text-paper/55">{result.duplicateScore.toFixed(2)}</span>
+                <span className="font-semibold text-ink">{result.name}</span>
+                <span className="text-ink/55">{result.duplicateScore.toFixed(2)}</span>
                 {result.status === "auto_merged" ? (
-                  <span className="inline-flex items-start gap-2 text-[#362519]">
+                  <span className="inline-flex items-start gap-2 text-pine">
                     <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                     Merged into {result.matchedName ?? "an existing hackathon"}
                   </span>
                 ) : (
-                  <span className="inline-flex items-start gap-2 text-[#B54708]">
+                  <span className="inline-flex items-start gap-2 text-warning">
                     <FileWarning aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                     {result.reason}
                   </span>

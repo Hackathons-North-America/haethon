@@ -57,10 +57,10 @@ export default async function AccountPage() {
           <div className="min-w-0 space-y-10">
             <ProfilePinnedSection
               empty={
-                <p className="text-sm text-ink/55 dark:text-paper/55">
+                <p className="text-sm text-ink/55">
                   Pin wins and attended events from{" "}
                   <Link
-                    className="font-semibold text-pine dark:text-moss underline decoration-1 underline-offset-4 hover:no-underline"
+                    className="font-semibold text-pine underline decoration-1 underline-offset-4 hover:no-underline"
                     href="/my"
                   >
                     My hackathons

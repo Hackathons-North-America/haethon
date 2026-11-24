@@ -45,18 +45,18 @@ export function PastHackathonCard({
   const attended = status === "attended";
 
   return (
-    <article className="group rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 p-5">
+    <article className="group rounded-xl border border-ink/10 bg-paper p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link
-            className="text-lg font-semibold text-ink dark:text-paper underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
+            className="text-lg font-semibold text-ink underline-offset-4 hover:text-pine hover:underline"
             href={`/hackathons/${slug}`}
             replace={panelOpen}
             scroll={false}
           >
             {hackathonName}
           </Link>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink/55 dark:text-paper/55">
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink/55">
             <span className="inline-flex items-center gap-1">
               <CalendarDays aria-hidden="true" className="size-3.5 shrink-0" />
               {dateRange}
@@ -69,17 +69,17 @@ export function PastHackathonCard({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {won ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-pine px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pine px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-paper">
               <Trophy aria-hidden="true" className="size-3.5" />
               Winner
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/55 dark:text-paper/55">
+            <span className="inline-flex items-center rounded-full border border-ink/10 bg-surface px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/55">
               {attended ? "Attended" : "Ended"}
             </span>
           )}
           {isPinned ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-pine/25 bg-white dark:bg-white/[0.06] px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-pine dark:text-moss">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-pine/25 bg-surface px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-pine">
               <Pin aria-hidden="true" className="size-3.5 fill-current" />
               Pinned
             </span>
@@ -96,14 +96,14 @@ export function PastHackathonCard({
       {(won && awardName) || devpostUrl ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
           {won && awardName ? (
-            <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-pine dark:text-moss">
+            <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-pine">
               <Trophy aria-hidden="true" className="size-3.5 shrink-0" />
               {awardName}
             </p>
           ) : null}
           {devpostUrl ? (
             <a
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-ink dark:text-paper underline-offset-4 hover:text-pine dark:hover:text-moss hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-ink underline-offset-4 hover:text-pine hover:underline"
               href={devpostUrl}
               rel="noreferrer"
               target="_blank"
@@ -115,7 +115,7 @@ export function PastHackathonCard({
         </div>
       ) : null}
 
-      <div className="mt-4 border-t border-ink/10 dark:border-white/10 pt-4">
+      <div className="mt-4 border-t border-ink/10 pt-4">
         {won || attended ? (
           <HackathonResultActions
             awardName={awardName}

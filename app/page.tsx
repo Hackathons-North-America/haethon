@@ -20,7 +20,7 @@ export default function Home() {
   // Signed-in visitors are redirected into the app by the proxy, keeping this
   // page fully static.
   return (
-    <main className="min-h-screen overflow-x-clip bg-white text-black">
+    <main className="min-h-screen overflow-x-clip bg-surface text-ink">
       {/* The sky's height is chosen so the dome's peak crosses the toolbox
           about 39% of the way down, like a horizon behind it. It is the sum of
           the fixed heights above that point: nav (82) + section padding +
@@ -61,7 +61,7 @@ export default function Home() {
           </p>
 
           <Link
-            className="mt-[34px] inline-flex h-[60px] items-center rounded-full bg-black px-[26px] text-[20px] font-medium text-white transition-colors hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            className="mt-[34px] inline-flex h-[60px] items-center rounded-full bg-ink px-[26px] text-[20px] font-medium text-surface transition-colors hover:bg-ink/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             href="/hackathons"
           >
             Browse hackathons

@@ -102,9 +102,9 @@ export function submissionReviewIntent(submitter: EventTarget | null) {
 }
 
 const inputClassName =
-  "w-full rounded-xl border border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] px-3 py-2 text-sm text-ink dark:text-paper outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
-const checkboxClassName = "size-4 rounded border-ink/20 dark:border-white/20 text-pine dark:text-moss focus:ring-pine/20";
-const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55";
+  "w-full rounded-xl border border-ink/15 bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-pine focus:ring-2 focus:ring-pine/15";
+const checkboxClassName = "size-4 rounded border-ink/20 text-pine focus:ring-pine/20";
+const labelClassName = "mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-ink/55";
 
 function initialPreviewPayload(submission: SubmissionReviewItem) {
   return {
@@ -239,39 +239,39 @@ export function SubmissionReviewCard({
   }
 
   return (
-    <article className="rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-5">
+    <article className="rounded-xl border border-ink/10 bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-xl font-semibold text-ink dark:text-paper">{submission.normalizedName}</h3>
-            <span className="rounded-full bg-paper dark:bg-white/5 px-2.5 py-1 text-xs font-semibold capitalize text-pine dark:text-moss">
+            <h3 className="text-xl font-semibold text-ink">{submission.normalizedName}</h3>
+            <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold capitalize text-pine">
               {submission.submitterType}
             </span>
-            <span className="rounded-full bg-paper dark:bg-white/5 px-2.5 py-1 text-xs font-semibold capitalize text-ink/55 dark:text-paper/55">
+            <span className="rounded-full bg-paper px-2.5 py-1 text-xs font-semibold capitalize text-ink/55">
               {submission.status}
             </span>
           </div>
-          <p className="mt-1 text-sm text-ink/55 dark:text-paper/55">
+          <p className="mt-1 text-sm text-ink/55">
             {submission.submitterEmail ?? "Unknown submitter"} · {submission.organizationName ?? value(submission.payload, "organizationName", "No organization")}
           </p>
         </div>
-        <div className="text-right text-sm text-ink/55 dark:text-paper/55">
+        <div className="text-right text-sm text-ink/55">
           <p>Duplicate score</p>
-          <p className="text-lg font-semibold text-ink dark:text-paper">{submission.duplicateScore ?? "0.00"}</p>
+          <p className="text-lg font-semibold text-ink">{submission.duplicateScore ?? "0.00"}</p>
         </div>
       </div>
 
       <form onSubmit={submitReview} className="mt-5 space-y-5">
         {fixReason ? (
-          <div className="rounded-xl border border-[#B54708]/25 bg-[#FFFAEB] p-4 text-sm leading-6 text-[#704600]">
-            <p className="font-semibold text-[#B54708]">Needs fix</p>
+          <div className="rounded-xl border border-warning/25 bg-warning-soft p-4 text-sm leading-6 text-warning-ink">
+            <p className="font-semibold text-warning">Needs fix</p>
             <p className="mt-1">{fixReason}</p>
           </div>
         ) : null}
 
         {hasDuplicate ? (
-          <div className="rounded-xl border border-[#B54708]/30 bg-[#FFFAEB] p-4 text-sm leading-6 text-[#704600]">
-            <p className="flex items-center gap-2 font-semibold text-[#B54708]">
+          <div className="rounded-xl border border-warning/30 bg-warning-soft p-4 text-sm leading-6 text-warning-ink">
+            <p className="flex items-center gap-2 font-semibold text-warning">
               <AlertTriangle aria-hidden="true" className="size-4" />
               Possible duplicate · score {submission.duplicateScore ?? "0.00"}
             </p>
@@ -279,7 +279,7 @@ export function SubmissionReviewCard({
               Looks like{" "}
               {submission.matchedHackathonSlug ? (
                 <a
-                  className="font-semibold text-[#B54708] underline"
+                  className="font-semibold text-warning underline"
                   href={`/hackathons/${submission.matchedHackathonSlug}`}
                   rel="noreferrer noopener"
                   target="_blank"
@@ -477,7 +477,7 @@ export function SubmissionReviewCard({
               className={inputClassName}
             />
           </div>
-          <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
+          <label className="flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-sm font-semibold text-ink">
             <input
               className={checkboxClassName}
               defaultChecked={value(submission.payload, "beginnerFriendly") === "true" || submission.payload.beginnerFriendly === true}
@@ -486,7 +486,7 @@ export function SubmissionReviewCard({
             />
             Beginner friendly
           </label>
-          <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
+          <label className="flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-sm font-semibold text-ink">
             <input
               className={checkboxClassName}
               defaultChecked={value(submission.payload, "travelReimbursement") === "true" || submission.payload.travelReimbursement === true}
@@ -495,7 +495,7 @@ export function SubmissionReviewCard({
             />
             Travel support
           </label>
-          <label className="flex items-center gap-2 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2 text-sm font-semibold text-ink dark:text-paper">
+          <label className="flex items-center gap-2 rounded-xl border border-ink/10 bg-paper px-3 py-2 text-sm font-semibold text-ink">
             <input
               className={checkboxClassName}
               defaultChecked={
@@ -523,9 +523,9 @@ export function SubmissionReviewCard({
           </div>
         </div>
 
-        <details className="rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-ink dark:text-paper">Raw submission payload</summary>
-          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-ink/70 dark:text-paper/70">
+        <details className="rounded-xl border border-ink/10 bg-paper p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-ink">Raw submission payload</summary>
+          <pre className="mt-3 overflow-x-auto whitespace-pre-wrap text-xs text-ink/70">
             {JSON.stringify(submission.payload, null, 2)}
           </pre>
         </details>
@@ -537,8 +537,8 @@ export function SubmissionReviewCard({
             aria-pressed={recurring}
             className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold disabled:opacity-50 ${
               recurring
-                ? "border-pine bg-pine text-paper dark:border-paper dark:bg-paper dark:text-[#141414]"
-                : "border-ink/20 dark:border-white/20 text-ink/70 dark:text-paper/70"
+                ? "border-pine bg-pine text-paper"
+                : "border-ink/20 text-ink/70"
             }`}
             disabled={disabled}
             onClick={() => setRecurring((current) => !current)}
@@ -551,7 +551,7 @@ export function SubmissionReviewCard({
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
             disabled={disabled}
             name="intent"
             type="submit"
@@ -561,7 +561,7 @@ export function SubmissionReviewCard({
             Approve new
           </button>
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine hover:bg-pine/90 px-4 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine hover:bg-pine/90 px-4 text-sm font-semibold text-paper disabled:opacity-50"
             disabled={disabled}
             name="intent"
             type="submit"
@@ -572,7 +572,7 @@ export function SubmissionReviewCard({
           </button>
           {hasDuplicate && allowDeleteExisting ? (
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#B54708] hover:bg-[#8a3606] px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-warning hover:bg-warning/85 px-4 text-sm font-semibold text-paper disabled:opacity-50"
               disabled={disabled}
               name="intent"
               type="submit"
@@ -583,7 +583,7 @@ export function SubmissionReviewCard({
             </button>
           ) : null}
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
             disabled={disabled}
             name="intent"
             type="submit"
@@ -593,7 +593,7 @@ export function SubmissionReviewCard({
             Reject
           </button>
           {message ? (
-            <p aria-live="polite" className={`text-sm font-semibold ${status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}>
+            <p aria-live="polite" className={`text-sm font-semibold ${status === "error" ? "text-danger" : "text-pine"}`}>
               {message}
             </p>
           ) : null}

@@ -48,11 +48,19 @@ function getInitials(name: string) {
 function getStatusPill(status: string) {
   switch (status) {
     case "live":
-      return { label: "Live now", dot: "#362519", bg: "#EDE5DD", text: "#362519" };
+      return { label: "Live now", dot: "bg-pine", pill: "bg-pine-soft text-pine" };
     case "completed":
-      return { label: "Completed", dot: "#838a98", bg: "#f4f4f6", text: "#616a7c" };
+      return {
+        label: "Completed",
+        dot: "bg-[#838a98] dark:bg-[#9ca3af]",
+        pill: "bg-[#f4f4f6] text-[#616a7c] dark:bg-ink/[0.08] dark:text-ink/60",
+      };
     default:
-      return { label: "Upcoming", dot: "#B7791F", bg: "#FBF3E4", text: "#8A5A00" };
+      return {
+        label: "Upcoming",
+        dot: "bg-[#B7791F] dark:bg-warning",
+        pill: "bg-[#FBF3E4] text-[#8A5A00] dark:bg-warning-soft dark:text-warning-ink",
+      };
   }
 }
 
@@ -210,11 +218,8 @@ export function HackathonDetailView({
           </Property>
 
           <Property icon={CircleDot} label="Status" labelWidthClassName={labelWidthClassName}>
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-sm font-medium"
-              style={{ backgroundColor: statusPill.bg, color: statusPill.text }}
-            >
-              <span aria-hidden="true" className="size-1.5 rounded-full" style={{ backgroundColor: statusPill.dot }} />
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-sm font-medium ${statusPill.pill}`}>
+              <span aria-hidden="true" className={`size-1.5 rounded-full ${statusPill.dot}`} />
               {statusPill.label}
             </span>
           </Property>

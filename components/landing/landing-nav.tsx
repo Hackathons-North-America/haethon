@@ -25,7 +25,7 @@ const products: MenuItem[] = [
 ];
 
 const navText =
-  "flex h-10 items-center text-[17px] font-medium text-black focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black";
+  "flex h-10 items-center text-[17px] font-medium text-ink focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink";
 
 /* The Products trigger opens on hover for mouse users and toggles on
    click/tap for everyone; Escape or a click outside closes it. */
@@ -107,16 +107,16 @@ function ProductsMenu() {
       {/* The pt-2 gap is part of the panel's hit area, so the pointer can
           travel from the trigger into the panel without closing it. */}
       <div className={`absolute left-[-1rem] top-full z-50 pt-2 ${open ? "block" : "hidden"}`} id={panelId}>
-        <div className="w-80 rounded-2xl border border-black/[0.06] bg-white p-2 shadow-[0_24px_48px_-16px_rgba(0,0,0,0.25)]">
+        <div className="w-80 rounded-2xl border border-ink/[0.06] bg-surface p-2 shadow-[0_24px_48px_-16px_rgba(0,0,0,0.25)]">
           {products.map((item) => (
             <Link
-              className="block rounded-xl px-4 py-3 text-left transition-colors hover:bg-black/[0.04] focus-visible:bg-black/[0.04] focus-visible:outline-none"
+              className="block rounded-xl px-4 py-3 text-left transition-colors hover:bg-ink/[0.04] focus-visible:bg-ink/[0.04] focus-visible:outline-none"
               href={item.href}
               key={item.label}
               onClick={() => setOpen(false)}
             >
-              <span className="block text-[15px] font-medium text-black">{item.label}</span>
-              <span className="mt-0.5 block text-[13px] leading-snug text-black/55">{item.description}</span>
+              <span className="block text-[15px] font-medium text-ink">{item.label}</span>
+              <span className="mt-0.5 block text-[13px] leading-snug text-ink/55">{item.description}</span>
             </Link>
           ))}
         </div>
@@ -139,7 +139,7 @@ export function LandingNav() {
           {/* "?home" opts out of the proxy's signed-in redirect to /hackathons,
               so the logo always lands on the marketing homepage from here. */}
           <Link
-            className="flex items-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
+            className="flex items-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink"
             href="/?home"
           >
             <BrandLogo />
@@ -161,7 +161,7 @@ export function LandingNav() {
               shrinks to the icon alone. */}
           <a
             aria-label="Join our Discord"
-            className="inline-flex size-10 items-center justify-center gap-2 rounded-full text-[17px] font-medium text-black transition-colors hover:bg-black/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black md:w-auto md:px-[15px]"
+            className="inline-flex size-10 items-center justify-center gap-2 rounded-full text-[17px] font-medium text-ink transition-colors hover:bg-ink/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:w-auto md:px-[15px]"
             href={DISCORD_INVITE_URL}
             rel="noopener noreferrer"
             target="_blank"
@@ -174,14 +174,14 @@ export function LandingNav() {
               hidden, so signed-in users never see it flash. */}
           {isSignedIn === false ? (
             <Link
-              className="hidden h-10 items-center rounded-full border border-black px-[15px] text-[17px] font-medium text-black transition-colors hover:bg-black/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black sm:inline-flex"
+              className="hidden h-10 items-center rounded-full border border-ink px-[15px] text-[17px] font-medium text-ink transition-colors hover:bg-ink/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink sm:inline-flex"
               href="/sign-in"
             >
               Sign in
             </Link>
           ) : null}
           <Link
-            className="inline-flex h-10 items-center rounded-full bg-black px-[15px] text-[17px] font-medium text-white transition-colors hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            className="inline-flex h-10 items-center rounded-full bg-ink px-[15px] text-[17px] font-medium text-surface transition-colors hover:bg-ink/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             href="/hackathons"
           >
             Go to app

@@ -4,17 +4,7 @@ import { UserProfile } from "@clerk/nextjs";
 import { LogOut } from "lucide-react";
 
 import { AccountSignOutButton } from "@/components/account-sign-out-button";
-
-const lightVariables = {
-  colorBackground: "#fbf7f0",
-  colorInput: "#fbf7f0",
-  colorForeground: "#1b1917",
-  colorMutedForeground: "rgba(27, 25, 23, 0.55)",
-  colorPrimary: "#362519",
-  colorPrimaryForeground: "#fbf7f0",
-  colorBorder: "rgba(27, 25, 23, 0.15)",
-  borderRadius: "0px",
-};
+import { clerkThemeVariables } from "@/lib/clerk-appearance";
 
 export function ThemedUserProfile() {
   return (
@@ -22,7 +12,7 @@ export function ThemedUserProfile() {
       path="/account/settings"
       routing="path"
       appearance={{
-        variables: lightVariables,
+        variables: clerkThemeVariables,
         elements: {
           rootBox: "w-full max-w-5xl",
           cardBox: "w-full bg-paper shadow-none",

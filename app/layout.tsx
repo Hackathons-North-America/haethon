@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { AppProviders } from "@/components/providers/app-providers";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const geist = Geist({
@@ -29,9 +30,14 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geist.variable} ${geistMono.variable} h-full bg-paper`}
-      style={{ colorScheme: "light" }}
       suppressHydrationWarning
     >
+      <head>
+        {/* Applies a saved theme choice before first paint so the page never
+            flashes the wrong theme. Without a saved choice it does nothing
+            and the CSS follows the OS setting. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body
         className="min-h-full bg-paper font-sans text-ink antialiased selection:bg-pine/25 selection:text-ink motion-safe:[&_*]:transition-[color,border-color,background-color,opacity] motion-safe:[&_*]:duration-[160ms] motion-safe:[&_*]:ease-out"
       >

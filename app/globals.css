@@ -1,19 +1,103 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
+/* Light/dark theme. Every palette token below is a `light-dark()` pair, so the
+   page follows `color-scheme`: by default the visitor's OS setting, or the
+   explicit choice the theme toggle stores in the `theme` cookie (applied as
+   `data-theme` on <html> by the inline script in app/layout.tsx before first
+   paint). Because the tokens themselves flip, utilities like `bg-paper` and
+   `text-ink` need no `dark:` twin; reach for the `dark:` variant only for
+   one-off colors that are not tokens. */
+:root {
+  color-scheme: light dark;
+}
 
-@theme inline {
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+:root {
   /* Paper-and-ink palette: warm cream ground, near-black warm ink, espresso
      accents. Pine and moss keep their names for continuity but now carry an
      espresso brown and a lighter tone from the same family. There is no red
-     accent left in the system — destructive actions use the pine brown. */
-  --color-paper: #fbf7f0;
-  --color-ink: #1b1917;
-  --color-pine: #362519;
-  --color-moss: #6b4a30;
+     accent left in the system — destructive actions use the pine brown.
+
+     Dark mode inverts it onto a neutral near-black: paper becomes the deep
+     ground and ink the off-white text, while pine and moss lighten to a tan
+     so `bg-pine text-paper` buttons and `text-pine` links keep their
+     contrast. The warmth lives in the accents and the espresso watercolor
+     band (--watercolor-filter), not in the grounds. */
+  --paper: light-dark(#fbf7f0, #0f0f10);
+  --ink: light-dark(#1b1917, #f4f4f5);
+  --pine: light-dark(#362519, #dcb994);
+  --moss: light-dark(#6b4a30, #b48e69);
+  --ember: light-dark(#e4572e, #f07a52);
+
+  /* Raised surfaces (cards, menus, inputs, dialogs): white on the cream
+     ground, a step lighter than the ground in dark mode. */
+  --surface: light-dark(#ffffff, #18181b);
+  /* A pale pine wash for "live"/success pills and notices. */
+  --pine-soft: light-dark(#ede5dd, #2a2622);
+
+  /* Status colors for errors, warnings, and confirmations. */
+  --danger: light-dark(#b42318, #f97066);
+  --danger-soft: light-dark(#fef3f2, #2c1514);
+  --warning: light-dark(#b54708, #fdb022);
+  --warning-soft: light-dark(#fffaeb, #2a210c);
+  --warning-ink: light-dark(#704600, #fec84b);
+  --success: light-dark(#137a4c, #47cd89);
+
+  /* Muted text and hairline borders as plain variables, for consumers that
+     can't use Tailwind's opacity modifiers (Clerk's appearance variables). */
+  --ink-muted: color-mix(in oklab, var(--ink) 55%, transparent);
+  --ink-hairline: color-mix(in oklab, var(--ink) 15%, transparent);
+
+  /* Darkens the beige watercolor backdrop into a warm espresso wash in dark
+     mode, so the header band stays brown above the neutral ground. */
+  --watercolor-filter: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --watercolor-filter: brightness(0.24) saturate(1.1);
+  }
+}
+
+:root[data-theme="dark"] {
+  --watercolor-filter: brightness(0.24) saturate(1.1);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-pine: var(--pine);
+  --color-moss: var(--moss);
+  --color-surface: var(--surface);
+  --color-pine-soft: var(--pine-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-success: var(--success);
 
   /* Warm accent token. */
-  --color-ember: #e4572e;
+  --color-ember: var(--ember);
 
   --font-sans: var(--font-geist);
   --font-serif: var(--font-geist);
