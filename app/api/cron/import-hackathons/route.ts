@@ -1,11 +1,15 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { env } from "@/lib/env";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
 import { findScraperImportReviewerId, hasScraperSecret } from "@/lib/hackathons/scraper-import";
 import { adminHackathonImportSchema } from "@/lib/validations/hackathon";
 
+/* Also covers the work deferred with after(): vetting images and draining the
+   Discord channel queue. Without it that work ran inside the request, one
+   channel at a time, and a batch of auto-approved rows could pass the limit. */
 export const maxDuration = 60;
 
 /**
@@ -54,7 +58,16 @@ export async function POST(request: Request) {
       payloads: parsed.data.hackathons,
       reviewerUserId,
       ignoreDuplicates: false,
+      // As in the admin import: validation, duplicate checks and the writes
+      // are done before the response; image vetting and Discord run after it.
+      // Channel jobs that do not finish there are picked up by the next
+      // import or the daily sync-discord cron.
+      defer: after,
     });
+
+    // The writes are committed; drop the prerendered catalog now rather than
+    // waiting for the deferred work.
+    revalidateHackathonCaches();
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
