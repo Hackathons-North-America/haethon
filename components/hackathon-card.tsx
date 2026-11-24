@@ -472,8 +472,12 @@ function CardActionUnderline() {
   );
 }
 
+/* Just the arrow at rest. On hover/focus the "More info" label slides out
+   leftward from behind the arrow: the label's grid column animates 0fr -> 1fr
+   while the text eases in from the right. The link sits at the right end of
+   the footer, so the arrow stays put and the row grows to its left. */
 const cardFooterLinkClassName =
-  `relative z-20 inline-flex min-h-8 items-center gap-1 text-ink/70 underline-offset-[3px] transition-colors hover:text-pine hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${cardLabelClassName}`;
+  `group/more relative z-20 inline-flex min-h-8 items-center rounded-full text-ink/70 transition-colors hover:text-pine focus-visible:text-pine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${cardLabelClassName}`;
 
 /* Route to our detail page, on the right of the footer under the rule. Inside
    the app the navigation is intercepted and opens the side panel over the
@@ -487,8 +491,17 @@ function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData
 
   const label = (
     <>
-      More info
-      <ArrowUpRight aria-hidden="true" className="size-3" />
+      <span className="grid grid-cols-[0fr] transition-[grid-template-columns] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/more:grid-cols-[1fr] group-focus-visible/more:grid-cols-[1fr] motion-reduce:transition-none">
+        <span className="overflow-hidden">
+          <span className="block translate-x-3 whitespace-nowrap pr-1 underline decoration-transparent underline-offset-[3px] opacity-0 transition-[translate,opacity,text-decoration-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/more:translate-x-0 group-hover/more:decoration-current group-hover/more:opacity-100 group-focus-visible/more:translate-x-0 group-focus-visible/more:opacity-100 motion-reduce:transition-none">
+            More info
+          </span>
+        </span>
+      </span>
+      {/* Matches the vote arrows' 28px hit box and 18px glyph, one stroke heavier. */}
+      <span className="grid size-7 shrink-0 place-items-center">
+        <ArrowUpRight aria-hidden="true" className="size-[18px]" strokeWidth={2.5} />
+      </span>
     </>
   );
 
@@ -504,6 +517,7 @@ function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData
       // closing it always goes straight back to the list.
       replace={panelOpen}
       scroll={false}
+      aria-label={`More info about ${hackathon.name}`}
       title={`View ${hackathon.name} details`}
     >
       {label}
