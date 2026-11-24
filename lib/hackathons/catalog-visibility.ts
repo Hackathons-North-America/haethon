@@ -21,17 +21,20 @@ export function isPastCatalogRow(row: Pick<CatalogVisibilityRow, "startsAt" | "e
   return reference !== null && reference.getTime() < now.getTime();
 }
 
-/* Series ids that need the "does a current edition exist?" guard query. */
-export function pastRecurringSeriesIds(rows: CatalogVisibilityRow[], now: Date) {
+/* Series that already have a current edition listed: one whose end date is
+   still ahead. A dates-TBA row does not count, matching the rule that only a
+   dated edition retires the previous year's listing. `rows` must hold every
+   listed edition, not one filtered page of them. */
+export function seriesWithCurrentEdition(rows: Pick<CatalogVisibilityRow, "seriesId" | "endsAt">[], now: Date) {
   const seriesIds = new Set<string>();
 
   for (const row of rows) {
-    if (row.seriesId && row.isRecurring && isPastCatalogRow(row, now)) {
+    if (row.seriesId && row.endsAt !== null && row.endsAt.getTime() >= now.getTime()) {
       seriesIds.add(row.seriesId);
     }
   }
 
-  return [...seriesIds];
+  return seriesIds;
 }
 
 /**
