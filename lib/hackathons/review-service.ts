@@ -2,7 +2,11 @@ import { and, desc, eq, inArray, isNull, like, lt, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { previewHackathonDiscordChannel, syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
+import {
+  ensureHackathonDiscordChannel,
+  previewHackathonDiscordChannel,
+  syncHackathonDiscordChannelSafely,
+} from "@/lib/discord/sync";
 import {
   hackathonDates,
   hackathonExternalIds,
@@ -40,6 +44,7 @@ import {
 } from "@/lib/validations/hackathon";
 
 type DiscordChannelPreview = Awaited<ReturnType<typeof previewHackathonDiscordChannel>>;
+type AutoDiscordResult = Awaited<ReturnType<typeof ensureHackathonDiscordChannel>>;
 export type ReviewAction = z.infer<typeof reviewActionSchema>;
 export type AdminHackathonImportPayload = z.infer<typeof adminHackathonImportPayloadSchema>;
 export type AdminHackathonFixImportItem = z.infer<typeof adminHackathonFixImportItemSchema>;
@@ -839,7 +844,9 @@ export async function importAdminHackathons(input: {
   ignoreDuplicates?: boolean;
 }) {
   const results: Array<{
+    autoApprove?: boolean;
     discord?: DiscordChannelPreview;
+    discordSync?: AutoDiscordResult;
     duplicateScore: number;
     externalId?: string;
     hackathonId?: string;
@@ -894,6 +901,7 @@ export async function importAdminHackathons(input: {
 
       results.push({
         duplicateScore: 1,
+        autoApprove: rawPayload.autoApprove === true,
         externalId: rawPayload.externalId,
         hackathonId: linked.hackathonId,
         index,
@@ -947,6 +955,7 @@ export async function importAdminHackathons(input: {
 
         results.push({
           duplicateScore,
+          autoApprove: rawPayload.autoApprove === true,
           externalId: rawPayload.externalId,
           hackathonId: duplicate.id,
           index,
@@ -963,6 +972,7 @@ export async function importAdminHackathons(input: {
       // pending submission in the review queue — nothing is written until the admin decides.
       results.push({
         duplicateScore,
+        autoApprove: rawPayload.autoApprove === true,
         externalId: rawPayload.externalId,
         index,
         matchedHackathonId: duplicate.id,
@@ -1003,6 +1013,7 @@ export async function importAdminHackathons(input: {
 
     results.push({
       duplicateScore,
+      autoApprove: rawPayload.autoApprove === true,
       externalId: rawPayload.externalId,
       hackathonId,
       index,
@@ -1020,13 +1031,27 @@ export async function importAdminHackathons(input: {
     revalidateHackathonCaches();
   }
 
+  // Auto-approved rows skip the admin's channel decision: the channel is made
+  // or reused right away. One at a time, so two rows of one series cannot both
+  // try to claim the same existing channel. A row that landed on a hackathon
+  // already in the catalog keeps that hackathon's channel if it has one.
+  for (const result of results) {
+    if (result.autoApprove && result.hackathonId && result.status !== "duplicate_flagged") {
+      result.discordSync = await ensureHackathonDiscordChannel(result.hackathonId, {
+        keepExisting: result.status !== "imported",
+      });
+    }
+  }
+
+  const previewResults = importedResults.filter((result) => !result.autoApprove);
+
   // Discord previews are independent read operations. A small worker pool
   // removes the serial network waterfall without creating an unbounded burst.
   let nextPreviewIndex = 0;
   await Promise.all(
-    Array.from({ length: Math.min(4, importedResults.length) }, async () => {
-      while (nextPreviewIndex < importedResults.length) {
-        const result = importedResults[nextPreviewIndex++];
+    Array.from({ length: Math.min(4, previewResults.length) }, async () => {
+      while (nextPreviewIndex < previewResults.length) {
+        const result = previewResults[nextPreviewIndex++];
         result.discord = await previewHackathonDiscordChannel(result.hackathonId);
       }
     })

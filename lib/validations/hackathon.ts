@@ -230,6 +230,11 @@ export const adminHackathonImportPayloadSchema = normalizedHackathonPayloadBaseS
     // Provenance comes from the scraper/feed, not necessarily the event URL
     // (an MLH calendar entry may link to Devpost, for example).
     source: z.enum(HACKATHON_SOURCES).optional(),
+    // Set by the scraper when a trusted feed (MLH, Luma, Cerebral Valley)
+    // listed the event: the importer publishes it, and makes or reuses its
+    // Discord channel, without asking the admin. Missing (older scraper
+    // output) means false.
+    autoApprove: z.boolean().optional(),
   })
   .strip()
   .superRefine(dateRangeRefinement)
