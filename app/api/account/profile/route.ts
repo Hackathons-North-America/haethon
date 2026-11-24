@@ -2,7 +2,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
 import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
@@ -13,7 +13,7 @@ function stripUndefined<T extends Record<string, unknown>>(value: T) {
 }
 
 export async function PATCH(request: Request) {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -35,7 +35,7 @@ export async function PATCH(request: Request) {
 
     // Clerk's REST API accepts null to clear a name; its TS type only admits
     // strings, hence the cast.
-    await client.users.updateUser(context.user.clerkUserId, {
+    await client.users.updateUser(context.clerkUserId, {
       ...(firstName !== undefined ? { firstName: firstName ?? null } : {}),
       ...(lastName !== undefined ? { lastName: lastName ?? null } : {}),
     } as Parameters<typeof client.users.updateUser>[1]);
@@ -47,7 +47,7 @@ export async function PATCH(request: Request) {
         ...(lastName !== undefined ? { lastName } : {}),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, context.user.id));
+      .where(eq(users.id, context.userId));
   }
 
   const values = stripUndefined(profileData);
@@ -55,7 +55,7 @@ export async function PATCH(request: Request) {
   const [profile] = await db
     .insert(userProfiles)
     .values({
-      userId: context.user.id,
+      userId: context.userId,
       ...values,
     })
     .onConflictDoUpdate({

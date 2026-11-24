@@ -1,4 +1,4 @@
-import posthog from "posthog-js";
+import { captureAnalyticsEvent } from "@/lib/analytics/client";
 
 // Central definition of the custom events we send to PostHog. Keeping the names
 // and property shapes here (rather than sprinkling string literals across
@@ -24,9 +24,7 @@ export function trackEvent<Name extends keyof AnalyticsEvents>(
   name: Name,
   properties: AnalyticsEvents[Name]
 ) {
-  if (!posthog.__loaded) {
-    return;
-  }
-
-  posthog.capture(name, properties);
+  // Goes through the SDK-free handle so tracking an event never pulls
+  // posthog-js into the bundle of the component that tracks it.
+  captureAnalyticsEvent(name, properties);
 }

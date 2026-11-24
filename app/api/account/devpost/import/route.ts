@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { DevpostImportError, importDevpostItems } from "@/lib/devpost/import-service";
 import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
@@ -20,7 +20,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const rateLimit = await consumeRateLimit({
-    key: `devpost-import:${context.user.id}`,
+    key: `devpost-import:${context.userId}`,
     limit: MAX_IMPORTS,
     windowMs: IMPORT_WINDOW_MS,
   });
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
   try {
     const summary = await importDevpostItems({
-      userId: context.user.id,
+      userId: context.userId,
       batchId: parsed.data.batchId,
       itemIds: parsed.data.itemIds,
     });

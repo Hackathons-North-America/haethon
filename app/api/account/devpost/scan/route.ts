@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { DevpostImportError, scanDevpostProfile } from "@/lib/devpost/import-service";
 import { DevpostFetchError } from "@/lib/devpost/scrape";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
@@ -12,14 +12,14 @@ const MAX_SCANS = 4;
 const SCAN_WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST() {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
   const rateLimit = await consumeRateLimit({
-    key: `devpost-scan:${context.user.id}`,
+    key: `devpost-scan:${context.userId}`,
     limit: MAX_SCANS,
     windowMs: SCAN_WINDOW_MS,
   });
@@ -32,7 +32,7 @@ export async function POST() {
   }
 
   try {
-    return NextResponse.json({ data: await scanDevpostProfile(context.user.id) });
+    return NextResponse.json({ data: await scanDevpostProfile(context.userId) });
   } catch (error) {
     if (error instanceof DevpostImportError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

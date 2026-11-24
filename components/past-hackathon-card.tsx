@@ -8,6 +8,7 @@ import { HackathonResultActions } from "@/components/hackathon-result-actions";
 import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
+import { DETAIL_LINK_PREFETCH } from "@/lib/hackathons/detail-link";
 
 /* A finished hackathon in the My Hackathons "Past" list. Client-side so the
    trash button can drop the card from view once its tracking row is deleted. */
@@ -51,6 +52,7 @@ export function PastHackathonCard({
           <Link
             className="text-lg font-semibold text-ink underline-offset-4 hover:text-pine hover:underline"
             href={`/hackathons/${slug}`}
+            prefetch={DETAIL_LINK_PREFETCH}
             replace={panelOpen}
             scroll={false}
           >

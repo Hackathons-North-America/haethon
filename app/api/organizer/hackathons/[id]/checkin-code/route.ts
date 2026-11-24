@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext, isOrganizerRole } from "@/lib/auth";
+import { getCurrentIdentity, isOrganizerRole } from "@/lib/auth";
 import { canManageHackathon, getActiveCheckinCode, rotateCheckinCode } from "@/lib/hackathons/checkin-service";
 
 type RouteContext = {
@@ -8,7 +8,7 @@ type RouteContext = {
 };
 
 async function authorize(context: RouteContext) {
-  const userContext = await getCurrentUserContext();
+  const userContext = await getCurrentIdentity();
 
   if (!userContext) {
     return { error: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }) } as const;
@@ -20,7 +20,7 @@ async function authorize(context: RouteContext) {
 
   const { id } = await context.params;
 
-  if (!(await canManageHackathon({ userId: userContext.user.id, role: userContext.role, hackathonId: id }))) {
+  if (!(await canManageHackathon({ userId: userContext.userId, role: userContext.role, hackathonId: id }))) {
     return { error: NextResponse.json({ error: "You don't organize this hackathon." }, { status: 403 }) } as const;
   }
 
@@ -58,7 +58,7 @@ export async function POST(_request: Request, context: RouteContext) {
   try {
     const created = await rotateCheckinCode({
       hackathonId: auth.hackathonId,
-      createdByUserId: auth.userContext.user.id,
+      createdByUserId: auth.userContext.userId,
     });
 
     return NextResponse.json(

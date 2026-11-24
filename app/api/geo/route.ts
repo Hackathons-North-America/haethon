@@ -16,13 +16,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: null });
   }
 
-  return NextResponse.json({
-    data: {
-      latitude,
-      longitude,
-      // Vercel URI-encodes header values ("S%C3%A3o%20Paulo").
-      city: rawCity ? decodeURIComponent(rawCity) : null,
-      countryCode: countryCode ? countryCode.toUpperCase() : null,
+  return NextResponse.json(
+    {
+      data: {
+        latitude,
+        longitude,
+        // Vercel URI-encodes header values ("S%C3%A3o%20Paulo").
+        city: rawCity ? decodeURIComponent(rawCity) : null,
+        countryCode: countryCode ? countryCode.toUpperCase() : null,
+      },
     },
-  });
+    /* The answer depends only on the caller's IP, so their browser can keep
+       it: a returning visitor gets it from the HTTP cache instead of invoking
+       this function again. `private` keeps it out of the shared CDN cache,
+       where one visitor's city would be served to the next. A miss (no geo
+       headers) is deliberately left uncached. */
+    { headers: { "Cache-Control": "private, max-age=3600" } }
+  );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext, isOrganizerRole } from "@/lib/auth";
+import { getCurrentIdentity, isOrganizerRole } from "@/lib/auth";
 import { getApprovedOrganizationIdsForUser, reviewHackathonSubmission } from "@/lib/hackathons/review-service";
 import { reviewActionErrorPayload, reviewActionSchema } from "@/lib/validations/hackathon";
 
@@ -9,7 +9,7 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
-  const userContext = await getCurrentUserContext();
+  const userContext = await getCurrentIdentity();
 
   if (!userContext) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -26,12 +26,12 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const organizationIds = await getApprovedOrganizationIdsForUser(userContext.user.id);
+  const organizationIds = await getApprovedOrganizationIdsForUser(userContext.userId);
 
   try {
     const result = await reviewHackathonSubmission({
       action: parsed.data,
-      reviewerUserId: userContext.user.id,
+      reviewerUserId: userContext.userId,
       submissionId: id,
       allowedOrganizationIds: organizationIds,
     });
