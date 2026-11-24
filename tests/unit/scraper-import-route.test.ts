@@ -3,11 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const testEnv: { SCRAPER_IMPORT_SECRET?: string } = {};
 const importAdminHackathons = vi.fn();
 const findScraperImportReviewerId = vi.fn();
+const revalidateHackathonCaches = vi.fn();
+const after = vi.fn();
 
 vi.mock("@/lib/env", () => ({ env: testEnv }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/hackathons/review-service", () => ({ importAdminHackathons }));
 vi.mock("@/lib/db", () => ({ db: {} }));
+vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after,
+}));
 vi.mock("@/lib/hackathons/scraper-import", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/hackathons/scraper-import")>()),
   findScraperImportReviewerId,
@@ -55,6 +62,7 @@ describe("POST /api/cron/import-hackathons", () => {
     testEnv.SCRAPER_IMPORT_SECRET = "s3cret";
     importAdminHackathons.mockReset().mockResolvedValue({ importedCount: 1, results: [{ index: 0, status: "imported" }] });
     findScraperImportReviewerId.mockReset().mockResolvedValue("admin-user-id");
+    revalidateHackathonCaches.mockReset();
   });
 
   it("is switched off until the secret is configured", async () => {
@@ -87,6 +95,24 @@ describe("POST /api/cron/import-hackathons", () => {
       expect.objectContaining({ reviewerUserId: "admin-user-id", ignoreDuplicates: false })
     );
     expect(importAdminHackathons.mock.calls[0][0].payloads[0].name).toBe("MapleHacks 2027");
+  });
+
+  it("defers image checks and Discord work past the response, as the admin import does", async () => {
+    await POST(request({ hackathons: [row] }, "Bearer s3cret"));
+
+    // Run inside the request, they took several seconds per batch and grew
+    // with every auto-approved row's Discord channel.
+    expect(importAdminHackathons.mock.calls[0][0].defer).toBe(after);
+    expect(revalidateHackathonCaches).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh the catalog when the import fails", async () => {
+    importAdminHackathons.mockRejectedValue(new Error("database down"));
+
+    const response = await POST(request({ hackathons: [row] }, "Bearer s3cret"));
+
+    expect(response.status).toBe(500);
+    expect(revalidateHackathonCaches).not.toHaveBeenCalled();
   });
 
   it("never lets the caller bypass the duplicate check", async () => {
