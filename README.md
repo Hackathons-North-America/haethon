@@ -228,7 +228,7 @@ template is [`.env.example`](.env.example).
 | `NEXT_PUBLIC_APP_URL` | Absolute application origin with no trailing slash |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser-side publishable key |
 | `CLERK_SECRET_KEY` | Clerk server-side secret key |
-| `CRON_SECRET` | Bearer token for `/api/cron/*` |
+| `CRON_SECRET` | Bearer token for the scheduled `/api/cron/*` jobs |
 
 ### Authentication routes
 
@@ -246,6 +246,7 @@ template is [`.env.example`](.env.example).
 | Discord | `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID` | Event channel creation, links, sorting, and archiving |
 | Discord categories | `DISCORD_CANADA_CATEGORY_ID`, `DISCORD_US_CATEGORY_ID`, `DISCORD_DELETED_CATEGORY_ID` | Explicit category mappings; categories can otherwise be resolved by name |
 | UploadThing | `UPLOADTHING_TOKEN` | Admin-managed event image uploads |
+| Scraper import | `SCRAPER_IMPORT_SECRET` | Unattended imports from the hackathon scraper (`/api/cron/import-hackathons`) |
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Product analytics |
 | Sentry | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Runtime error reporting and source-map uploads |
 
@@ -346,6 +347,22 @@ routes:
 
 Vercel automatically supplies `Authorization: Bearer $CRON_SECRET` to configured
 cron requests. Manual requests must include the same header.
+
+### Scraper import
+
+`POST /api/cron/import-hackathons` is the unattended form of the admin JSON
+import. The hackathon scraper's scheduled GitHub Actions run calls it with
+`Authorization: Bearer $SCRAPER_IMPORT_SECRET` and the same body the admin
+import page sends (`{ "hackathons": [...] }`, at most 250 rows).
+
+- The route answers 503 until `SCRAPER_IMPORT_SECRET` is set, so it is off by
+  default. Use a value of its own (`openssl rand -hex 32`), not `CRON_SECRET`,
+  and store the same value as the scraper repository's `HNA_IMPORT_SECRET`
+  secret.
+- Imports are recorded under the longest-standing admin account.
+- A possible duplicate is never imported "as new anyway" here. It comes back as
+  `duplicate_flagged` with nothing written; the scraper saves those rows to
+  `duplicates.json` for the admin import page.
 
 ## Deployment
 
