@@ -43,7 +43,8 @@ export default function RootLayout({
         className="min-h-full font-sans text-ink antialiased selection:bg-pine/25 selection:text-ink motion-safe:[&_*]:transition-[color,border-color,background-color,opacity] motion-safe:[&_*]:duration-[160ms] motion-safe:[&_*]:ease-out"
       >
         {/* The body has no background of its own: html's bg-paper paints the
-            canvas, and an opaque body would hide the -z-10 PageWash. */}
+            canvas, and an opaque body would hide the -z-10 PageWash (which
+            only shows on pages that opt in with data-page-wash). */}
         <PageWash />
         <AppProviders>{children}</AppProviders>
       </body>

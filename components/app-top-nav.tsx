@@ -105,7 +105,8 @@ function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
   );
 }
 
-/* The ☰ button: a disclosure that drops down every link the old sidebar held. */
+/* The ☰ button: a disclosure that drops down every link the old sidebar held,
+   plus the light/dark switch at the bottom. */
 function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSignedIn: boolean; links: NavLink[] }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -203,6 +204,11 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
                 </li>
               );
             })}
+            {/* Always last, after Organizer too: it is a setting, not a
+                page, so it closes out the menu below the link groups. */}
+            <li>
+              <ThemeToggle className="flex min-h-11 w-full items-center gap-3 px-5 text-left text-sm font-medium text-ink/75 transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:bg-ink/[0.04] focus-visible:outline-none" />
+            </li>
           </ul>
         </nav>
       ) : null}
@@ -268,7 +274,6 @@ export function AppTopNav({
                 <NavUnderline />
               </span>
             </LoginRequiredLink>
-            <ThemeToggle className={`${circleButton} bg-ink/[0.06] text-ink hover:bg-ink/10`} />
             <ProfileCircle isSignedIn={isSignedIn} />
             <NavMenu activeHref={activeHref} isSignedIn={isSignedIn} links={links} />
           </div>

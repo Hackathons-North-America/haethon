@@ -42,7 +42,9 @@ export default async function HackathonsPage({
   const hackathonCards = await applyUserCardState(cards, userId);
 
   return (
-    <main className="min-h-screen">
+    /* data-page-wash: this list is the one page that shows the brown PageWash
+       blooms (components/page-wash.tsx); every other page sits on plain paper. */
+    <main className="min-h-screen" data-page-wash>
       <HackathonSearch
         initialFilters={filters}
         initialHackathons={hackathonCards}

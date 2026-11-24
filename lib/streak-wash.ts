@@ -38,3 +38,22 @@ export function streakBloom(shape: StreakBloomShape, rgb: string, strength = 1) 
     mask: `radial-gradient(${shoulder}, black 0%, black 58%, transparent 82%)`,
   };
 }
+
+/* A softer bloom for the image-less card covers: no shoulder ring and no flat
+   core. The tint eases out from the center along the whole radius, so the
+   bloom melts into the paper instead of ending in a visible edge, and the
+   grain mask thins out on the same curve. `strength` works as in streakBloom. */
+export function softStreakBloom(
+  shape: Pick<StreakBloomShape, "centerX" | "centerY" | "radiusX" | "radiusY">,
+  rgb: string,
+  strength = 1
+) {
+  const { centerX, centerY, radiusX, radiusY } = shape;
+  const ellipse = `ellipse ${radiusX}% ${radiusY}% at ${centerX}% ${centerY}%`;
+  const tint = (alpha: number) => `rgb(${rgb} / ${Number((alpha * strength).toFixed(3))})`;
+
+  return {
+    wash: `radial-gradient(${ellipse}, ${tint(0.46)} 0%, ${tint(0.42)} 15%, ${tint(0.34)} 30%, ${tint(0.24)} 45%, ${tint(0.14)} 60%, ${tint(0.06)} 75%, ${tint(0.015)} 88%, transparent 100%)`,
+    mask: `radial-gradient(${ellipse}, black 0%, rgb(0 0 0 / 0.75) 35%, rgb(0 0 0 / 0.35) 60%, rgb(0 0 0 / 0.1) 80%, transparent 95%)`,
+  };
+}

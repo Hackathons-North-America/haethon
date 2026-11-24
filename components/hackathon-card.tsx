@@ -15,7 +15,7 @@ import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
 import { isVotingClosed, type VoteValue } from "@/lib/hackathons/vote-state";
-import { STREAK_NOISE_URI, streakBloom } from "@/lib/streak-wash";
+import { softStreakBloom, STREAK_NOISE_URI, streakBloom } from "@/lib/streak-wash";
 
 export type HackathonCardData = {
   /** Search metadata sent with the cached catalog snapshot. */
@@ -211,7 +211,9 @@ function getCardStreak(name: string) {
    The right bloom sits low so the top-right corner, where the cover sets the
    hackathon's name, stays mostly clear paper. Stable per name like
    getCardStreak, but its own shapes: two blooms share the cover, so each is
-   narrower than a card body's single bloom. */
+   narrower than a card body's single bloom, and each uses the soft bloom
+   (no ring, no flat core) so it blends into the cover rather than reading
+   as a hard-edged shape. */
 function getCoverWash(name: string) {
   const random = seededRandom(nameSeed(name));
   const firstColor = Math.floor(random() * STREAK_RGB_PALETTE.length);
@@ -223,18 +225,12 @@ function getCoverWash(name: string) {
   const bloom = (centerX: number, centerY: number, rgb: string) => {
     const radiusX = Math.round(38 + random() * 12);
     const radiusY = Math.round(60 + random() * 26);
+    /* Two draws left over from the shoulder ring the soft bloom no longer
+       has. Still taken so every cover keeps its existing bloom positions. */
+    random();
+    random();
 
-    return streakBloom(
-      {
-        centerX,
-        centerY,
-        radiusX,
-        radiusY,
-        shoulderRadiusX: radiusX + Math.round(2 + random() * 4),
-        shoulderRadiusY: radiusY + Math.round(2 + random() * 5),
-      },
-      rgb
-    );
+    return softStreakBloom({ centerX, centerY, radiusX, radiusY }, rgb);
   };
 
   const left = bloom(

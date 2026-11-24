@@ -11,9 +11,11 @@ function getServerTheme(): Theme | null {
   return null;
 }
 
-/* Sun/moon button for the app top nav. The icon is picked by CSS (the `dark:`
-   variant), not by React state, so it is already right on first paint and
-   never mismatches during hydration. */
+/* The "Switch to dark/light mode" row in the app top nav's ☰ menu. The icon is
+   picked by CSS (the `dark:` variant), not by React state, so it is right on
+   first paint; the label needs the resolved theme, which the menu (only
+   rendered once opened, after hydration) always has. Clicking leaves the menu
+   open so the change is visible in place. */
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const theme = useSyncExternalStore(subscribeToTheme, getResolvedTheme, getServerTheme);
   const label =
@@ -21,14 +23,13 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 
   return (
     <button
-      aria-label={label}
       className={className}
       onClick={() => setTheme(getResolvedTheme() === "dark" ? "light" : "dark")}
-      title={label}
       type="button"
     >
-      <Moon aria-hidden="true" className="size-[18px] dark:hidden" strokeWidth={2.2} />
-      <Sun aria-hidden="true" className="hidden size-[18px] dark:block" strokeWidth={2.2} />
+      <Moon aria-hidden="true" className="size-4 shrink-0 dark:hidden" />
+      <Sun aria-hidden="true" className="hidden size-4 shrink-0 dark:block" />
+      {label}
     </button>
   );
 }
