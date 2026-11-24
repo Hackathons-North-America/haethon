@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Copy, Pencil, Pin, PinOff, Trash2, X } from "lucide-react";
 
 import type {
@@ -9,79 +9,77 @@ import type {
   AdminDiscordOverview,
 } from "@/lib/discord/channel-admin";
 import type { DiscordChannelDuplicate } from "@/lib/discord/duplicates";
+import { reportBackgroundFailure, scheduleUndoableRequest } from "@/lib/client/background-actions";
+import { sendRequest } from "@/lib/client/request";
+import { useLatestSave } from "@/lib/client/use-latest-save";
 
-async function patchChannel(channelId: string, name: string | null) {
-  const response = await fetch(`/api/admin/discord/channels/${channelId}`, {
+function patchChannel(channelId: string, name: string | null) {
+  return sendRequest<AdminDiscordChannel>(`/api/admin/discord/channels/${channelId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    json: { name },
   });
-  const result = (await response.json().catch(() => ({}))) as { data?: AdminDiscordChannel; error?: unknown };
-
-  if (!response.ok || !result.data) {
-    throw new Error(typeof result.error === "string" ? result.error : "Could not update the Discord channel.");
-  }
-
-  return result.data;
 }
+
+type ChannelNamePatch = { name?: string; nameOverride: string | null };
 
 function DiscordChannelCard({
   entry,
   onDelete,
+  onPatch,
   onUpdate,
 }: {
   entry: AdminDiscordGuildChannel;
-  onDelete: (channelId: string) => void;
+  onDelete: (entry: AdminDiscordGuildChannel) => void;
+  onPatch: (channelSnowflake: string, patch: ChannelNamePatch) => void;
   onUpdate: (channel: AdminDiscordChannel) => void;
 }) {
   const tracked = entry.tracked;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.name);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const busy = saving || deleting;
+  /* What Discord last confirmed; a failed rename snaps back to it. */
+  const confirmedRef = useRef<ChannelNamePatch>({ name: entry.name, nameOverride: tracked?.nameOverride ?? null });
 
-  async function submit(name: string | null) {
+  /* Renames apply instantly and save in the background (last one wins). */
+  const { save } = useLatestSave<string | null, AdminDiscordChannel>(
+    (name) => patchChannel(tracked?.id ?? "", name),
+    {
+      onSuccess: (updated, _value, { latest }) => {
+        confirmedRef.current = { name: updated.name, nameOverride: updated.nameOverride };
+
+        if (latest) {
+          onUpdate(updated);
+        }
+      },
+      onError: (error, value) => {
+        onPatch(entry.channelSnowflake, confirmedRef.current);
+
+        if (value !== null) {
+          // Reopen the rename field with what was typed.
+          setDraft(value);
+          setEditing(true);
+        }
+
+        reportBackgroundFailure(error, {
+          message:
+            value === null
+              ? `Couldn't switch #${confirmedRef.current.name} back to its automatic name.`
+              : `Couldn't rename #${confirmedRef.current.name}.`,
+          retry: () => rename(value),
+        });
+      },
+    }
+  );
+
+  function rename(name: string | null) {
     if (!tracked) {
       return;
     }
 
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      const updated = await patchChannel(tracked.id, name);
-      setEditing(false);
-      onUpdate(updated);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not update the Discord channel.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteChannel() {
-    if (!tracked) {
-      return;
-    }
-
-    setDeleting(true);
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/admin/discord/channels/${tracked.id}`, { method: "DELETE" });
-
-      if (!response.ok) {
-        const result = (await response.json().catch(() => ({}))) as { error?: unknown };
-        throw new Error(typeof result.error === "string" ? result.error : "Could not delete the Discord channel.");
-      }
-
-      onDelete(tracked.id);
-    } catch (error) {
-      setDeleting(false);
-      setMessage(error instanceof Error ? error.message : "Could not delete the Discord channel.");
-    }
+    setEditing(false);
+    // The automatic name is only known once the sync answers, so that case
+    // just drops the pinned badge until the response lands.
+    onPatch(entry.channelSnowflake, name === null ? { nameOverride: null } : { name: name.trim(), nameOverride: name.trim() });
+    save(name);
   }
 
   return (
@@ -92,7 +90,7 @@ function DiscordChannelCard({
             className="flex flex-wrap items-center gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              void submit(draft);
+              rename(draft);
             }}
           >
             <input
@@ -105,19 +103,17 @@ function DiscordChannelCard({
             />
             <button
               className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
-              disabled={saving || !draft.trim()}
+              disabled={!draft.trim()}
               type="submit"
             >
               <Check aria-hidden="true" className="size-4" />
-              {saving ? "Saving..." : "Save"}
+              Save
             </button>
             <button
               className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 disabled:opacity-50"
-              disabled={saving}
               onClick={() => {
                 setEditing(false);
                 setDraft(entry.name);
-                setMessage(null);
               }}
               type="button"
             >
@@ -161,11 +157,9 @@ function DiscordChannelCard({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink disabled:opacity-50"
-            disabled={saving}
             onClick={() => {
               setDraft(entry.name);
               setEditing(true);
-              setMessage(null);
             }}
             type="button"
           >
@@ -175,18 +169,16 @@ function DiscordChannelCard({
           {tracked.nameOverride ? (
             <button
               className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink disabled:opacity-50"
-              disabled={busy}
-              onClick={() => void submit(null)}
+              onClick={() => rename(null)}
               type="button"
             >
               <PinOff aria-hidden="true" className="size-4" />
-              {saving ? "Saving..." : "Use automatic name"}
+              Use automatic name
             </button>
           ) : null}
           <button
             className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
-            disabled={busy}
-            onClick={() => void deleteChannel()}
+            onClick={() => onDelete(entry)}
             title={
               tracked.hackathonId
                 ? "This hackathon is still listed, so the next sync will create a fresh channel for it."
@@ -195,12 +187,11 @@ function DiscordChannelCard({
             type="button"
           >
             <Trash2 aria-hidden="true" className="size-4" />
-            {deleting ? "Deleting..." : "Delete"}
+            Delete
           </button>
         </div>
       )}
 
-      {message ? <p className="mt-3 text-sm font-semibold text-danger">{message}</p> : null}
     </li>
   );
 }
@@ -247,27 +238,74 @@ function DuplicateChannelsNotice({ duplicates }: { duplicates: DiscordChannelDup
   );
 }
 
+/* Renames apply instantly and deletes hide the channel behind an undo toast;
+   both save in the background and restore the channel if Discord refuses. */
 export function DiscordChannelManager({ overview }: { overview: AdminDiscordOverview }) {
   const [groups, setGroups] = useState(overview.groups);
+  /* Server ordering, so an undone delete lands back in its original slot. */
+  const [order] = useState(() => overview.groups.flatMap((group) => group.channels.map((entry) => entry.channelSnowflake)));
+
+  function mapEntries(fn: (entry: AdminDiscordGuildChannel) => AdminDiscordGuildChannel) {
+    setGroups((current) => current.map((group) => ({ ...group, channels: group.channels.map(fn) })));
+  }
 
   function handleUpdate(updated: AdminDiscordChannel) {
-    setGroups((current) =>
-      current.map((group) => ({
-        ...group,
-        channels: group.channels.map((entry) =>
-          entry.tracked?.id === updated.id ? { ...entry, name: updated.name, tracked: updated } : entry
-        ),
-      }))
+    mapEntries((entry) => (entry.tracked?.id === updated.id ? { ...entry, name: updated.name, tracked: updated } : entry));
+  }
+
+  function handlePatch(channelSnowflake: string, patch: ChannelNamePatch) {
+    mapEntries((entry) =>
+      entry.channelSnowflake === channelSnowflake && entry.tracked
+        ? {
+            ...entry,
+            name: patch.name ?? entry.name,
+            tracked: { ...entry.tracked, name: patch.name ?? entry.tracked.name, nameOverride: patch.nameOverride },
+          }
+        : entry
     );
   }
 
-  function handleDelete(recordId: string) {
+  function handleDelete(target: AdminDiscordGuildChannel) {
+    const tracked = target.tracked;
+    const groupKey = groups.find((group) => group.channels.includes(target))?.categorySnowflake ?? null;
+    const groupName = groups.find((group) => group.channels.includes(target))?.name;
+
+    if (!tracked) {
+      return;
+    }
+
     setGroups((current) =>
       current.map((group) => ({
         ...group,
-        channels: group.channels.filter((entry) => entry.tracked?.id !== recordId),
+        channels: group.channels.filter((entry) => entry.channelSnowflake !== target.channelSnowflake),
       }))
     );
+
+    scheduleUndoableRequest({
+      message: `Deleted #${target.name}.`,
+      failureMessage: `Couldn't delete #${target.name}.`,
+      url: `/api/admin/discord/channels/${tracked.id}`,
+      init: { method: "DELETE" },
+      onUndo: () =>
+        setGroups((current) =>
+          current.map((group) => {
+            if (group.categorySnowflake !== groupKey || group.name !== groupName) {
+              return group;
+            }
+
+            if (group.channels.some((entry) => entry.channelSnowflake === target.channelSnowflake)) {
+              return group;
+            }
+
+            const rank = (snowflake: string) => order.indexOf(snowflake);
+            const index = group.channels.findIndex((entry) => rank(entry.channelSnowflake) > rank(target.channelSnowflake));
+            const channels = [...group.channels];
+            channels.splice(index === -1 ? channels.length : index, 0, target);
+            return { ...group, channels };
+          })
+        ),
+      retry: () => handleDelete(target),
+    });
   }
 
   if (!groups.length) {
@@ -310,6 +348,7 @@ export function DiscordChannelManager({ overview }: { overview: AdminDiscordOver
                   entry={entry}
                   key={entry.channelSnowflake}
                   onDelete={handleDelete}
+                  onPatch={handlePatch}
                   onUpdate={handleUpdate}
                 />
               ))}

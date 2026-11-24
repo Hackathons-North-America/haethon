@@ -2,9 +2,9 @@
 
 import { FormEvent, useState } from "react";
 import { AlertTriangle, Check, GitMerge, Repeat, Trash2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { HackathonCardPreview } from "@/components/admin/hackathon-card-preview";
+import { RequestError } from "@/lib/client/request";
 
 export type SubmissionReviewItem = {
   id: string;
@@ -116,18 +116,35 @@ function initialPreviewPayload(submission: SubmissionReviewItem) {
   };
 }
 
+/* Used in failure toasts ("Couldn't reject …"); anything else is an approval. */
+const intentVerb: Record<string, string> = {
+  reject: "reject",
+  merge: "merge",
+  delete_existing: "replace the existing listing for",
+};
+
+/* One submission in the review queue. Submitting hands control back to the
+   queue right away (onSubmitted) so the next submission shows while this
+   review saves in the background. The card stays mounted but hidden while it
+   saves, so if the server refuses, it can come back with every edit intact
+   and the reason shown (onFailed). */
 export function SubmissionReviewCard({
   allowDeleteExisting = false,
   endpointBase,
+  hidden = false,
+  onFailed,
   onReviewed,
+  onSubmitted,
   submission,
 }: {
   allowDeleteExisting?: boolean;
   endpointBase: string;
+  hidden?: boolean;
+  onFailed?: (submissionId: string, failure: { message: string; verb: string; error: unknown }) => void;
   onReviewed?: (submissionId: string) => void;
+  onSubmitted?: (submissionId: string) => void;
   submission: SubmissionReviewItem;
 }) {
-  const router = useRouter();
   const [status, setStatus] = useState<"idle" | "submitting" | "done" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [previewPayload, setPreviewPayload] = useState<Record<string, unknown>>(() => initialPreviewPayload(submission));
@@ -219,27 +236,48 @@ export function SubmissionReviewCard({
               normalizedPayload,
             };
 
-    const response = await fetch(`${endpointBase}/${submission.id}/review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const result = (await response.json()) as { error?: unknown };
+    onSubmitted?.(submission.id);
 
-    if (!response.ok) {
+    let failure: { message: string; error: unknown } | null = null;
+
+    try {
+      const response = await fetch(`${endpointBase}/${submission.id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: unknown };
+
+      if (!response.ok) {
+        failure = {
+          message: submissionReviewErrorMessage(result.error),
+          error: new RequestError(
+            submissionReviewErrorMessage(result.error),
+            response.status,
+            submissionReviewErrorMessage(result.error)
+          ),
+        };
+      }
+    } catch {
+      failure = {
+        message: "The review couldn't reach the server. Check your connection and try again.",
+        error: new RequestError("Network request failed.", 0),
+      };
+    }
+
+    if (failure) {
       setStatus("error");
-      setMessage(submissionReviewErrorMessage(result.error));
+      setMessage(failure.message);
+      onFailed?.(submission.id, { ...failure, verb: intentVerb[intent] ?? "approve" });
       return;
     }
 
     setStatus("done");
-    setMessage("Review action saved.");
     onReviewed?.(submission.id);
-    router.refresh();
   }
 
   return (
-    <article className="rounded-xl border border-ink/10 bg-surface p-5">
+    <article className="rounded-xl border border-ink/10 bg-surface p-5" hidden={hidden}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">

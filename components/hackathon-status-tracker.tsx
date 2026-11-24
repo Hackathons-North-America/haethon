@@ -1,17 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 
-import { showLoginRequiredDialog } from "@/components/login-required-dialog";
-import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
+import { useTrackStatus, type TrackableStatus } from "@/lib/hackathons/use-track-status";
 
-export type TrackableStatus = "interested" | "applied" | "attending";
-
-function handleUnauthenticated() {
-  showLoginRequiredDialog();
-}
+export type { TrackableStatus } from "@/lib/hackathons/use-track-status";
 
 const stages: { value: TrackableStatus; label: string }[] = [
   { value: "interested", label: "Interested" },
@@ -29,56 +23,32 @@ const stageOrder: Record<string, number> = {
 
 export function HackathonStatusTracker({
   hackathonId,
+  hackathonName,
   initialStatus,
   compact = false,
 }: {
   hackathonId: string;
+  hackathonName?: string;
   initialStatus: string | null;
   compact?: boolean;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState(initialStatus);
-  const [pending, setPending] = useState(false);
-
-  // Follow changes made from this hackathon's card while the side panel is open.
-  useHackathonStatusListener(hackathonId, setStatus);
+  // Clicks show instantly; the save (and the page refresh that resyncs
+  // dashboard counts) runs in the background.
+  const { status, select } = useTrackStatus(hackathonId, initialStatus, {
+    hackathonName,
+    onSaved: () => router.refresh(),
+  });
 
   const currentOrder = status ? stageOrder[status] ?? -1 : -1;
   const isPastPipeline = status === "attended" || status === "won";
 
-  async function selectStage(nextStatus: TrackableStatus) {
-    if (pending || status === nextStatus || isPastPipeline) {
+  function selectStage(nextStatus: TrackableStatus) {
+    if (status === nextStatus || isPastPipeline) {
       return;
     }
 
-    const previousStatus = status;
-
-    setStatus(nextStatus);
-    setPending(true);
-
-    try {
-      const response = await fetch(`/api/hackathons/${encodeURIComponent(hackathonId)}/track`, {
-        body: JSON.stringify({ applicationStatus: nextStatus }),
-        headers: { "Content-Type": "application/json" },
-        method: "PATCH",
-      });
-
-      if (response.status === 401) {
-        handleUnauthenticated();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Could not update status.");
-      }
-
-      announceHackathonStatus(hackathonId, nextStatus);
-      router.refresh();
-    } catch {
-      setStatus(previousStatus);
-    } finally {
-      setPending(false);
-    }
+    select(nextStatus);
   }
 
   return (
@@ -96,7 +66,7 @@ export function HackathonStatusTracker({
         return (
           <button
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 border px-3 font-medium transition-colors disabled:cursor-wait disabled:opacity-60 ${
+            className={`inline-flex items-center gap-1.5 border px-3 font-medium transition-colors disabled:opacity-60 ${
               compact ? "min-h-8" : "min-h-9"
             } ${
               active
@@ -105,7 +75,7 @@ export function HackathonStatusTracker({
                   ? "border-pine/40 bg-pine/5 text-pine hover:bg-pine/10"
                   : "border-ink/15 bg-surface text-ink/55 hover:border-pine/40 hover:text-pine"
             }`}
-            disabled={pending || isPastPipeline}
+            disabled={isPastPipeline}
             key={stage.value}
             onClick={() => selectStage(stage.value)}
             type="button"

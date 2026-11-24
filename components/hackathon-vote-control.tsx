@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowBigDown, ArrowBigUp } from "lucide-react";
 
-import { showLoginRequiredDialog } from "@/components/login-required-dialog";
+import { reportBackgroundFailure } from "@/lib/client/background-actions";
+import { sendRequest } from "@/lib/client/request";
+import { useLatestSave } from "@/lib/client/use-latest-save";
 import {
   applyViewerVote,
   netVoteScore,
@@ -86,8 +88,8 @@ const sizeStyles = {
 /**
  * An unbordered vote group: [⇧ score | ⇩]. The score is net (ups minus downs). Clicking the
  * active arrow clears the vote; the other arrow switches it. Signed-out
- * clicks open the login dialog. Updates are optimistic and roll back if the
- * request fails.
+ * clicks open the login dialog. Updates are optimistic (last click wins) and
+ * roll back with a retry toast if the request fails.
  */
 export function HackathonVoteControl({
   className = "",
@@ -109,55 +111,59 @@ export function HackathonVoteControl({
   size?: keyof typeof sizeStyles;
 }) {
   const [state, setState] = useState(() => (preview ? initialState : confirmedVotes.get(hackathonId) ?? initialState));
-  const pendingRef = useRef(false);
-  const [pending, setPending] = useState(false);
+  /* The last state the server confirmed; a failed save snaps back to it. */
+  const confirmedRef = useRef(state);
   const styles = sizeStyles[size];
 
-  useVoteListener(hackathonId, setState);
+  /* Every click updates the pill immediately. Requests go out one at a time
+     and only the newest choice is sent after the current one lands, so rapid
+     up/down/up clicks never block or fight each other. */
+  const { save, isSaving } = useLatestSave<VoteValue | null, HackathonVoteState>(
+    (next) =>
+      sendRequest<HackathonVoteState>(
+        `/api/hackathons/${encodeURIComponent(hackathonId)}/vote`,
+        next === null ? { method: "DELETE" } : { method: "PUT", json: { value: next } }
+      ),
+    {
+      onSuccess: (result, _value, { latest }) => {
+        confirmedRef.current = result;
 
-  async function vote(clicked: VoteValue) {
-    if (preview || closed || pendingRef.current) {
+        if (latest) {
+          setState(result);
+          announceVote(hackathonId, result);
+        }
+      },
+      onError: (error, value) => {
+        setState(confirmedRef.current);
+        reportBackgroundFailure(error, {
+          message: `Couldn't save your vote on ${hackathonName}.`,
+          retry: () => applyVote(value),
+        });
+      },
+    }
+  );
+
+  // Follow confirmed votes from this hackathon's other control (card vs.
+  // side panel). While this control is mid-save its own choice wins.
+  useVoteListener(hackathonId, (next) => {
+    confirmedRef.current = next;
+
+    if (!isSaving()) {
+      setState(next);
+    }
+  });
+
+  function applyVote(next: VoteValue | null) {
+    setState((current) => applyViewerVote(current, next));
+    save(next);
+  }
+
+  function vote(clicked: VoteValue) {
+    if (preview || closed) {
       return;
     }
 
-    const previous = state;
-    const next = nextVoteFor(previous.viewerVote, clicked);
-
-    pendingRef.current = true;
-    setPending(true);
-    setState(applyViewerVote(previous, next));
-
-    try {
-      const response = await fetch(
-        `/api/hackathons/${encodeURIComponent(hackathonId)}/vote`,
-        next === null
-          ? { method: "DELETE" }
-          : {
-              body: JSON.stringify({ value: next }),
-              headers: { "Content-Type": "application/json" },
-              method: "PUT",
-            }
-      );
-
-      if (response.status === 401) {
-        setState(previous);
-        showLoginRequiredDialog();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Could not save vote.");
-      }
-
-      const body = (await response.json()) as { data: HackathonVoteState };
-      setState(body.data);
-      announceVote(hackathonId, body.data);
-    } catch {
-      setState(previous);
-    } finally {
-      pendingRef.current = false;
-      setPending(false);
-    }
+    applyVote(nextVoteFor(state.viewerVote, clicked));
   }
 
   const score = netVoteScore(state);
@@ -179,9 +185,7 @@ export function HackathonVoteControl({
         aria-pressed={active}
         className={`grid shrink-0 place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-pine disabled:cursor-default ${
           styles.button
-        } ${active ? activeColor : `text-ink ${inert ? "opacity-45" : `${hoverColor} hover:bg-ink/5`}`} ${
-          pending ? "cursor-wait" : ""
-        }`}
+        } ${active ? activeColor : `text-ink ${inert ? "opacity-45" : `${hoverColor} hover:bg-ink/5`}`}`}
         disabled={inert}
         onClick={() => vote(value)}
         tabIndex={preview ? -1 : undefined}

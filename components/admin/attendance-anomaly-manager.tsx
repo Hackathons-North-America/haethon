@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { BadgeCheck, Undo2 } from "lucide-react";
 
+import { reportBackgroundFailure } from "@/lib/client/background-actions";
+import { sendRequest } from "@/lib/client/request";
 import type { AttendanceAnomalyFinding, AttendanceAnomalyType } from "@/lib/hackathons/attendance-anomalies";
 
 const TYPE_LABELS: Record<AttendanceAnomalyType, string> = {
@@ -14,7 +16,9 @@ const TYPE_LABELS: Record<AttendanceAnomalyType, string> = {
 
 const TYPE_ORDER: AttendanceAnomalyType[] = ["same_day_overlap", "post_signup_burst", "high_volume", "late_claim_ratio"];
 
-type ResolutionState = { status: "verifying" | "revoking" | "verified" | "revoked" | "error"; message?: string };
+/* Resolutions show as settled the moment they're clicked; the message gains
+   the day count once the server answers. */
+type ResolutionState = { status: "verified" | "revoked"; message: string };
 
 function pairKey(userId: string, hackathonId: string) {
   return `${userId}:${hackathonId}`;
@@ -46,8 +50,7 @@ function FindingRow({
       <ul className="mt-3 space-y-2">
         {finding.hackathons.map((hackathon) => {
           const resolution = resolutions.get(pairKey(finding.userId, hackathon.id));
-          const busy = resolution?.status === "verifying" || resolution?.status === "revoking";
-          const settled = resolution?.status === "verified" || resolution?.status === "revoked";
+          const settled = Boolean(resolution);
 
           return (
             <li
@@ -56,32 +59,28 @@ function FindingRow({
             >
               <span className="text-sm font-semibold text-ink">{hackathon.name}</span>
               <span className="flex flex-wrap items-center gap-2">
-                {resolution?.message ? (
-                  <span
-                    className={`text-sm font-semibold ${resolution.status === "error" ? "text-danger" : "text-pine"}`}
-                  >
+                {resolution ? (
+                  <span className={`text-sm font-semibold ${resolution.status === "revoked" ? "text-danger" : "text-pine"}`}>
                     {resolution.message}
                   </span>
                 ) : null}
                 {settled ? null : (
                   <>
                     <button
-                      className="inline-flex min-h-9 items-center gap-2 rounded-full bg-pine px-3 text-sm font-semibold text-paper disabled:opacity-50"
-                      disabled={busy}
+                      className="inline-flex min-h-9 items-center gap-2 rounded-full bg-pine px-3 text-sm font-semibold text-paper"
                       onClick={() => onResolve(finding.userId, hackathon.id, "verify")}
                       type="button"
                     >
                       <BadgeCheck aria-hidden="true" className="size-4" />
-                      {resolution?.status === "verifying" ? "Verifying..." : "Verify"}
+                      Verify
                     </button>
                     <button
-                      className="inline-flex min-h-9 items-center gap-2 rounded-full border border-danger px-3 text-sm font-semibold text-danger disabled:opacity-50"
-                      disabled={busy}
+                      className="inline-flex min-h-9 items-center gap-2 rounded-full border border-danger px-3 text-sm font-semibold text-danger"
                       onClick={() => onResolve(finding.userId, hackathon.id, "revoke")}
                       type="button"
                     >
                       <Undo2 aria-hidden="true" className="size-4" />
-                      {resolution?.status === "revoking" ? "Revoking..." : "Revoke"}
+                      Revoke
                     </button>
                   </>
                 )}
@@ -97,36 +96,50 @@ function FindingRow({
 export function AttendanceAnomalyManager({ findings }: { findings: AttendanceAnomalyFinding[] }) {
   const [resolutions, setResolutions] = useState<Map<string, ResolutionState>>(new Map());
 
-  function setResolution(key: string, state: ResolutionState) {
-    setResolutions((current) => new Map(current).set(key, state));
+  function setResolution(key: string, state: ResolutionState | null) {
+    setResolutions((current) => {
+      const next = new Map(current);
+
+      if (state) {
+        next.set(key, state);
+      } else {
+        next.delete(key);
+      }
+
+      return next;
+    });
   }
 
-  async function resolve(userId: string, hackathonId: string, action: "verify" | "revoke") {
+  /* Shows the outcome immediately and resolves in the background. A failure
+     brings the Verify / Revoke buttons back with a retry toast. */
+  function resolve(userId: string, hackathonId: string, action: "verify" | "revoke") {
     const key = pairKey(userId, hackathonId);
+    const status = action === "verify" ? "verified" : "revoked";
 
-    setResolution(key, { status: action === "verify" ? "verifying" : "revoking" });
+    setResolution(key, { status, message: action === "verify" ? "Verified." : "Revoked." });
 
-    const response = await fetch("/api/admin/attendance-anomalies/resolve", {
+    sendRequest<{ affectedDayCount: number }>("/api/admin/attendance-anomalies/resolve", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, hackathonId, action }),
-    });
-    const result = (await response.json()) as { data?: { affectedDayCount: number }; error?: unknown };
+      json: { userId, hackathonId, action },
+    })
+      .then((data) => {
+        const days = data?.affectedDayCount ?? 0;
+        const unit = days === 1 ? "day" : "days";
 
-    if (!response.ok || !result.data) {
-      setResolution(key, {
-        status: "error",
-        message: typeof result.error === "string" ? result.error : "Could not resolve the claim.",
+        setResolution(key, {
+          status,
+          message: action === "verify" ? `Verified (${days} ${unit} upgraded).` : `Revoked (${days} ${unit} removed).`,
+        });
+      })
+      .catch((error: unknown) => {
+        const userName = findings.find((finding) => finding.userId === userId)?.userName ?? "this user";
+
+        setResolution(key, null);
+        reportBackgroundFailure(error, {
+          message: `Couldn't ${action} the claim for ${userName}.`,
+          retry: () => resolve(userId, hackathonId, action),
+        });
       });
-      return;
-    }
-
-    setResolution(
-      key,
-      action === "verify"
-        ? { status: "verified", message: `Verified (${result.data.affectedDayCount} days upgraded).` }
-        : { status: "revoked", message: `Revoked (${result.data.affectedDayCount} days removed).` }
-    );
   }
 
   if (!findings.length) {

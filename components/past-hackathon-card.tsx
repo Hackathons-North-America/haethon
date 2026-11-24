@@ -2,15 +2,38 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
-import { HackathonResultActions } from "@/components/hackathon-result-actions";
+import { HackathonResultActions, type ResultSave } from "@/components/hackathon-result-actions";
 import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
+import { reportBackgroundFailure } from "@/lib/client/background-actions";
+import { sendRequest } from "@/lib/client/request";
+import { useKeyedLatestSave } from "@/lib/client/use-latest-save";
 
-/* A finished hackathon in the My Hackathons "Past" list. Client-side so the
-   trash button can drop the card from view once its tracking row is deleted. */
+export type PastResultFields = {
+  status: "attended" | "won" | "ended";
+  awardName: string | null;
+  devpostUrl: string | null;
+  isPinned: boolean;
+};
+
+function patchToRequestBody(patch: Partial<PastResultFields>) {
+  return {
+    ...(patch.status !== undefined ? { applicationStatus: patch.status } : {}),
+    ...(patch.awardName !== undefined ? { awardName: patch.awardName } : {}),
+    ...(patch.devpostUrl !== undefined ? { devpostUrl: patch.devpostUrl } : {}),
+    ...(patch.isPinned !== undefined ? { isPinned: patch.isPinned } : {}),
+  };
+}
+
+/* A finished hackathon in the My Hackathons "Past" list. Client-side so every
+   action on it (mark attended, pin, log/undo a win, project link, remove)
+   shows immediately: the card owns an optimistic copy of its fields and saves
+   in the background, one request per kind of change with the last click
+   winning. A failed save restores the confirmed values with a toast. */
 export function PastHackathonCard({
   awardName,
   dateRange,
@@ -34,15 +57,69 @@ export function PastHackathonCard({
   status: "attended" | "won" | "ended";
   userHackathonId: string;
 }) {
+  const router = useRouter();
   const [removed, setRemoved] = useState(false);
   const panelOpen = useHackathonPanelOpen();
+
+  const serverFields: PastResultFields = { status, awardName, devpostUrl, isPinned };
+  const serverKey = `${status}|${awardName}|${devpostUrl}|${isPinned}`;
+  const [fields, setFields] = useState(serverFields);
+  /* What the server has confirmed; failed saves roll back to it. */
+  const [confirmed, setConfirmed] = useState(serverFields);
+  const [syncedKey, setSyncedKey] = useState(serverKey);
+  const [saving, setSaving] = useState(false);
+
+  // Adopt fresh server props after a refresh, unless this card has saves
+  // still in flight (their refresh will follow once they land).
+  if (syncedKey !== serverKey && !saving) {
+    setSyncedKey(serverKey);
+    setFields(serverFields);
+    setConfirmed(serverFields);
+  }
+
+  const { save, isSaving } = useKeyedLatestSave<string, ResultSave, unknown>(
+    (_key, { patch }) =>
+      sendRequest(`/api/user-hackathons/${encodeURIComponent(userHackathonId)}`, {
+        method: "PATCH",
+        json: patchToRequestBody(patch),
+      }),
+    {
+      onSuccess: (_result, { patch }) => {
+        setConfirmed((current) => ({ ...current, ...patch }));
+
+        if (!isSaving()) {
+          setSaving(false);
+          router.refresh();
+        }
+      },
+      onError: (error, value) => {
+        const rollback = Object.fromEntries(
+          Object.keys(value.patch).map((key) => [key, confirmed[key as keyof PastResultFields]])
+        ) as Partial<PastResultFields>;
+
+        setFields((current) => ({ ...current, ...rollback }));
+        if (!isSaving()) {
+          setSaving(false);
+        }
+
+        value.onFailed?.();
+        reportBackgroundFailure(error, { message: value.failureMessage, retry: () => apply(value) });
+      },
+    }
+  );
+
+  function apply(value: ResultSave) {
+    setFields((current) => ({ ...current, ...value.patch }));
+    setSaving(true);
+    save(value.key, value);
+  }
 
   if (removed) {
     return null;
   }
 
-  const won = status === "won";
-  const attended = status === "attended";
+  const won = fields.status === "won";
+  const attended = fields.status === "attended";
 
   return (
     <article className="group rounded-xl border border-ink/10 bg-paper p-5">
@@ -78,7 +155,7 @@ export function PastHackathonCard({
               {attended ? "Attended" : "Ended"}
             </span>
           )}
-          {isPinned ? (
+          {fields.isPinned ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-pine/25 bg-surface px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-pine">
               <Pin aria-hidden="true" className="size-3.5 fill-current" />
               Pinned
@@ -88,23 +165,24 @@ export function PastHackathonCard({
             hackathonId={hackathonId}
             hackathonName={hackathonName}
             listLabel="Past"
-            onRemoved={() => setRemoved(true)}
+            onRemove={() => setRemoved(true)}
+            onRestore={() => setRemoved(false)}
           />
         </div>
       </div>
 
-      {(won && awardName) || devpostUrl ? (
+      {(won && fields.awardName) || fields.devpostUrl ? (
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-          {won && awardName ? (
+          {won && fields.awardName ? (
             <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-pine">
               <Trophy aria-hidden="true" className="size-3.5 shrink-0" />
-              {awardName}
+              {fields.awardName}
             </p>
           ) : null}
-          {devpostUrl ? (
+          {fields.devpostUrl ? (
             <a
               className="inline-flex items-center gap-1.5 text-sm font-medium text-ink underline-offset-4 hover:text-pine hover:underline"
-              href={devpostUrl}
+              href={fields.devpostUrl}
               rel="noreferrer"
               target="_blank"
             >
@@ -118,14 +196,23 @@ export function PastHackathonCard({
       <div className="mt-4 border-t border-ink/10 pt-4">
         {won || attended ? (
           <HackathonResultActions
-            awardName={awardName}
-            devpostUrl={devpostUrl}
-            isPinned={isPinned}
+            awardName={fields.awardName}
+            devpostUrl={fields.devpostUrl}
+            hackathonName={hackathonName}
+            isPinned={fields.isPinned}
+            onSave={apply}
             status={won ? "won" : "attended"}
-            userHackathonId={userHackathonId}
           />
         ) : (
-          <MarkAttendedButton userHackathonId={userHackathonId} />
+          <MarkAttendedButton
+            onMark={() =>
+              apply({
+                key: "result",
+                patch: { status: "attended" },
+                failureMessage: `Couldn't mark ${hackathonName} as attended.`,
+              })
+            }
+          />
         )}
       </div>
     </article>

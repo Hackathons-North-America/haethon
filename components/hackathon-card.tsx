@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,10 +9,9 @@ import { DiscordGlyph } from "@/components/discord-glyph";
 import { HackathonVoteControl } from "@/components/hackathon-vote-control";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
 import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
-import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
-import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
+import { useTrackStatus } from "@/lib/hackathons/use-track-status";
 import { isVotingClosed, type VoteValue } from "@/lib/hackathons/vote-state";
 import { STREAK_NOISE_URI, streakBloom } from "@/lib/streak-wash";
 
@@ -61,10 +59,6 @@ export type HackathonCardData = {
       new tab; cards without one link to our detail page instead. */
   websiteUrl?: string | null;
 };
-
-function handleUnauthenticated() {
-  showLoginRequiredDialog();
-}
 
 /* Only Canada and the United States get flag-colored treatment; every other
    country renders in the line's default ink color. */
@@ -250,53 +244,18 @@ function CardStatusStack({
   initialStatus?: string | null;
   preview?: boolean;
 }) {
-  const [status, setStatus] = useState(initialStatus ?? null);
-  const [pending, setPending] = useState(false);
-
-  // Follow changes made from the side panel's tracker for this hackathon.
-  useHackathonStatusListener(hackathonId, setStatus);
+  // Clicks show instantly and save in the background; clicking the active
+  // stage again untracks. Failures roll back with a toast (see useTrackStatus).
+  const { status, select } = useTrackStatus(hackathonId, initialStatus, { hackathonName });
 
   const isPastPipeline = status === "attended" || status === "won";
 
-  async function selectStage(nextStatus: TrackableStatus) {
-    if (pending || isPastPipeline) {
+  function selectStage(nextStatus: TrackableStatus) {
+    if (isPastPipeline) {
       return;
     }
 
-    const previousStatus = status;
-    const untracking = status === nextStatus;
-
-    setStatus(untracking ? null : nextStatus);
-    setPending(true);
-
-    try {
-      const response = await fetch(
-        `/api/hackathons/${encodeURIComponent(hackathonId)}/track`,
-        untracking
-          ? { method: "DELETE" }
-          : {
-              body: JSON.stringify({ applicationStatus: nextStatus }),
-              headers: { "Content-Type": "application/json" },
-              method: "PATCH",
-            }
-      );
-
-      if (response.status === 401) {
-        setStatus(previousStatus);
-        handleUnauthenticated();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Could not update status.");
-      }
-
-      announceHackathonStatus(hackathonId, untracking ? null : nextStatus);
-    } catch {
-      setStatus(previousStatus);
-    } finally {
-      setPending(false);
-    }
+    select(status === nextStatus ? null : nextStatus);
   }
 
   if (isPastPipeline) {
@@ -330,10 +289,9 @@ function CardStatusStack({
         return (
           <button
             aria-pressed={active}
-            className={`${cardStatusClassName} group/action relative z-20 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine disabled:cursor-wait disabled:opacity-60 ${
+            className={`${cardStatusClassName} group/action relative z-20 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
               active ? "text-ink" : "text-ink/55 hover:text-ink"
             }`}
-            disabled={pending}
             key={stage.value}
             onClick={() => selectStage(stage.value)}
             title={
