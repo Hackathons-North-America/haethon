@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
-import { motion, useReducedMotion } from "motion/react";
+import { SignOutButton, useUser } from "@clerk/nextjs";
 import { useEffect, useId, useRef, useState, type ElementType } from "react";
 import {
   Building2,
   CalendarDays,
   CircleUser,
   LogIn,
+  LogOut,
   Menu,
   PlusSquare,
   Search,
@@ -105,8 +105,12 @@ function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
   );
 }
 
+/* Shared look for the menu's non-link rows (theme switch, Sign out). */
+const menuButtonRow =
+  "flex min-h-11 w-full items-center gap-3 px-5 text-left text-sm font-medium text-ink/75 transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:bg-ink/[0.04] focus-visible:outline-none";
+
 /* The ☰ button: a disclosure that drops down every link the old sidebar held,
-   plus the light/dark switch at the bottom. */
+   plus the light/dark switch and, when signed in, Sign out at the bottom. */
 function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSignedIn: boolean; links: NavLink[] }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -207,8 +211,22 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
             {/* Always last, after Organizer too: it is a setting, not a
                 page, so it closes out the menu below the link groups. */}
             <li>
-              <ThemeToggle className="flex min-h-11 w-full items-center gap-3 px-5 text-left text-sm font-medium text-ink/75 transition-colors hover:bg-ink/[0.04] hover:text-ink focus-visible:bg-ink/[0.04] focus-visible:outline-none" />
+              <ThemeToggle className={menuButtonRow} />
             </li>
+            {/* Sign out is the very last row, set off by a hairline so it
+                isn't hit by accident on the way to the theme switch.
+                Signed-out visitors already have Login further up. */}
+            {isSignedIn ? (
+              <li>
+                <div aria-hidden="true" className="mx-5 my-2 border-t border-ink/10" />
+                <SignOutButton redirectUrl="/">
+                  <button className={menuButtonRow} type="button">
+                    <LogOut aria-hidden="true" className="size-4 shrink-0" />
+                    Sign out
+                  </button>
+                </SignOutButton>
+              </li>
+            ) : null}
           </ul>
         </nav>
       ) : null}
@@ -226,7 +244,6 @@ export function AppTopNav({
   isSignedIn: boolean;
 }) {
   const pathname = usePathname();
-  const prefersReducedMotion = useReducedMotion();
   const slotRef = useAppNavSlotRef();
   const links = buildLinks({ isAdmin, isOrganizer, isSignedIn });
   const activeHref = activeHrefFor(links, pathname);
@@ -243,11 +260,8 @@ export function AppTopNav({
           wider than the logo. With the search bar below, the header also
           takes the same 1rem on top that the band leaves above the bar,
           so the row sits midway between the page top and the bar's top. */}
-      <motion.header
-        animate={{ opacity: 1, y: 0 }}
+      <header
         className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent has-[[data-nav-slot]:not(:empty)]:bg-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-4"
-        initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
-        transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-x-4 px-5 sm:px-8 lg:grid lg:min-h-20 lg:has-[[data-nav-slot]:not(:empty)]:min-h-[68px] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-12">
           <Link className="flex min-h-16 items-center justify-self-start" href={isSignedIn ? "/hackathons" : "/"}>
@@ -278,16 +292,13 @@ export function AppTopNav({
             <NavMenu activeHref={activeHref} isSignedIn={isSignedIn} links={links} />
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Phone tab bar: fixed to the bottom so it survives scrolling, padded for
           the home-indicator inset, every tab sharing the width evenly. */}
-      <motion.nav
-        animate={{ opacity: 1, y: 0 }}
+      <nav
         aria-label="App navigation"
         className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/15 bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden"
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
-        transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <ul className="flex items-stretch">
           {links.map(({ href, icon: Icon, label, requiresAuth }) => {
@@ -313,7 +324,7 @@ export function AppTopNav({
             );
           })}
         </ul>
-      </motion.nav>
+      </nav>
     </>
   );
 }
