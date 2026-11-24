@@ -175,12 +175,12 @@ html[data-catalog-url="filtered"] [data-catalog-results] {
       scale 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* Interactive cards grow 10% on hover, lifted above their neighbours so the
+  /* Interactive cards grow 2% on hover, lifted above their neighbours so the
      enlarged card overlaps the grid gap instead of slipping under the next
      card. Pointer-only: touch has no hover, and admin previews skip the class. */
   @media (hover: hover) {
     .card-spotlight-grow:hover {
-      scale: 1.1;
+      scale: 1.02;
       z-index: 10;
     }
   }
