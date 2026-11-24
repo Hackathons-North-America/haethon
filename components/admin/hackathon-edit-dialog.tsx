@@ -106,6 +106,7 @@ export function HackathonEditDialog({
       travelReimbursement: formData.get("travelReimbursement") === "on",
       highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
+      discordTag: formData.get("discordTag")?.toString() ?? "",
       discordChannelId: formData.get("discordChannelId")?.toString() ?? "",
       source: formData.get("source")?.toString() ?? "",
     };
@@ -360,6 +361,21 @@ export function HackathonEditDialog({
                   type="number"
                   min="0"
                   defaultValue={item.prizeAmountUsd ?? ""}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className={labelClassName} htmlFor={`${item.id}-discordTag`}>
+                  Discord tag
+                </label>
+                <input
+                  id={`${item.id}-discordTag`}
+                  name="discordTag"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={33}
+                  placeholder="Organizer to ping"
+                  defaultValue={item.discordTag ?? ""}
                   className={inputClassName}
                 />
               </div>

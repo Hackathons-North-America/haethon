@@ -413,6 +413,7 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
       travelReimbursement: formData.get("travelReimbursement") === "on",
       highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
+      discordTag: formData.get("discordTag")?.toString() ?? "",
     };
 
     const response = await fetch(`/api/organizer/hackathons/${item.id}`, {
@@ -648,6 +649,21 @@ function OrganizerHackathonPanel({ item: initialItem, defaultOpen }: { item: Org
                     type="number"
                     min="0"
                     defaultValue={item.prizeAmountUsd ?? ""}
+                    className={inputClassName}
+                  />
+                </div>
+                <div>
+                  <label className={labelClassName} htmlFor={`${item.id}-discordTag`}>
+                    Discord tag
+                  </label>
+                  <input
+                    id={`${item.id}-discordTag`}
+                    name="discordTag"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={33}
+                    placeholder="Organizer to ping"
+                    defaultValue={item.discordTag ?? ""}
                     className={inputClassName}
                   />
                 </div>

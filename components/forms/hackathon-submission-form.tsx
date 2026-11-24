@@ -88,6 +88,7 @@ export function HackathonSubmissionForm() {
             shortDescription: fieldValue(formData, "shortDescription"),
             organizationName: fieldValue(formData, "organizationName"),
             websiteUrl: urlValue(formData, "websiteUrl"),
+            discordTag: fieldValue(formData, "discordTag"),
             applicationOpensAt: fieldValue(formData, "applicationOpensAt"),
             applicationClosesAt: fieldValue(formData, "applicationClosesAt"),
             venue: fieldValue(formData, "venue"),
@@ -196,6 +197,27 @@ export function HackathonSubmissionForm() {
                     placeholder="www.example.com"
                     className={inputClassName}
                   />
+                </div>
+                <div>
+                  <label className={labelClassName} htmlFor="discordTag">
+                    Organizer Discord
+                  </label>
+                  <input
+                    id="discordTag"
+                    name="discordTag"
+                    required
+                    type="text"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={33}
+                    placeholder="username"
+                    aria-describedby="discordTag-note"
+                    className={inputClassName}
+                  />
+                  <p id="discordTag-note" className="mt-2 text-xs leading-5 text-ink/55">
+                    One organizer hackers can ping with questions.
+                  </p>
                 </div>
               </>
             ) : (

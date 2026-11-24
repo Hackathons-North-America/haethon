@@ -176,6 +176,9 @@ export const hackathons = pgTable(
     travelReimbursement: boolean("travel_reimbursement").notNull().default(false),
     highSchoolersOnly: boolean("high_schoolers_only").notNull().default(false),
     prizeAmountUsd: integer("prize_amount_usd"),
+    /* Discord username of one organizer hackers can ping. Required on the
+       organizer submission form; null for scraped/community listings. */
+    discordTag: varchar("discord_tag", { length: 32 }),
     /* Where the listing came from, compiled once when the hackathon is
        created (derived from the import's source URL) and admin-editable
        afterwards. Later sightings of the same event never overwrite it.

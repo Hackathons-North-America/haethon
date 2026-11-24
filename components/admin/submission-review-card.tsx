@@ -66,6 +66,7 @@ const reviewFieldLabels: Record<string, string> = {
   format: "format",
   shortDescription: "description",
   prizeAmountUsd: "prize",
+  discordTag: "Discord tag",
 };
 
 export function submissionReviewErrorMessage(error: unknown) {
@@ -200,6 +201,7 @@ export function SubmissionReviewCard({
       travelReimbursement: formData.get("travelReimbursement") === "on",
       highSchoolersOnly: formData.get("highSchoolersOnly") === "on",
       prizeAmountUsd: formData.get("prizeAmountUsd")?.toString() ?? "",
+      discordTag: formData.get("discordTag")?.toString() ?? "",
       recurring,
     };
     const body =
@@ -517,6 +519,21 @@ export function SubmissionReviewCard({
               rows={3}
               minLength={3}
               placeholder="Required to reject"
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className={labelClassName} htmlFor={`${submission.id}-discordTag`}>
+              Discord tag
+            </label>
+            <input
+              id={`${submission.id}-discordTag`}
+              name="discordTag"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={33}
+              placeholder="Organizer to ping"
+              defaultValue={value(submission.payload, "discordTag")}
               className={inputClassName}
             />
           </div>
