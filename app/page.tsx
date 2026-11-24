@@ -1,20 +1,11 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 
-import { DotsIcon, FlagsIcon, GlobeStarIcon, TicketIcon } from "@/components/landing/feature-icons";
 import { HeroToolbox } from "@/components/landing/hero-toolbox";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { TypewriterWord } from "@/components/landing/typewriter-word";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 
 const heroAudiences = ["Student", "Corporate", "Professional"] as const;
-
-const features: { icon: ReactNode; label: string }[] = [
-  { icon: <FlagsIcon />, label: "Find hackathons across the US and Canada" },
-  { icon: <TicketIcon />, label: "Track every application in one pipeline" },
-  { icon: <GlobeStarIcon />, label: "Build a hacker profile from Devpost" },
-  { icon: <DotsIcon />, label: "Check in, vote, and show what you shipped" },
-];
 
 export default function Home() {
   // Signed-in visitors are redirected into the app by the proxy, keeping this
@@ -30,7 +21,7 @@ export default function Home() {
         <WatercolorBackdrop dome className="absolute inset-x-0 top-0 h-[calc(288px+var(--dome))] xl:h-[calc(381px+var(--dome))]" />
         <LandingNav />
 
-        <section className="relative px-6 pt-16 text-center xl:pt-[122px]">
+        <section className="relative px-6 pb-40 pt-16 text-center xl:pt-[122px]">
           <p className="text-[17px] font-medium leading-5">
             <span className="sr-only">Every Student, Corporate, and Professional Hackathon in North America</span>
             <span aria-hidden="true">
@@ -66,17 +57,6 @@ export default function Home() {
           >
             Browse hackathons
           </Link>
-        </section>
-
-        <section aria-label="What you can do" className="px-6 pb-40 pt-28 xl:pt-[210px]">
-          <ul className="mx-auto grid max-w-[1748px] grid-cols-1 gap-y-14 sm:grid-cols-2 lg:grid-cols-4">
-            {features.map(({ icon, label }) => (
-              <li className="flex flex-col items-center text-center" key={label}>
-                <div className="flex h-9 items-center justify-center">{icon}</div>
-                <p className="mt-[14px] max-w-[270px] text-[20px] leading-[1.3]">{label}</p>
-              </li>
-            ))}
-          </ul>
         </section>
       </div>
     </main>
