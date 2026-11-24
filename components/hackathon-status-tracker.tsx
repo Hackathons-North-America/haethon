@@ -100,10 +100,10 @@ export function HackathonStatusTracker({
               compact ? "min-h-8" : "min-h-9"
             } ${
               active
-                ? "border-pine dark:border-moss/50 bg-pine text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white"
+                ? "border-pine bg-pine text-paper"
                 : reached
-                  ? "border-pine/40 bg-pine/5 dark:bg-moss/10 text-pine dark:text-moss hover:bg-pine/10"
-                  : "border-ink/15 dark:border-white/15 bg-white dark:bg-white/[0.06] text-ink/55 dark:text-paper/55 hover:border-pine/40 dark:hover:border-moss/40 hover:text-pine dark:hover:text-moss"
+                  ? "border-pine/40 bg-pine/5 text-pine hover:bg-pine/10"
+                  : "border-ink/15 bg-surface text-ink/55 hover:border-pine/40 hover:text-pine"
             }`}
             disabled={pending || isPastPipeline}
             key={stage.value}
@@ -116,7 +116,7 @@ export function HackathonStatusTracker({
         );
       })}
       {isPastPipeline ? (
-        <span className="inline-flex rounded-full min-h-8 items-center border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 font-medium text-ink dark:text-paper">
+        <span className="inline-flex rounded-full min-h-8 items-center border border-ink/10 bg-paper px-3 font-medium text-ink">
           {status === "won" ? "Won" : "Attended"}
         </span>
       ) : null}

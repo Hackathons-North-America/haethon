@@ -30,19 +30,19 @@ function FindingRow({
   resolutions: Map<string, ResolutionState>;
 }) {
   return (
-    <article className="rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-5">
+    <article className="rounded-xl border border-ink/10 bg-surface p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="text-sm font-semibold text-ink dark:text-paper">{finding.userName}</p>
-        <p className="text-sm text-ink/55 dark:text-paper/55">{finding.userEmail}</p>
+        <p className="text-sm font-semibold text-ink">{finding.userName}</p>
+        <p className="text-sm text-ink/55">{finding.userEmail}</p>
         <span
           className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-            finding.severity === "high" ? "bg-[#B42318]/10 text-[#B42318]" : "bg-[#B54708]/10 text-[#B54708]"
+            finding.severity === "high" ? "bg-danger/10 text-danger" : "bg-warning/10 text-warning"
           }`}
         >
           {finding.severity}
         </span>
       </div>
-      <p className="mt-2 text-sm leading-6 text-ink/70 dark:text-paper/70">{finding.summary}</p>
+      <p className="mt-2 text-sm leading-6 text-ink/70">{finding.summary}</p>
       <ul className="mt-3 space-y-2">
         {finding.hackathons.map((hackathon) => {
           const resolution = resolutions.get(pairKey(finding.userId, hackathon.id));
@@ -51,14 +51,14 @@ function FindingRow({
 
           return (
             <li
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-3 py-2"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink/10 bg-paper px-3 py-2"
               key={hackathon.id}
             >
-              <span className="text-sm font-semibold text-ink dark:text-paper">{hackathon.name}</span>
+              <span className="text-sm font-semibold text-ink">{hackathon.name}</span>
               <span className="flex flex-wrap items-center gap-2">
                 {resolution?.message ? (
                   <span
-                    className={`text-sm font-semibold ${resolution.status === "error" ? "text-[#B42318]" : "text-[#362519]"}`}
+                    className={`text-sm font-semibold ${resolution.status === "error" ? "text-danger" : "text-pine"}`}
                   >
                     {resolution.message}
                   </span>
@@ -66,7 +66,7 @@ function FindingRow({
                 {settled ? null : (
                   <>
                     <button
-                      className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#362519] px-3 text-sm font-semibold text-white disabled:opacity-50"
+                      className="inline-flex min-h-9 items-center gap-2 rounded-full bg-pine px-3 text-sm font-semibold text-paper disabled:opacity-50"
                       disabled={busy}
                       onClick={() => onResolve(finding.userId, hackathon.id, "verify")}
                       type="button"
@@ -75,7 +75,7 @@ function FindingRow({
                       {resolution?.status === "verifying" ? "Verifying..." : "Verify"}
                     </button>
                     <button
-                      className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[#B42318] px-3 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+                      className="inline-flex min-h-9 items-center gap-2 rounded-full border border-danger px-3 text-sm font-semibold text-danger disabled:opacity-50"
                       disabled={busy}
                       onClick={() => onResolve(finding.userId, hackathon.id, "revoke")}
                       type="button"
@@ -131,7 +131,7 @@ export function AttendanceAnomalyManager({ findings }: { findings: AttendanceAno
 
   if (!findings.length) {
     return (
-      <p className="rounded-xl border border-ink/10 dark:border-white/10 bg-white dark:bg-white/[0.06] p-6 text-sm text-ink/55 dark:text-paper/55">
+      <p className="rounded-xl border border-ink/10 bg-surface p-6 text-sm text-ink/55">
         No attendance anomalies detected. Self reported claims currently look statistically normal.
       </p>
     );
@@ -147,9 +147,9 @@ export function AttendanceAnomalyManager({ findings }: { findings: AttendanceAno
     <div className="space-y-8">
       {groups.map((group) => (
         <section key={group.type}>
-          <h2 className="text-lg font-semibold text-ink dark:text-paper">
+          <h2 className="text-lg font-semibold text-ink">
             {group.label}{" "}
-            <span className="ml-1 rounded-full bg-paper dark:bg-white/5 px-2.5 py-0.5 text-sm font-semibold text-ink/70 dark:text-paper/70">
+            <span className="ml-1 rounded-full bg-paper px-2.5 py-0.5 text-sm font-semibold text-ink/70">
               {group.findings.length}
             </span>
           </h2>

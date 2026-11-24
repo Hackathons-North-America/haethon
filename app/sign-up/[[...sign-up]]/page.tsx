@@ -1,16 +1,9 @@
 import { SignUp } from "@clerk/nextjs";
 
+import { clerkThemeVariables } from "@/lib/clerk-appearance";
+
 const appearance = {
-  variables: {
-    colorBackground: "#fbf7f0",
-    colorInput: "#fbf7f0",
-    colorForeground: "#1b1917",
-    colorMutedForeground: "rgba(27, 25, 23, 0.55)",
-    colorPrimary: "#362519",
-    colorPrimaryForeground: "#fbf7f0",
-    colorBorder: "rgba(27, 25, 23, 0.15)",
-    borderRadius: "0px",
-  },
+  variables: clerkThemeVariables,
   elements: {
     cardBox: "border border-ink/15 shadow-none",
     card: "shadow-none",

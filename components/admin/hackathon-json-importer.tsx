@@ -307,15 +307,15 @@ export function HackathonJsonImporter() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Bulk import</p>
-            <h2 className="mt-1 text-2xl font-semibold text-ink dark:text-paper">{complete ? "Import review complete" : "Approve imported card"}</h2>
-            <p className="mt-1 text-sm text-ink/55 dark:text-paper/55">
+            <h2 className="mt-1 text-2xl font-semibold text-ink">{complete ? "Import review complete" : "Approve imported card"}</h2>
+            <p className="mt-1 text-sm text-ink/55">
               {complete
                 ? `${importedCount} approved, ${mergedCount} merged, ${updatedCount} updated, ${skippedCount} skipped.`
                 : `${remainingCount} remaining · ${importedCount} approved · ${mergedCount} merged · ${updatedCount} updated · ${skippedCount} skipped`}
             </p>
           </div>
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 dark:border-white/15 px-4 text-sm font-semibold text-ink dark:text-paper hover:bg-paper dark:hover:bg-white/10"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink hover:bg-paper"
             onClick={resetImport}
             type="button"
           >
@@ -331,12 +331,12 @@ export function HackathonJsonImporter() {
               <HackathonPayloadDetails payload={activePayload} />
             </div>
             {pendingDuplicate ? (
-              <div className="order-first flex flex-col rounded-xl border border-[#B54708]/30 bg-[#FFFAEB] p-4 dark:border-[#f5b678]/40 dark:bg-[#f5b678]/10 xl:order-none xl:sticky xl:top-4">
+              <div className="order-first flex flex-col rounded-xl border border-warning/30 bg-warning-soft p-4 xl:order-none xl:sticky xl:top-4">
                 <div>
-                  <p className="text-sm font-semibold text-ink dark:text-paper">Possible duplicate</p>
-                  <p className="mt-2 text-sm leading-6 text-ink/55 dark:text-paper/55">
+                  <p className="text-sm font-semibold text-ink">Possible duplicate</p>
+                  <p className="mt-2 text-sm leading-6 text-ink/55">
                     This matches{" "}
-                    <span className="font-semibold text-ink dark:text-paper">
+                    <span className="font-semibold text-ink">
                       {pendingDuplicate.matchedName ?? "an existing hackathon"}
                     </span>{" "}
                     on both name and start date (match {pendingDuplicate.duplicateScore.toFixed(2)}). Import it as a
@@ -345,7 +345,7 @@ export function HackathonJsonImporter() {
                 </div>
                 <div className="mt-5 grid gap-3">
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
                     disabled={status === "submitting"}
                     onClick={() => runImport({ ignoreDuplicates: true })}
                     type="button"
@@ -354,7 +354,7 @@ export function HackathonJsonImporter() {
                     Import as new anyway
                   </button>
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
                     disabled={status === "submitting"}
                     onClick={dismissDuplicate}
                     type="button"
@@ -365,21 +365,21 @@ export function HackathonJsonImporter() {
                 </div>
               </div>
             ) : pendingDiscord && pendingDiscord.discord.action !== "create" ? (
-              <div className="order-first flex flex-col rounded-xl border border-pine/20 bg-pine/5 p-4 dark:border-moss/40 dark:bg-moss/10 xl:order-none xl:sticky xl:top-4">
+              <div className="order-first flex flex-col rounded-xl border border-pine/20 bg-pine/5 p-4 xl:order-none xl:sticky xl:top-4">
                 <div>
-                  <p className="text-sm font-semibold text-ink dark:text-paper">Create a Discord channel?</p>
-                  <p className="mt-2 text-sm leading-6 text-ink/55 dark:text-paper/55">
+                  <p className="text-sm font-semibold text-ink">Create a Discord channel?</p>
+                  <p className="mt-2 text-sm leading-6 text-ink/55">
                     Imported. This qualifies for the{" "}
-                    <span className="font-semibold text-ink dark:text-paper">{pendingDiscord.discord.categoryName}</span> category.
+                    <span className="font-semibold text-ink">{pendingDiscord.discord.categoryName}</span> category.
                     Approving will recycle the existing{" "}
-                    <span className="font-semibold text-ink dark:text-paper">#{pendingDiscord.discord.existingChannelName}</span>{" "}
-                    channel named <span className="font-semibold text-ink dark:text-paper">#{pendingDiscord.discord.name}</span> and
+                    <span className="font-semibold text-ink">#{pendingDiscord.discord.existingChannelName}</span>{" "}
+                    channel named <span className="font-semibold text-ink">#{pendingDiscord.discord.name}</span> and
                     place it there. Deny keeps the hackathon published without a channel.
                   </p>
                 </div>
                 <div className="mt-5 grid gap-3">
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
                     disabled={discordBusy}
                     onClick={() => decideDiscord("approve")}
                     type="button"
@@ -388,7 +388,7 @@ export function HackathonJsonImporter() {
                     Approve channel
                   </button>
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
                     disabled={discordBusy}
                     onClick={() => decideDiscord("deny")}
                     type="button"
@@ -399,16 +399,16 @@ export function HackathonJsonImporter() {
                 </div>
               </div>
             ) : pendingDiscord ? null : (
-              <div className="order-first flex flex-col rounded-xl border border-ink/10 bg-paper p-4 dark:border-white/10 dark:bg-white/5 xl:order-none xl:sticky xl:top-4">
+              <div className="order-first flex flex-col rounded-xl border border-ink/10 bg-paper p-4 xl:order-none xl:sticky xl:top-4">
                 <div>
-                  <p className="text-sm font-semibold text-ink dark:text-paper">Does this card look right?</p>
-                  <p className="mt-2 text-sm leading-6 text-ink/55 dark:text-paper/55">
+                  <p className="text-sm font-semibold text-ink">Does this card look right?</p>
+                  <p className="mt-2 text-sm leading-6 text-ink/55">
                     Yes imports this record. No skips it and shows the next card. Edit card fixes details, tags, or location before importing.
                   </p>
                 </div>
                 <div className="mt-5 grid gap-3">
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#362519] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
                     disabled={status === "submitting"}
                     onClick={() => runImport()}
                     type="button"
@@ -417,7 +417,7 @@ export function HackathonJsonImporter() {
                     Yes
                   </button>
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-ink/15 dark:border-white/15 px-4 text-sm font-semibold text-ink dark:text-paper hover:bg-white dark:hover:bg-white/10 disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink hover:bg-surface disabled:opacity-50"
                     disabled={status === "submitting"}
                     onClick={() => setEditing(true)}
                     type="button"
@@ -426,7 +426,7 @@ export function HackathonJsonImporter() {
                     Edit card
                   </button>
                   <button
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
                     disabled={status === "submitting"}
                     onClick={skipActive}
                     type="button"
@@ -446,19 +446,19 @@ export function HackathonJsonImporter() {
 
         {pendingDiscord && pendingDiscord.discord.action === "create" ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-            <div className="w-full max-w-2xl rounded-2xl border border-pine/20 dark:border-moss/40 bg-white dark:bg-[#141414] p-8 shadow-2xl sm:p-12">
+            <div className="w-full max-w-2xl rounded-2xl border border-pine/20 bg-surface p-8 shadow-2xl sm:p-12">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">New Discord channel</p>
-              <h2 className="mt-3 text-3xl font-semibold text-ink dark:text-paper">Create a Discord channel?</h2>
-              <p className="mt-4 text-base leading-7 text-ink/55 dark:text-paper/55">
+              <h2 className="mt-3 text-3xl font-semibold text-ink">Create a Discord channel?</h2>
+              <p className="mt-4 text-base leading-7 text-ink/55">
                 Imported. This qualifies for the{" "}
-                <span className="font-semibold text-ink dark:text-paper">{pendingDiscord.discord.categoryName}</span> category.
+                <span className="font-semibold text-ink">{pendingDiscord.discord.categoryName}</span> category.
                 Approving will create a new channel named{" "}
-                <span className="font-semibold text-ink dark:text-paper">#{pendingDiscord.discord.name}</span> and place it there.
+                <span className="font-semibold text-ink">#{pendingDiscord.discord.name}</span> and place it there.
                 Deny keeps the hackathon published without a channel.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <button
-                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-[#362519] px-4 text-base font-semibold text-white disabled:opacity-50"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-pine px-4 text-base font-semibold text-paper disabled:opacity-50"
                   disabled={discordBusy}
                   onClick={() => decideDiscord("approve")}
                   type="button"
@@ -467,7 +467,7 @@ export function HackathonJsonImporter() {
                   Approve channel
                 </button>
                 <button
-                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-[#B42318] px-4 text-base font-semibold text-[#B42318] disabled:opacity-50"
+                  className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-danger px-4 text-base font-semibold text-danger disabled:opacity-50"
                   disabled={discordBusy}
                   onClick={() => decideDiscord("deny")}
                   type="button"
@@ -484,8 +484,8 @@ export function HackathonJsonImporter() {
           <div
             className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
               status === "error"
-                ? "border-[#B42318]/30 bg-[#FEF3F2] text-[#B42318]"
-                : "border-[#362519]/25 bg-[#EDE5DD] text-[#362519]"
+                ? "border-danger/30 bg-danger-soft text-danger"
+                : "border-pine/25 bg-pine-soft text-pine"
             }`}
           >
             {status === "error" ? (
@@ -505,10 +505,10 @@ export function HackathonJsonImporter() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Bulk import</p>
-          <h2 className="mt-2 text-2xl font-semibold text-ink dark:text-paper">Scraped hackathons JSON</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">Scraped hackathons JSON</h2>
         </div>
         <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine hover:bg-pine/90 px-4 text-sm font-semibold text-paper dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine hover:bg-pine/90 px-4 text-sm font-semibold text-paper disabled:opacity-50"
           disabled={status === "submitting" || !jsonText.trim()}
           type="submit"
         >
@@ -519,7 +519,7 @@ export function HackathonJsonImporter() {
 
       <textarea
         aria-label="Hackathon import JSON"
-        className="min-h-72 w-full rounded-xl border border-ink/15 dark:border-white/15 bg-paper dark:bg-white/5 p-4 font-mono text-xs leading-5 text-ink dark:text-paper outline-none focus:border-pine focus:ring-2 focus:ring-pine/15"
+        className="min-h-72 w-full rounded-xl border border-ink/15 bg-paper p-4 font-mono text-xs leading-5 text-ink outline-none focus:border-pine focus:ring-2 focus:ring-pine/15"
         onChange={(event) => setJsonText(event.target.value)}
         placeholder={sampleJson}
         spellCheck={false}
@@ -530,8 +530,8 @@ export function HackathonJsonImporter() {
         <div
           className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${
             status === "error"
-              ? "border-[#B42318]/30 bg-[#FEF3F2] text-[#B42318]"
-              : "border-[#362519]/25 bg-[#EDE5DD] text-[#362519]"
+              ? "border-danger/30 bg-danger-soft text-danger"
+              : "border-pine/25 bg-pine-soft text-pine"
           }`}
         >
           {status === "error" ? (
@@ -544,19 +544,19 @@ export function HackathonJsonImporter() {
       ) : null}
 
       {results.length ? (
-        <div className="overflow-hidden rounded-xl border border-ink/10 dark:border-white/10">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-ink/10 dark:border-white/10 bg-paper dark:bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55 dark:text-paper/55">
+        <div className="overflow-hidden rounded-xl border border-ink/10">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-ink/10 bg-paper px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-ink/55">
             <span>Name</span>
             <span>Status</span>
             <span>Duplicate</span>
           </div>
-          <div className="divide-y divide-ink/10 dark:divide-white/10 bg-white dark:bg-white/[0.06]">
+          <div className="divide-y divide-ink/10 bg-surface">
             {results.map((result, position) => (
               // Cards are imported one at a time, so the list position is the
               // stable identity; an unchanged feed update has no submission id.
               <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3 text-sm" key={`${position}-${result.status}`}>
-                <span className="font-semibold text-ink dark:text-paper">{result.name}</span>
-                <span className={result.status === "duplicate_flagged" ? "text-[#B54708]" : "text-[#362519]"}>
+                <span className="font-semibold text-ink">{result.name}</span>
+                <span className={result.status === "duplicate_flagged" ? "text-warning" : "text-pine"}>
                   {result.status === "imported"
                     ? "Imported"
                     : result.status === "auto_merged"
@@ -565,7 +565,7 @@ export function HackathonJsonImporter() {
                         ? "Updated"
                         : "Flagged"}
                 </span>
-                <span className="text-ink/55 dark:text-paper/55">{result.duplicateScore.toFixed(2)}</span>
+                <span className="text-ink/55">{result.duplicateScore.toFixed(2)}</span>
               </div>
             ))}
           </div>

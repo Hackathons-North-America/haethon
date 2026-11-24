@@ -5,11 +5,16 @@
 
    With `dome`, a white "horizon" cuts into the bottom: a quadratic curve whose
    height scales with the viewport (--dome, set by the caller) so the arc keeps
-   the same curvature at any width. Decorative throughout. */
+   the same curvature at any width. In dark mode the whole wash is dimmed by
+   --watercolor-filter (app/globals.css) so its texture survives as a dark
+   ground, and the horizon is filled with the page's surface color. Decorative
+   throughout. */
 export function WatercolorBackdrop({ className = "", dome = false }: { className?: string; dome?: boolean }) {
   return (
     <div aria-hidden="true" className={`pointer-events-none overflow-hidden ${className}`}>
-      <svg className="absolute inset-0 size-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1600 480">
+      <svg
+        className="absolute inset-0 size-full [filter:var(--watercolor-filter)]"
+        preserveAspectRatio="xMidYMid slice" viewBox="0 0 1600 480">
         <defs>
           <linearGradient id="watercolor-base" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="#dcc8aa" />
@@ -44,7 +49,7 @@ export function WatercolorBackdrop({ className = "", dome = false }: { className
           {/* Edges sit on the bottom, the peak touches the top: a quadratic
               with its control point at -100 peaks at exactly y=0. The extra 1
               unit below hides any sub-pixel seam against the white page. */}
-          <path d="M0 100 Q50 -100 100 100 V101 H0 Z" fill="#fff" />
+          <path d="M0 100 Q50 -100 100 100 V101 H0 Z" className="fill-surface" />
         </svg>
       ) : null}
     </div>

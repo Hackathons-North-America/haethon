@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 /* The measuring-tape frame: a dashed rule with a tick every 40px (plus minor
    ticks every 8px on the horizontal rulers). Drawn entirely with background
    gradients so it stretches to any height without extra DOM. */
-const rule = "rgb(0 0 0 / 0.2)";
+const rule = "color-mix(in oklab, var(--ink) 20%, transparent)";
 const dashed = (direction: "right" | "bottom") =>
   `repeating-linear-gradient(to ${direction}, ${rule} 0 2px, transparent 2px 5px)`;
 const tick = (direction: "right" | "bottom") => `linear-gradient(to ${direction}, ${rule} 0 1px, transparent 1px)`;
@@ -40,8 +40,8 @@ function ruler(edge: "top" | "bottom"): CSSProperties {
 function HackCanadaFigure() {
   return (
     <figure className="my-14 sm:my-16">
-      <div className="border border-dashed border-black/15 p-1.5">
-        <div className="relative aspect-[4/3] overflow-hidden border border-black/15 bg-black/[0.03]">
+      <div className="border border-dashed border-ink/15 p-1.5">
+        <div className="relative aspect-[4/3] overflow-hidden border border-ink/15 bg-ink/[0.03]">
           <Image
             alt="The Hack Canada organizing team in matching Hack Canada shirts, posing and throwing hand signs around a reception desk"
             className="object-cover"
@@ -51,7 +51,7 @@ function HackCanadaFigure() {
           />
         </div>
       </div>
-      <figcaption className="mt-3 font-mono text-[12px] uppercase tracking-[0.12em] text-black/45">
+      <figcaption className="mt-3 font-mono text-[12px] uppercase tracking-[0.12em] text-ink/45">
         The Hack Canada team · 2026
       </figcaption>
     </figure>
@@ -60,7 +60,7 @@ function HackCanadaFigure() {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-white text-black">
+    <main className="min-h-screen overflow-x-clip bg-surface text-ink">
       <LandingNav />
 
       <div className="px-4 pb-32 pt-10 sm:px-6 sm:pt-16">
@@ -70,8 +70,8 @@ export default function AboutPage() {
           <div aria-hidden="true" className="absolute inset-y-4 left-0 w-[7px]" style={rail("left")} />
           <div aria-hidden="true" className="absolute inset-y-4 right-0 w-[7px]" style={rail("right")} />
 
-          <div className="mx-auto max-w-[540px] px-7 pb-20 pt-16 text-[16px] leading-[1.7] text-black/65 sm:px-10 sm:pb-28 sm:pt-24 sm:text-[17px] [&_p+p]:mt-7">
-            <h1 className="mb-10 text-[22px] font-medium leading-tight tracking-[-0.02em] text-black sm:text-[24px]">
+          <div className="mx-auto max-w-[540px] px-7 pb-20 pt-16 text-[16px] leading-[1.7] text-ink/65 sm:px-10 sm:pb-28 sm:pt-24 sm:text-[17px] [&_p+p]:mt-7">
+            <h1 className="mb-10 text-[22px] font-medium leading-tight tracking-[-0.02em] text-ink sm:text-[24px]">
               Why We Were Invented
             </h1>
 
@@ -118,7 +118,7 @@ export default function AboutPage() {
               just prompting. There&apos;s a great quote for this:
             </p>
 
-            <blockquote className="my-9 border-l border-black/20 pl-5 text-[19px] leading-snug tracking-[-0.01em] text-black sm:text-[20px]">
+            <blockquote className="my-9 border-l border-ink/20 pl-5 text-[19px] leading-snug tracking-[-0.01em] text-ink sm:text-[20px]">
               &ldquo;An idiot in motion is better than a genius at rest.&rdquo;
             </blockquote>
 

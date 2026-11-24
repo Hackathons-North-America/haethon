@@ -101,7 +101,7 @@ function AdminHackathonCard({
       />
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
           disabled={deleting}
           onClick={() => onEdit(item)}
           type="button"
@@ -113,8 +113,8 @@ function AdminHackathonCard({
           aria-pressed={item.isRecurring}
           className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold disabled:opacity-50 ${
             item.isRecurring
-              ? "border-pine bg-pine text-paper dark:border-paper dark:bg-paper dark:text-[#141414]"
-              : "border-ink/20 text-ink/70 dark:border-white/20 dark:text-paper/70"
+              ? "border-pine bg-pine text-paper"
+              : "border-ink/20 text-ink/70"
           }`}
           disabled={busy}
           onClick={() => void toggleRecurring()}
@@ -124,7 +124,7 @@ function AdminHackathonCard({
           {status === "toggling" ? "Saving..." : item.isRecurring ? "Repeats yearly" : "Not repeating"}
         </button>
         <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
           disabled={busy}
           onClick={() => void deleteHackathon()}
           type="button"
@@ -132,7 +132,7 @@ function AdminHackathonCard({
           <Trash2 aria-hidden="true" className="size-4" />
           {deleting ? "Deleting..." : "Delete"}
         </button>
-        {message ? <p className="w-full text-sm font-semibold text-[#B42318]">{message}</p> : null}
+        {message ? <p className="w-full text-sm font-semibold text-danger">{message}</p> : null}
       </div>
     </div>
   );
@@ -149,7 +149,7 @@ export function PublishedHackathonManager({ hackathons }: { hackathons: AdminHac
 
   if (!items.length) {
     return (
-      <p className="rounded-xl border border-ink/10 bg-white p-6 text-sm text-ink/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-paper/55">
+      <p className="rounded-xl border border-ink/10 bg-surface p-6 text-sm text-ink/55">
         No hackathons are currently displayed on the hackathons page.
       </p>
     );

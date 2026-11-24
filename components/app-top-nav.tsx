@@ -21,6 +21,7 @@ import { useAppNavSlotRef } from "@/components/app-nav-slot";
 import { BrandLogo } from "@/components/brand-logo";
 import { LoginRequiredLink } from "@/components/login-required-dialog";
 import { NavUnderline } from "@/components/nav-underline";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type NavLink = {
   href: string;
@@ -155,7 +156,7 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
       {open ? (
         <nav
           aria-label="Menu"
-          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 overflow-hidden rounded-2xl border border-ink/10 bg-white py-2 shadow-[0_18px_44px_-12px_rgba(27,25,23,0.3)]"
+          className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 overflow-hidden rounded-2xl border border-ink/10 bg-surface py-2 shadow-[0_18px_44px_-12px_rgba(27,25,23,0.3)]"
           id={menuId}
         >
           <ul>
@@ -267,6 +268,7 @@ export function AppTopNav({
                 <NavUnderline />
               </span>
             </LoginRequiredLink>
+            <ThemeToggle className={`${circleButton} bg-ink/[0.06] text-ink hover:bg-ink/10`} />
             <ProfileCircle isSignedIn={isSignedIn} />
             <NavMenu activeHref={activeHref} isSignedIn={isSignedIn} links={links} />
           </div>

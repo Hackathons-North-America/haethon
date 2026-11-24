@@ -146,7 +146,7 @@ export function LoginRequiredDialog() {
 
         <div className="mt-7 flex flex-wrap items-center gap-3">
           <Link
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-black bg-pine px-5 text-sm font-medium text-paper hover:bg-moss focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-ink bg-pine px-5 text-sm font-medium text-paper hover:bg-moss focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
             href={signInHref}
           >
             Log in

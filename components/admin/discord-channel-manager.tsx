@@ -85,7 +85,7 @@ function DiscordChannelCard({
   }
 
   return (
-    <li className="rounded-xl border border-ink/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.06]">
+    <li className="rounded-xl border border-ink/10 bg-surface p-5">
       <div className="flex flex-wrap items-center gap-3">
         {editing ? (
           <form
@@ -98,13 +98,13 @@ function DiscordChannelCard({
             <input
               aria-label="Channel name"
               autoFocus
-              className="min-h-10 rounded-full border border-ink/20 bg-white px-4 font-mono text-sm text-ink focus:outline-none focus:ring-2 focus:ring-pine dark:border-white/20 dark:bg-white/10 dark:text-paper"
+              className="min-h-10 rounded-full border border-ink/20 bg-surface px-4 font-mono text-sm text-ink focus:outline-none focus:ring-2 focus:ring-pine"
               maxLength={100}
               onChange={(event) => setDraft(event.target.value)}
               value={draft}
             />
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 dark:bg-paper dark:text-[#141414] dark:hover:bg-white disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
               disabled={saving || !draft.trim()}
               type="submit"
             >
@@ -112,7 +112,7 @@ function DiscordChannelCard({
               {saving ? "Saving..." : "Save"}
             </button>
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 dark:border-white/20 dark:text-paper/70 disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 disabled:opacity-50"
               disabled={saving}
               onClick={() => {
                 setEditing(false);
@@ -127,15 +127,15 @@ function DiscordChannelCard({
           </form>
         ) : (
           <>
-            <span className="font-mono text-sm font-semibold text-ink dark:text-paper">#{entry.name}</span>
+            <span className="font-mono text-sm font-semibold text-ink">#{entry.name}</span>
             {tracked?.nameOverride ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-pine/30 bg-pine/10 px-3 py-1 text-xs font-semibold text-pine dark:border-paper/30 dark:bg-paper/10 dark:text-paper">
+              <span className="inline-flex items-center gap-1 rounded-full border border-pine/30 bg-pine/10 px-3 py-1 text-xs font-semibold text-pine">
                 <Pin aria-hidden="true" className="size-3" />
                 Pinned name
               </span>
             ) : null}
             {tracked ? null : (
-              <span className="inline-flex items-center rounded-full border border-ink/15 bg-paper px-3 py-1 text-xs font-semibold text-ink/60 dark:border-white/15 dark:bg-white/5 dark:text-paper/60">
+              <span className="inline-flex items-center rounded-full border border-ink/15 bg-paper px-3 py-1 text-xs font-semibold text-ink/60">
                 Untracked
               </span>
             )}
@@ -144,7 +144,7 @@ function DiscordChannelCard({
       </div>
 
       {tracked ? (
-        <p className="mt-2 text-sm text-ink/55 dark:text-paper/55">
+        <p className="mt-2 text-sm text-ink/55">
           {tracked.seriesName ? <>Series: {tracked.seriesName}</> : <>Not linked to a series</>}
           {" · "}
           {tracked.hackathonName ? <>Hackathon: {tracked.hackathonName}</> : <>No hackathon attached</>}
@@ -152,7 +152,7 @@ function DiscordChannelCard({
           {tracked.guildName}
         </p>
       ) : (
-        <p className="mt-2 text-sm text-ink/55 dark:text-paper/55">
+        <p className="mt-2 text-sm text-ink/55">
           {entry.topic ? entry.topic : "Not managed by the sync — created outside Haethon."}
         </p>
       )}
@@ -160,7 +160,7 @@ function DiscordChannelCard({
       {editing || !tracked ? null : (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink dark:border-white/20 dark:text-paper/70 dark:hover:bg-white/10 dark:hover:text-paper disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink disabled:opacity-50"
             disabled={saving}
             onClick={() => {
               setDraft(entry.name);
@@ -174,7 +174,7 @@ function DiscordChannelCard({
           </button>
           {tracked.nameOverride ? (
             <button
-              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink dark:border-white/20 dark:text-paper/70 dark:hover:bg-white/10 dark:hover:text-paper disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/20 px-4 text-sm font-semibold text-ink/70 hover:bg-paper hover:text-ink disabled:opacity-50"
               disabled={busy}
               onClick={() => void submit(null)}
               type="button"
@@ -184,7 +184,7 @@ function DiscordChannelCard({
             </button>
           ) : null}
           <button
-            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#B42318] px-4 text-sm font-semibold text-[#B42318] disabled:opacity-50"
+            className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
             disabled={busy}
             onClick={() => void deleteChannel()}
             title={
@@ -200,7 +200,7 @@ function DiscordChannelCard({
         </div>
       )}
 
-      {message ? <p className="mt-3 text-sm font-semibold text-[#B42318]">{message}</p> : null}
+      {message ? <p className="mt-3 text-sm font-semibold text-danger">{message}</p> : null}
     </li>
   );
 }
@@ -208,14 +208,14 @@ function DiscordChannelCard({
 /* Report-only: the sync never deletes either channel. The admin decides which to keep. */
 function DuplicateChannelsNotice({ duplicates }: { duplicates: DiscordChannelDuplicate[] }) {
   return (
-    <section className="rounded-xl border border-[#B54708]/30 bg-[#FFFAEB] p-5 dark:border-[#FDB022]/30 dark:bg-[#FDB022]/[0.08]">
+    <section className="rounded-xl border border-warning/30 bg-warning-soft p-5">
       <div className="flex items-center gap-2">
-        <Copy aria-hidden="true" className="size-4 text-[#B54708] dark:text-[#FDB022]" />
-        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-[#B54708] dark:text-[#FDB022]">
+        <Copy aria-hidden="true" className="size-4 text-warning" />
+        <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-warning">
           Possible duplicates · {duplicates.length}
         </h2>
       </div>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/65 dark:text-paper/65">
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/65">
         These hackathons have a channel the sync manages and an untracked channel with a matching name, usually one
         made by hand. Nothing is deleted automatically. To keep the hand-made one, attach its channel ID in the
         hackathon&apos;s edit form, then delete the other on Discord. To keep the tracked one, delete the hand-made
@@ -224,11 +224,11 @@ function DuplicateChannelsNotice({ duplicates }: { duplicates: DiscordChannelDup
       <ul className="mt-4 space-y-2">
         {duplicates.map((duplicate) => (
           <li
-            className="rounded-lg border border-ink/10 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.06]"
+            className="rounded-lg border border-ink/10 bg-surface px-4 py-3 text-sm"
             key={duplicate.tracked.channelSnowflake}
           >
-            <span className="font-semibold text-ink dark:text-paper">{duplicate.hackathonName}</span>
-            <span className="text-ink/55 dark:text-paper/55">
+            <span className="font-semibold text-ink">{duplicate.hackathonName}</span>
+            <span className="text-ink/55">
               {" · tracked "}
               <span className="font-mono">#{duplicate.tracked.name}</span>
               {" · also "}
@@ -272,7 +272,7 @@ export function DiscordChannelManager({ overview }: { overview: AdminDiscordOver
 
   if (!groups.length) {
     return (
-      <p className="rounded-xl border border-ink/10 bg-white p-6 text-sm text-ink/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-paper/55">
+      <p className="rounded-xl border border-ink/10 bg-surface p-6 text-sm text-ink/55">
         No Discord channels have been created yet. Channels appear here once a hackathon is approved for Discord.
       </p>
     );
@@ -281,7 +281,7 @@ export function DiscordChannelManager({ overview }: { overview: AdminDiscordOver
   return (
     <div className="space-y-6">
       {!overview.live ? (
-        <p className="rounded-xl border border-ink/10 bg-white p-4 text-sm text-ink/55 dark:border-white/10 dark:bg-white/[0.06] dark:text-paper/55">
+        <p className="rounded-xl border border-ink/10 bg-surface p-4 text-sm text-ink/55">
           Discord could not be reached, so only tracked channels are shown, grouped by the category the sync last
           filed them into.
         </p>
@@ -291,14 +291,14 @@ export function DiscordChannelManager({ overview }: { overview: AdminDiscordOver
 
       {groups.map((group) => (
         <section
-          className="rounded-xl border border-ink/10 bg-paper/60 p-5 dark:border-white/10 dark:bg-white/[0.03]"
+          className="rounded-xl border border-ink/10 bg-paper/60 p-5"
           key={group.categorySnowflake ?? group.name}
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-ink/70 dark:text-paper/70">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-ink/70">
               {group.name}
             </h2>
-            <span className="text-xs font-semibold text-ink/45 dark:text-paper/45">
+            <span className="text-xs font-semibold text-ink/45">
               {group.channels.length} {group.channels.length === 1 ? "channel" : "channels"}
             </span>
           </div>
@@ -315,7 +315,7 @@ export function DiscordChannelManager({ overview }: { overview: AdminDiscordOver
               ))}
             </ul>
           ) : (
-            <p className="mt-4 text-sm text-ink/45 dark:text-paper/45">No text channels in this category.</p>
+            <p className="mt-4 text-sm text-ink/45">No text channels in this category.</p>
           )}
         </section>
       ))}
