@@ -1,13 +1,15 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
-import { requireAdminUser } from "@/lib/auth";
+import { requireAdminUserId } from "@/lib/auth";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
 import { adminHackathonImportSchema } from "@/lib/validations/hackathon";
 
+/* Also covers the work deferred with after(): vetting images and draining the
+   Discord channel queue. */
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const gate = await requireAdminUser();
+  const gate = await requireAdminUserId();
 
   if (!gate.ok) {
     return NextResponse.json({ error: gate.reason }, { status: gate.reason === "unauthenticated" ? 401 : 403 });
@@ -30,8 +32,11 @@ export async function POST(request: Request) {
   try {
     const result = await importAdminHackathons({
       payloads: parsed.data.hackathons,
-      reviewerUserId: gate.user.id,
+      reviewerUserId: gate.userId,
       ignoreDuplicates: parsed.data.ignoreDuplicates ?? false,
+      // Validation, duplicate checks and the writes are done before the
+      // response; image vetting and Discord run after it.
+      defer: after,
     });
 
     return NextResponse.json({ data: result }, { status: 201 });

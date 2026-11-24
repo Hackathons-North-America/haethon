@@ -5,7 +5,9 @@ import { neonConfig } from "@neondatabase/serverless";
    Neon HTTP proxy). Any other host is refused outright. */
 export const LOCAL_DATABASE_URL = "postgres://postgres:postgres@db.localtest.me:5432/main";
 const LOCAL_HOSTS = new Set(["db.localtest.me", "localhost", "127.0.0.1"]);
-const PROXY_PORT = 4444;
+/* Overridable so several checkouts can each run their own throwaway database
+   side by side (compose project on different host ports). */
+const PROXY_PORT = Number(process.env.TEST_DATABASE_PROXY_PORT ?? 4444);
 
 export function configureLocalDatabase() {
   const url = process.env.TEST_DATABASE_URL ?? LOCAL_DATABASE_URL;

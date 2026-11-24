@@ -86,8 +86,13 @@ const sizeStyles = {
 /**
  * An unbordered vote group: [⇧ score | ⇩]. The score is net (ups minus downs). Clicking the
  * active arrow clears the vote; the other arrow switches it. Signed-out
- * clicks open the login dialog. Updates are optimistic and roll back if the
- * request fails.
+ * clicks open the login dialog.
+ *
+ * Every click shows at once and never waits for the server. While a request is
+ * in flight, further clicks only change what the control shows and remember
+ * the latest choice; when the request returns, that choice is sent if the
+ * server does not already have it. A failed request rolls the control back to
+ * the last state the server confirmed.
  */
 export function HackathonVoteControl({
   className = "",
@@ -109,54 +114,85 @@ export function HackathonVoteControl({
   size?: keyof typeof sizeStyles;
 }) {
   const [state, setState] = useState(() => (preview ? initialState : confirmedVotes.get(hackathonId) ?? initialState));
-  const pendingRef = useRef(false);
-  const [pending, setPending] = useState(false);
+  /* The last state the server confirmed: what a failed request rolls back to. */
+  const confirmedRef = useRef(state);
+  /* The latest vote the viewer chose that has not been sent yet. */
+  const queuedRef = useRef<{ vote: VoteValue | null } | null>(null);
+  const sendingRef = useRef(false);
   const styles = sizeStyles[size];
 
-  useVoteListener(hackathonId, setState);
+  useVoteListener(hackathonId, (next) => {
+    confirmedRef.current = next;
+
+    // A choice of this control's own is still on its way; keep showing it.
+    if (!sendingRef.current) {
+      setState(next);
+    }
+  });
 
   async function vote(clicked: VoteValue) {
-    if (preview || closed || pendingRef.current) {
+    if (preview || closed) {
       return;
     }
 
-    const previous = state;
-    const next = nextVoteFor(previous.viewerVote, clicked);
+    const next = nextVoteFor(state.viewerVote, clicked);
 
-    pendingRef.current = true;
-    setPending(true);
-    setState(applyViewerVote(previous, next));
+    setState(applyViewerVote(state, next));
+    queuedRef.current = { vote: next };
+
+    if (sendingRef.current) {
+      return;
+    }
+
+    sendingRef.current = true;
 
     try {
-      const response = await fetch(
-        `/api/hackathons/${encodeURIComponent(hackathonId)}/vote`,
-        next === null
-          ? { method: "DELETE" }
-          : {
-              body: JSON.stringify({ value: next }),
-              headers: { "Content-Type": "application/json" },
-              method: "PUT",
-            }
-      );
+      while (queuedRef.current) {
+        const sent = queuedRef.current.vote;
+        queuedRef.current = null;
 
-      if (response.status === 401) {
-        setState(previous);
-        showLoginRequiredDialog();
-        return;
+        const response = await fetch(
+          `/api/hackathons/${encodeURIComponent(hackathonId)}/vote`,
+          sent === null
+            ? { method: "DELETE" }
+            : {
+                body: JSON.stringify({ value: sent }),
+                headers: { "Content-Type": "application/json" },
+                method: "PUT",
+              }
+        );
+
+        if (response.status === 401) {
+          queuedRef.current = null;
+          setState(confirmedRef.current);
+          showLoginRequiredDialog();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Could not save vote.");
+        }
+
+        const confirmed = ((await response.json()) as { data: HackathonVoteState }).data;
+        // Read again after the await: a click may have queued a new choice.
+        const queued = queuedRef.current as { vote: VoteValue | null } | null;
+        confirmedRef.current = confirmed;
+
+        if (queued && queued.vote !== confirmed.viewerVote) {
+          // The viewer clicked again meanwhile: keep their choice on screen,
+          // on top of the totals just confirmed, and send it next.
+          setState(applyViewerVote(confirmed, queued.vote));
+        } else {
+          queuedRef.current = null;
+          setState(confirmed);
+          announceVote(hackathonId, confirmed);
+        }
       }
-
-      if (!response.ok) {
-        throw new Error("Could not save vote.");
-      }
-
-      const body = (await response.json()) as { data: HackathonVoteState };
-      setState(body.data);
-      announceVote(hackathonId, body.data);
     } catch {
-      setState(previous);
+      queuedRef.current = null;
+      setState(confirmedRef.current);
     } finally {
-      pendingRef.current = false;
-      setPending(false);
+      sendingRef.current = false;
     }
   }
 
@@ -179,9 +215,7 @@ export function HackathonVoteControl({
         aria-pressed={active}
         className={`grid shrink-0 place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-pine disabled:cursor-default ${
           styles.button
-        } ${active ? activeColor : `text-ink ${inert ? "opacity-45" : `${hoverColor} hover:bg-ink/5`}`} ${
-          pending ? "cursor-wait" : ""
-        }`}
+        } ${active ? activeColor : `text-ink ${inert ? "opacity-45" : `${hoverColor} hover:bg-ink/5`}`}`}
         disabled={inert}
         onClick={() => vote(value)}
         tabIndex={preview ? -1 : undefined}
