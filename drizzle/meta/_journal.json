@@ -281,6 +281,13 @@
       "when": 1795497105363,
       "tag": "0039_add_hackathon_discord_tag",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795500317315,
+      "tag": "0040_perf_vote_totals_channel_jobs",
+      "breakpoints": true
     }
   ]
 }

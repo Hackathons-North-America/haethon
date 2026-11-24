@@ -1,3 +1,4 @@
+import { neonConfig } from "@neondatabase/serverless";
 import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -88,21 +89,24 @@ async function seedSeries(name: string, isRecurring: boolean) {
 }
 
 /* Counts HTTP requests to the database so the "one statement" property is
-   asserted, not assumed. */
+   asserted, not assumed. lib/db sends queries through its own keep-alive
+   fetch (neonConfig.fetchFunction), so that is what gets wrapped. */
 let databaseRequests = 0;
-const realFetch = globalThis.fetch;
+let realFetch: typeof neonConfig.fetchFunction;
 
 beforeEach(async () => {
   await db.execute(sql`TRUNCATE hackathons, hackathon_series, tags, discord_guilds, users CASCADE`);
   databaseRequests = 0;
-  globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+  realFetch = neonConfig.fetchFunction;
+  const inner = realFetch ?? globalThis.fetch;
+  neonConfig.fetchFunction = (...args: unknown[]) => {
     databaseRequests += 1;
-    return realFetch(...args);
-  }) as typeof fetch;
+    return (inner as (...fetchArgs: unknown[]) => unknown)(...args);
+  };
 });
 
 afterEach(() => {
-  globalThis.fetch = realFetch;
+  neonConfig.fetchFunction = realFetch;
 });
 
 describe("loadCatalogSnapshot", () => {

@@ -104,7 +104,7 @@ Other findings, outside my three parts:
 - **`lib/auth.ts`.** Adds `requireAdminUserId()`. Nothing existing changes.
 - **`lib/security/rate-limit.ts`.** The limiter's upsert is exposed as SQL so the vote statement can include it. `consumeRateLimit` behaves as before and now shares that SQL.
 - **`tests/integration/local-db.ts`.** `TEST_DATABASE_PROXY_PORT` overrides the proxy port, so four agents could each run a database.
-- **`tests/integration/global-setup.ts`.** Applies `docs/perf/4-import-votes-db.sql` after the migrations, because my branch has no migration for it. Delete that block once the migration exists (it is harmless if left: every statement is idempotent).
+- **`tests/integration/global-setup.ts`.** (Merge note: the temporary block that applied the hand-written SQL was removed once `drizzle/0040_perf_vote_totals_channel_jobs.sql` existed.)
 
 **For agent 2 (caching):** signed-out vote totals are cached for 30 seconds under the key `hackathon-vote-totals`, with no tag. A finished Discord job that created or reused a channel calls `revalidateHackathonCaches()`, as does clearing a dead image. Import revalidation is unchanged.
 
@@ -143,7 +143,7 @@ The harness calls the real route handlers (`POST /api/admin/hackathon-imports`, 
 
 ## DDL applied to DB
 
-Applied on 24 Nov 2026 to the database in `.env.local` (PostgreSQL 18.7, likely production), one statement at a time, in this order. This is `docs/perf/4-import-votes-db.sql` verbatim. It is additive and idempotent, and I ran it twice on the local database to confirm that. Statements are separated by the Drizzle breakpoint marker so the file can be a migration body as is.
+Applied on 24 Nov 2026 to the database in `.env.local` (PostgreSQL 18.7, likely production), one statement at a time, in this order. It is now the body of `drizzle/0040_perf_vote_totals_channel_jobs.sql` verbatim. It is additive and idempotent, and I ran it twice on the local database to confirm that. Statements are separated by the Drizzle breakpoint marker so the file can be a migration body as is.
 
 ```sql
 -- Schema changes for docs/perf/4-import-votes-db.md.
@@ -291,7 +291,7 @@ Everything else I ran there was read-only: statistics queries, `SELECT`s to copy
 
 ## Follow-ups for the parent
 
-- **Generate the migration.** `lib/db/schema.ts` adds `hackathon_vote_totals`, `discord_channel_jobs` (two indexes, two checks) and two expression indexes on `cities`. Use `docs/perf/4-import-votes-db.sql` as the migration's SQL in place of what `drizzle-kit` generates: the generated statements are not idempotent and would fail on the database where this is already applied, and the trigger, its function and the backfill cannot be generated at all. The neon-http migrator runs statements one at a time outside a transaction, so `CREATE INDEX CONCURRENTLY` is fine there. The database already has migration 0039 from `main`; the new migration's `when` must be later.
+- **Generate the migration.** `lib/db/schema.ts` adds `hackathon_vote_totals`, `discord_channel_jobs` (two indexes, two checks) and two expression indexes on `cities`. (Done at merge: `drizzle/0040_perf_vote_totals_channel_jobs.sql`.) Use this SQL as the migration's body in place of what `drizzle-kit` generates: the generated statements are not idempotent and would fail on the database where this is already applied, and the trigger, its function and the backfill cannot be generated at all. The neon-http migrator runs statements one at a time outside a transaction, so `CREATE INDEX CONCURRENTLY` is fine there. The database already has migration 0039 from `main`; the new migration's `when` must be later.
 - Then remove the block in `tests/integration/global-setup.ts` that applies the file, and the file if it is no longer wanted.
 - If production is a different database from the one in `.env.local`, it needs the same SQL before the deploy.
 - The benches live in `tests/perf/` with `vitest.perf.config.ts`. They are not part of `pnpm test`. Drop them if the PR should not carry them.

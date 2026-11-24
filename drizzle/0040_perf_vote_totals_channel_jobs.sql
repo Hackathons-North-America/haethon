@@ -1,3 +1,7 @@
+-- Perf PR: hackathon vote totals (trigger-maintained), the Discord channel job queue,
+-- and lower() city indexes. Body is the SQL in docs/perf/4-import-votes-db.md verbatim; every statement
+-- is idempotent because these objects were first applied by hand on Nov 24 2026.
+
 -- Schema changes for docs/perf/4-import-votes-db.md.
 --
 -- Additive and idempotent: safe to run more than once, and code deployed
