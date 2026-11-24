@@ -23,6 +23,10 @@ export const env = createEnv({
     UPLOADTHING_TOKEN: z.string().min(1).optional(),
     // Required: cron auth breaks silently (503s) without it.
     CRON_SECRET: z.string().min(1),
+    // Optional: bearer token for the hackathon scraper's unattended import
+    // (/api/cron/import-hackathons). Unset, that route answers 503, so the
+    // catalog has no secret-based write path until this is set on purpose.
+    SCRAPER_IMPORT_SECRET: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().url(),
@@ -49,6 +53,7 @@ export const env = createEnv({
     SENTRY_PROJECT: process.env.SENTRY_PROJECT,
     UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
     CRON_SECRET: process.env.CRON_SECRET,
+    SCRAPER_IMPORT_SECRET: process.env.SCRAPER_IMPORT_SECRET,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
