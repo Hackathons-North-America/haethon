@@ -15,7 +15,7 @@ import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
 import { isVotingClosed, type VoteValue } from "@/lib/hackathons/vote-state";
-import { softStreakBloom, STREAK_NOISE_URI, streakBloom } from "@/lib/streak-wash";
+import { STREAK_NOISE_URI, streakBloom } from "@/lib/streak-wash";
 
 export type HackathonCardData = {
   /** Search metadata sent with the cached catalog snapshot. */
@@ -206,47 +206,21 @@ function getCardStreak(name: string) {
   };
 }
 
-/* The wash for a cover with no image: two seeded blooms in two different
-   palette colors, one bleeding in from the left edge and one from the right.
-   The right bloom sits low so the top-right corner, where the cover sets the
-   hackathon's name, stays mostly clear paper. Stable per name like
-   getCardStreak, but its own shapes: two blooms share the cover, so each is
-   narrower than a card body's single bloom, and each uses the soft bloom
-   (no ring, no flat core) so it blends into the cover rather than reading
-   as a hard-edged shape. */
+/* The wash for a cover with no image: a vertical gradient from dark brown at
+   the top down to one seeded palette color at the bottom. The color is picked
+   with the same first seeded draw the old two-bloom wash used, so each cover
+   keeps the hue it already had. The top stays dark so the title set there in
+   cream reads in both themes. The grain mask follows the same ramp, so the
+   speckle rides the colored lower half and fades out into the brown. */
+const COVER_TOP_BROWN = "#24190f";
+
 function getCoverWash(name: string) {
   const random = seededRandom(nameSeed(name));
-  const firstColor = Math.floor(random() * STREAK_RGB_PALETTE.length);
-  /* Offset by 1..length-1 so the second color never repeats the first. */
-  const secondColor =
-    (firstColor + 1 + Math.floor(random() * (STREAK_RGB_PALETTE.length - 1))) %
-    STREAK_RGB_PALETTE.length;
-
-  const bloom = (centerX: number, centerY: number, rgb: string) => {
-    const radiusX = Math.round(38 + random() * 12);
-    const radiusY = Math.round(60 + random() * 26);
-    /* Two draws left over from the shoulder ring the soft bloom no longer
-       has. Still taken so every cover keeps its existing bloom positions. */
-    random();
-    random();
-
-    return softStreakBloom({ centerX, centerY, radiusX, radiusY }, rgb);
-  };
-
-  const left = bloom(
-    Math.round(-16 + random() * 20),
-    Math.round(14 + random() * 72),
-    STREAK_RGB_PALETTE[firstColor]
-  );
-  const right = bloom(
-    Math.round(96 + random() * 20),
-    Math.round(70 + random() * 34),
-    STREAK_RGB_PALETTE[secondColor]
-  );
+  const rgb = STREAK_RGB_PALETTE[Math.floor(random() * STREAK_RGB_PALETTE.length)];
 
   return {
-    wash: `${left.wash}, ${right.wash}`,
-    mask: `${left.mask}, ${right.mask}`,
+    wash: `linear-gradient(to bottom, ${COVER_TOP_BROWN} 0%, ${COVER_TOP_BROWN} 12%, rgb(${rgb} / 0.85) 100%)`,
+    mask: "linear-gradient(to bottom, transparent 15%, black 100%)",
   };
 }
 
@@ -823,8 +797,8 @@ export function HackathonCard({
             unoptimized
           />
         ) : coverStreak ? (
-          /* No image: two seeded circular blooms and their grain fill the
-             cover, with the full name set as a title in the top-right corner.
+          /* No image: a brown-to-color gradient and its grain fill the
+             cover, with the full name set as a title in the top-left corner.
              The name is aria-hidden because the card's h2 already says it. */
           <span
             aria-hidden="true"
@@ -840,7 +814,7 @@ export function HackathonCard({
               }}
             />
             <span
-              className={`absolute right-4 top-4 max-w-[80%] text-right text-[1.6rem] font-semibold leading-[1.05] tracking-[-0.045em] text-ink @[26rem]:right-5 @[26rem]:top-5 @[26rem]:text-[2rem] ${
+              className={`absolute left-4 top-4 max-w-[80%] text-left text-[1.6rem] font-semibold leading-[1.05] tracking-[-0.045em] text-[#f3ece1] @[26rem]:left-5 @[26rem]:top-5 @[26rem]:text-[2rem] ${
                 compact ? "line-clamp-2" : "line-clamp-3"
               }`}
             >

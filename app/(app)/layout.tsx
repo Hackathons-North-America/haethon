@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { AppNavSlotProvider } from "@/components/app-nav-slot";
-import { AppShellContent, AppShellWipe } from "@/components/app-shell-transition";
 import { AppTopNav } from "@/components/app-top-nav";
 import { isAdminRole, roleFromSessionClaims } from "@/lib/auth";
 
@@ -20,9 +19,9 @@ export default async function AppLayout({
     <AppNavSlotProvider>
       <div className="relative flex min-h-screen flex-col">
         <AppTopNav isAdmin={isAdminRole(role)} isOrganizer={role === "organizer"} isSignedIn={Boolean(userId)} />
-        <AppShellContent>{children}</AppShellContent>
+        {/* Clears the fixed phone tab bar (3.5rem + home-indicator inset). */}
+        <div className="relative z-10 min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
         {panel}
-        <AppShellWipe />
       </div>
     </AppNavSlotProvider>
   );

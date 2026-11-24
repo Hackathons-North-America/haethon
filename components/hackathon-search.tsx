@@ -752,7 +752,7 @@ export function HackathonSearch({
           above keeps its clearance and nothing below moves. */}
       <section
         aria-label="Hackathon filters"
-        className="relative isolate z-30 px-5 pb-9 pt-3 [--dome:max(20px,2.1vw)] sm:px-8 sm:pt-4 lg:px-12"
+        className="relative isolate z-30 px-5 pb-[3.375rem] pt-3 [--dome:max(20px,2.1vw)] sm:px-8 sm:pt-4 lg:px-12"
       >
         <WatercolorBackdrop
           dome
