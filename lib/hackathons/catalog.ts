@@ -16,10 +16,9 @@ import {
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
 import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
 import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
-import type { TierLabel } from "@/lib/hackathons/ranking";
 import type { CatalogSort } from "@/lib/hackathons/search-filters";
 import { EMPTY_VOTE_STATE, type HackathonVoteState } from "@/lib/hackathons/vote-state";
-import { getVoteStates, getVoteTiers } from "@/lib/hackathons/votes";
+import { getVoteStates } from "@/lib/hackathons/votes";
 import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 
 /* One page of catalog results. The listing page and the search API both read
@@ -148,8 +147,7 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
   const downs = sql`coalesce(${voteTotals.downvotes}, 0)::float8`;
   const total = sql`(${ups} + ${downs})`;
   /* Wilson lower bound at 95% (z = 1.96: z²/2 = 1.9208, z²/4 = 0.9604,
-     z² = 3.8416) — the same score as wilsonLowerBound() in ranking.ts, which
-     also drives the tiers, so sort order and tiers agree. */
+     z² = 3.8416) — the same score as wilsonLowerBound() in ranking.ts. */
   const wilsonScore = sql`case when ${total} = 0 then 0 else (
       ${ups} / ${total} + 1.9208 / ${total}
       - 1.96 * sqrt((${ups} / ${total}) * (1 - ${ups} / ${total}) / ${total} + 0.9604 / (${total} * ${total}))
@@ -361,8 +359,7 @@ export function getPublicHackathonCatalog(input: {
 }
 
 /**
- * Live vote totals, the viewer's own vote, and the vote tier for a set of
- * hackathons. Vote counts change far more often than the catalog, so they are
+ * Live vote totals and the viewer's own vote for a set of hackathons. Vote counts change far more often than the catalog, so they are
  * read per request (one grouped query) instead of from the cached page. Like
  * the rest of the personalization, a failure degrades to empty votes rather
  * than breaking the page.
@@ -370,30 +367,27 @@ export function getPublicHackathonCatalog(input: {
 export async function loadCardVotes(
   hackathonIds: string[],
   userId: string | null | undefined
-): Promise<{ states: Map<string, HackathonVoteState>; tiers: Record<string, TierLabel> }> {
-  const [states, tiers] = await Promise.all([
-    getVoteStates(hackathonIds, userId).catch((error: unknown) => {
-      Sentry.captureException(error, { tags: { feature: "catalog-votes" } });
-      return new Map<string, HackathonVoteState>();
-    }),
-    getVoteTiers(),
-  ]);
+): Promise<{ states: Map<string, HackathonVoteState> }> {
+  const states = await getVoteStates(hackathonIds, userId).catch((error: unknown) => {
+    Sentry.captureException(error, { tags: { feature: "catalog-votes" } });
+    return new Map<string, HackathonVoteState>();
+  });
 
-  return { states, tiers };
+  return { states };
 }
 
-export type CardVoteFields = HackathonVoteState & { tier: TierLabel | null };
+export type CardVoteFields = HackathonVoteState;
 
 export function cardVoteFields(
   id: string,
   votes: Awaited<ReturnType<typeof loadCardVotes>>
 ): CardVoteFields {
-  return { ...(votes.states.get(id) ?? EMPTY_VOTE_STATE), tier: votes.tiers[id] ?? null };
+  return votes.states.get(id) ?? EMPTY_VOTE_STATE;
 }
 
 /**
  * Overlays the signed-in user's pipeline stage onto cached public cards, plus
- * live vote totals and tiers. These are the only per-request queries the
+ * live vote totals. These are the only per-request queries the
  * catalog surfaces need; the tracked lookup hits the unique index on
  * (user_id, hackathon_id).
  */

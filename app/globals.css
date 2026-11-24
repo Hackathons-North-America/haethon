@@ -69,16 +69,24 @@
   /* Darkens the beige watercolor backdrop into a warm espresso wash in dark
      mode. */
   --watercolor-filter: none;
+
+  /* PageWash bloom color as an "r g b" triplet (it is spliced into
+     rgb(... / alpha) gradient stops, which light-dark() can't feed): coffee
+     brown on the cream page, the accent tan on the espresso page so the
+     blooms glow lighter than the ground instead of sinking into it. */
+  --page-wash-rgb: 140 95 60;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --watercolor-filter: brightness(0.24) saturate(1.1);
+    --page-wash-rgb: 220 185 148;
   }
 }
 
 :root[data-theme="dark"] {
   --watercolor-filter: brightness(0.24) saturate(1.1);
+  --page-wash-rgb: 220 185 148;
 }
 
 @theme inline {
@@ -117,12 +125,12 @@
    (under the cover, between the columns, above the footer) are their own
    `.card-spotlight-rule` elements. On hover a cursor-following radial
    "spotlight" recolors only the stretch of outline and inner lines near the
-   pointer in the tier's tint; everything outside the circle stays ink. The card
+   pointer in the card's tint; everything outside the circle stays ink. The card
    and each rule get the pointer position in their own coordinates. Keyboard
    focus has no pointer, so it tints the whole outline instead. The colors are
    registered so hover can fade them instead of snapping; `--card-accent` comes
-   from the card's tier (inline style) and defaults to pine for untiered
-   cards. */
+   from the card's randomly drawn streak color (inline style) and defaults to
+   pine. */
 @property --card-edge {
   syntax: "<color>";
   inherits: true;

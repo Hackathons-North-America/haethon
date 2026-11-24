@@ -201,7 +201,7 @@ export function HackathonEditDialog({
                   defaultValue={item.source ?? ""}
                   className={inputClassName}
                 >
-                  <option value="">None (no badge)</option>
+                  <option value="">None (cards show &quot;Other&quot;)</option>
                   {HACKATHON_SOURCES.map((source) => (
                     <option key={source} value={source}>
                       {sourceBadge(source).label}

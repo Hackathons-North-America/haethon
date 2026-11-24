@@ -12,10 +12,10 @@ import type { TrackableStatus } from "@/components/hackathon-status-tracker";
 import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
 import { showLoginRequiredDialog } from "@/components/login-required-dialog";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
-import type { CardTier, TierLabel } from "@/lib/hackathons/ranking";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { announceHackathonStatus, useHackathonStatusListener } from "@/lib/hackathons/status-events";
 import { isVotingClosed, type VoteValue } from "@/lib/hackathons/vote-state";
+import { STREAK_NOISE_URI, streakBloom } from "@/lib/streak-wash";
 
 export type HackathonCardData = {
   /** Search metadata sent with the cached catalog snapshot. */
@@ -43,16 +43,14 @@ export type HackathonCardData = {
   location: string;
   name: string;
   slug?: string | null;
-  /* Catalog metadata retained for card-data compatibility; cards do not
-     surface source provenance in their UI. */
+  /* Where the listing came from. Cover cards show its label when asked to
+     (showSource); null reads as "Other". */
   source?: HackathonSourceBadge | null;
   startsAt?: string | null;
   tags?: string[];
   /** The signed-in user's pipeline stage for this hackathon (null/undefined
       when it isn't on their My Hackathons board). */
   trackedStatus?: string | null;
-  /** Vote-derived tier; null while the hackathon has too few votes to rank. */
-  tier?: TierLabel | null;
   /** Live vote totals and the viewer's own vote. Cards render the vote
       control only when these are present (catalog, board, detail). */
   upvotes?: number;
@@ -123,35 +121,22 @@ function getAccentStyle(name: string) {
   } as CSSProperties & { "--hackathon-accent-rgb": string };
 }
 
-/* Classic tier-list color ramp: S red through D blue, rendered as bare text on
-   the paper card. Each shade is the darkened step of its hue so the label keeps
-   AA contrast against paper — plain yellow and green wash out. */
-const TIER_TEXT_STYLES: Record<TierLabel, string> = {
-  S: "text-[#DC2626] dark:text-[#f87171]",
-  A: "text-[#C2410C] dark:text-[#fb923c]",
-  B: "text-[#A16207] dark:text-[#facc15]",
-  C: "text-[#15803D] dark:text-[#4ade80]",
-  D: "text-[#1D4ED8] dark:text-[#60a5fa]",
-};
+/* The per-card color wash (getCardStreak below) is switched off for now: cards
+   render on plain paper, and the hover spotlight falls back to the shared pine
+   accent from .card-spotlight. The palette, noise and streak code stay intact
+   so flipping this back to true restores the wash, grain and seeded accent. */
+const SHOW_CARD_STREAK = false;
 
-/* Light companion tints to TIER_TEXT_STYLES, used for the body's airbrushed
-   streak. The label needs a darkened shade for contrast; the streak needs the
-   opposite — a pale wash that stays background against the beige paper. */
-const TIER_STREAK_RGB: Record<TierLabel, string> = {
-  S: "248 113 113",
-  A: "251 146 60",
-  B: "250 204 21",
-  C: "74 222 128",
-  D: "96 165 250",
-};
-
-/* Hover color for the card's lines: the cursor spotlight lights the outline and
-   inner divider lines near the pointer in the streak's own tint. */
-function getTierAccentStyle(tier: TierLabel) {
-  return {
-    "--card-accent": `rgb(${TIER_STREAK_RGB[tier]})`,
-  } as CSSProperties;
-}
+/* Pale tints for the body's airbrushed streak (red, orange, yellow, green,
+   blue). Each card draws one at random, seeded so the pick is stable. They
+   stay pale so the wash reads as background against the beige paper. */
+const STREAK_RGB_PALETTE = [
+  "248 113 113",
+  "251 146 60",
+  "250 204 21",
+  "74 222 128",
+  "96 165 250",
+] as const;
 
 /* Moves the invisible spotlight circle with the pointer. Coordinates are set
    per element (the card's outline, and each inner rule under the cover,
@@ -173,12 +158,6 @@ function trackCardSpotlight(event: PointerEvent<HTMLElement>) {
   }
 }
 
-/* Tiling grayscale noise: desaturated feTurbulence pushed to high contrast so
-   the speckle survives overlay-blending onto a pale tint. Masked to the
-   streak's own shape so the grain rides the tinted area and dissolves with it. */
-const STREAK_NOISE_URI =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='3' intercept='-1'/%3E%3CfeFuncG type='linear' slope='3' intercept='-1'/%3E%3CfeFuncB type='linear' slope='3' intercept='-1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E\")";
-
 /* Tiny LCG so a card's streak can be \"random\" yet deterministic: seeding off
    the name keeps the shape identical between server and client renders (no
    hydration mismatch) and stable across visits, unlike Math.random(). */
@@ -191,15 +170,19 @@ function seededRandom(seed: number) {
   };
 }
 
-/* The tinted wash and grain mask for one card. Each card uses a broad,
-   off-canvas circular bloom whose seeded position and proportions vary between
-   cards while remaining stable between renders. */
-function getTierStreak(name: string, tier: TierLabel) {
-  const seed = Array.from(name).reduce(
+/* Stable 32-bit seed from a hackathon's name, for seededRandom. */
+function nameSeed(name: string) {
+  return Array.from(name).reduce(
     (total, character) => (total * 31 + character.charCodeAt(0)) >>> 0,
     0
   );
-  const random = seededRandom(seed);
+}
+
+/* The tinted wash, grain mask and hover accent for one card. Each card uses a
+   broad, off-canvas circular bloom whose seeded position, proportions and
+   color vary between cards while remaining stable between renders. */
+function getCardStreak(name: string) {
+  const random = seededRandom(nameSeed(name));
   const entersFromLeft = random() < 0.72;
   const centerX = Math.round(
     entersFromLeft ? -18 + random() * 24 : 94 + random() * 24
@@ -209,16 +192,65 @@ function getTierStreak(name: string, tier: TierLabel) {
   const radiusY = Math.round(56 + random() * 30);
   const shoulderRadiusX = radiusX + Math.round(2 + random() * 4);
   const shoulderRadiusY = radiusY + Math.round(2 + random() * 5);
-  const ellipse = `ellipse ${radiusX}% ${radiusY}% at ${centerX}% ${centerY}%`;
-  const shoulder = `ellipse ${shoulderRadiusX}% ${shoulderRadiusY}% at ${centerX}% ${centerY}%`;
-  const rgb = TIER_STREAK_RGB[tier];
+  /* Drawn last so adding the color left every card's existing shape as is. */
+  const rgb = STREAK_RGB_PALETTE[Math.floor(random() * STREAK_RGB_PALETTE.length)];
 
   return {
-    wash: [
-      `radial-gradient(${shoulder}, transparent 46%, rgb(${rgb} / 0.2) 52%, rgb(${rgb} / 0.08) 61%, transparent 72%)`,
-      `radial-gradient(${ellipse}, rgb(${rgb} / 0.46) 0%, rgb(${rgb} / 0.44) 40%, rgb(${rgb} / 0.28) 53%, rgb(${rgb} / 0.1) 65%, transparent 76%)`,
-    ].join(", "),
-    mask: `radial-gradient(${shoulder}, black 0%, black 58%, transparent 82%)`,
+    /* Hover color for the card's lines: the cursor spotlight lights the
+       outline and inner divider lines near the pointer in the streak's tint. */
+    accentStyle: { "--card-accent": `rgb(${rgb})` } as CSSProperties,
+    ...streakBloom(
+      { centerX, centerY, radiusX, radiusY, shoulderRadiusX, shoulderRadiusY },
+      rgb
+    ),
+  };
+}
+
+/* The wash for a cover with no image: two seeded blooms in two different
+   palette colors, one bleeding in from the left edge and one from the right.
+   The right bloom sits low so the top-right corner, where the cover sets the
+   hackathon's name, stays mostly clear paper. Stable per name like
+   getCardStreak, but its own shapes: two blooms share the cover, so each is
+   narrower than a card body's single bloom. */
+function getCoverWash(name: string) {
+  const random = seededRandom(nameSeed(name));
+  const firstColor = Math.floor(random() * STREAK_RGB_PALETTE.length);
+  /* Offset by 1..length-1 so the second color never repeats the first. */
+  const secondColor =
+    (firstColor + 1 + Math.floor(random() * (STREAK_RGB_PALETTE.length - 1))) %
+    STREAK_RGB_PALETTE.length;
+
+  const bloom = (centerX: number, centerY: number, rgb: string) => {
+    const radiusX = Math.round(38 + random() * 12);
+    const radiusY = Math.round(60 + random() * 26);
+
+    return streakBloom(
+      {
+        centerX,
+        centerY,
+        radiusX,
+        radiusY,
+        shoulderRadiusX: radiusX + Math.round(2 + random() * 4),
+        shoulderRadiusY: radiusY + Math.round(2 + random() * 5),
+      },
+      rgb
+    );
+  };
+
+  const left = bloom(
+    Math.round(-16 + random() * 20),
+    Math.round(14 + random() * 72),
+    STREAK_RGB_PALETTE[firstColor]
+  );
+  const right = bloom(
+    Math.round(96 + random() * 20),
+    Math.round(70 + random() * 34),
+    STREAK_RGB_PALETTE[secondColor]
+  );
+
+  return {
+    wash: `${left.wash}, ${right.wash}`,
+    mask: `${left.mask}, ${right.mask}`,
   };
 }
 
@@ -422,7 +454,7 @@ function getWeekday(startsAt?: string | null) {
    month on its own row with the day (or "start–end" range) beneath it.
    Cross-month ranges keep both months: "Sep 30" / "– Oct 2". */
 function CardDate({ parsed, weekday }: { parsed: ParsedDate; weekday: string | null }) {
-  const lineClass = "text-[1.5rem] leading-[1.05] tracking-[-0.05em] @[26rem]:text-[1.8rem]";
+  const lineClass = "text-[1.25rem] leading-[1.05] tracking-[-0.05em] @[26rem]:text-[1.5rem]";
 
   const lines =
     parsed.kind === "raw"
@@ -729,7 +761,7 @@ export function HackathonCard({
   hackathon,
   layout = "cover",
   preview = false,
-  tier,
+  showSource = false,
 }: {
   /* Keeps pipeline-board cards shorter while preserving the shared layout. */
   compact?: boolean;
@@ -739,9 +771,10 @@ export function HackathonCard({
   /* The bookmark page keeps the original compact, square-logo card design. */
   layout?: "cover" | "bookmark";
   preview?: boolean;
-  /* A tier label above the name, or "unranked" for too few votes (grey label,
-     no tier wash). Omitted entirely on surfaces that don't rank. */
-  tier?: CardTier;
+  /* Shows where the listing came from (MLH, Devpost, User entered, …) above
+     the name. Off on surfaces that don't load sources, so a missing source
+     there isn't mislabeled "Other". */
+  showSource?: boolean;
 }) {
   if (layout === "bookmark") {
     return (
@@ -757,8 +790,10 @@ export function HackathonCard({
   const weekday = getWeekday(hackathon.startsAt);
   const countryDisplay = hackathon.country ? getCountryDisplay(hackathon.country) : null;
   const locationLine = [countryDisplay?.label, hackathon.location].filter(Boolean).join(", ");
-  const rankedTier = tier && tier !== "unranked" ? tier : null;
-  const streak = rankedTier ? getTierStreak(hackathon.name, rankedTier) : null;
+  const streak = SHOW_CARD_STREAK ? getCardStreak(hackathon.name) : null;
+  /* A cover with no image gets a seeded two-bloom wash instead, whatever
+     SHOW_CARD_STREAK says: it stands in for the missing picture. */
+  const coverStreak = hackathon.image ? null : getCoverWash(hackathon.name);
 
   return (
     <article
@@ -769,15 +804,16 @@ export function HackathonCard({
         hackathon.isPast ? "opacity-70 hover:opacity-100 focus-within:opacity-100" : ""
       }`}
       onPointerMove={trackCardSpotlight}
-      style={rankedTier ? getTierAccentStyle(rankedTier) : undefined}
+      style={streak?.accentStyle}
     >
       <CardStretchedLink hackathon={hackathon} preview={preview} />
 
-      {/* The cover rounds all four corners with no outline of its own. 7px is
-          the card's 8px radius less its 1px border, so the top corners follow
-          the card's inner edge exactly. */}
+      {/* The cover rounds only its top corners, with no outline of its own.
+          7px is the card's 8px radius less its 1px border, so the top corners
+          follow the card's inner edge exactly. The bottom corners stay square
+          so the cover meets the divider beneath it flush. */}
       <div
-        className={`relative shrink-0 overflow-hidden rounded-[7px] ${
+        className={`relative shrink-0 overflow-hidden rounded-t-[7px] ${
           compact ? "aspect-[5/2]" : "aspect-[2/1]"
         }`}
       >
@@ -790,22 +826,38 @@ export function HackathonCard({
             src={hackathonLogoSrc(hackathon.id, hackathon.image)}
             unoptimized
           />
-        ) : (
-          <span className="grid size-full place-items-center bg-ink/5 px-2 text-center font-mono text-xl font-semibold uppercase tracking-[0.18em] text-ink/35">
-            {hackathon.name
-              .split(/\s+/)
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((word) => word[0]?.toUpperCase())
-              .join("") || "HN"}
+        ) : coverStreak ? (
+          /* No image: two seeded circular blooms and their grain fill the
+             cover, with the full name set as a title in the top-right corner.
+             The name is aria-hidden because the card's h2 already says it. */
+          <span
+            aria-hidden="true"
+            className="relative block size-full bg-paper"
+            style={{ backgroundImage: coverStreak.wash }}
+          >
+            <span
+              className="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay"
+              style={{
+                backgroundImage: STREAK_NOISE_URI,
+                maskImage: coverStreak.mask,
+                WebkitMaskImage: coverStreak.mask,
+              }}
+            />
+            <span
+              className={`absolute right-4 top-4 max-w-[80%] text-right text-[1.6rem] font-semibold leading-[1.05] tracking-[-0.045em] text-ink @[26rem]:right-5 @[26rem]:top-5 @[26rem]:text-[2rem] ${
+                compact ? "line-clamp-2" : "line-clamp-3"
+              }`}
+            >
+              {hackathon.name}
+            </span>
           </span>
-        )}
+        ) : null}
       </div>
 
-      {/* The tinted wash is the grid's own background so it paints under the
+      {/* The tinted wash (when SHOW_CARD_STREAK is on) is the grid's own background so it paints under the
           columns' text; only the grain rides above as an overlay. The grid's
-          top rule is the line under the cover: drawn here rather than on the
-          cover, it stays straight below the cover's rounded bottom corners. A
+          top rule is the line under the cover, drawn here rather than on the
+          cover so it spans the card's full width. A
           shade darker than the card's other lines so it reads as the main
           divide. Like every inner line it is a spotlight rule laid over a
           transparent border, so layout keeps the border's 1px. */}
@@ -854,18 +906,9 @@ export function HackathonCard({
             compact ? "min-h-48" : "min-h-72"
           }`}
         >
-          {rankedTier ? (
-            <span
-              className={`mb-2.5 block font-mono text-[11px] font-medium uppercase tracking-[0.1em] ${TIER_TEXT_STYLES[rankedTier]}`}
-            >
-              Tier {rankedTier}
-            </span>
-          ) : tier === "unranked" ? (
-            <span
-              className="mb-2.5 block font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-ink/45"
-              title="Needs a few more votes to be ranked"
-            >
-              Unranked
+          {showSource ? (
+            <span className="mb-2.5 block font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-ink/45">
+              {hackathon.source?.label ?? "Other"}
             </span>
           ) : null}
 

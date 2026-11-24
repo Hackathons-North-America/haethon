@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatVoteScore } from "@/components/hackathon-vote-control";
-import { assignVoteTiers, MIN_VOTES_FOR_TIER, wilsonLowerBound } from "@/lib/hackathons/ranking";
+import { wilsonLowerBound } from "@/lib/hackathons/ranking";
 import {
   applyViewerVote,
   EMPTY_VOTE_STATE,
@@ -29,43 +29,6 @@ describe("wilsonLowerBound", () => {
       expect(score).toBeGreaterThanOrEqual(0);
       expect(score).toBeLessThanOrEqual(1);
     }
-  });
-});
-
-describe("assignVoteTiers", () => {
-  it("leaves hackathons under the vote minimum unranked", () => {
-    const tiers = assignVoteTiers([
-      { id: "few", upvotes: MIN_VOTES_FOR_TIER - 1, downvotes: 0 },
-      { id: "enough", upvotes: MIN_VOTES_FOR_TIER, downvotes: 0 },
-    ]);
-
-    expect(tiers.has("few")).toBe(false);
-    expect(tiers.get("enough")).toBe("S");
-  });
-
-  it("splits ten ranked hackathons 1/2/4/2/1 across S/A/B/C/D", () => {
-    // Strictly decreasing approval so every entry gets a distinct rank.
-    const entries = Array.from({ length: 10 }, (_, index) => ({
-      id: `h${index}`,
-      upvotes: 20 - index * 2,
-      downvotes: index * 2,
-    }));
-    const tiers = assignVoteTiers(entries);
-
-    expect(entries.map((entry) => tiers.get(entry.id)).join("")).toBe("SAABBBBCCD");
-  });
-
-  it("gives identical records the same (better) tier", () => {
-    const tiers = assignVoteTiers([
-      { id: "a", upvotes: 10, downvotes: 0 },
-      { id: "b", upvotes: 10, downvotes: 0 },
-      { id: "c", upvotes: 5, downvotes: 5 },
-      { id: "d", upvotes: 0, downvotes: 10 },
-    ]);
-
-    expect(tiers.get("a")).toBe("S");
-    expect(tiers.get("b")).toBe("S");
-    expect(tiers.get("d")).toBe("C");
   });
 });
 

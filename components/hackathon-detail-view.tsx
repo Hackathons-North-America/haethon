@@ -12,7 +12,6 @@ import {
   Landmark,
   type LucideIcon,
   MapPin,
-  Medal,
   Tag as TagIcon,
   Trophy,
 } from "lucide-react";
@@ -208,14 +207,6 @@ export function HackathonDetailView({
               </div>
             </Property>
           ) : null}
-
-          <Property icon={Medal} label="Community rank" labelWidthClassName={labelWidthClassName}>
-            {viewer.votes.tier ? (
-              <span className="font-medium">Tier {viewer.votes.tier}</span>
-            ) : (
-              <span className="font-medium text-ink/55">Unranked</span>
-            )}
-          </Property>
 
           <Property icon={CircleDot} label="Status" labelWidthClassName={labelWidthClassName}>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-sm font-medium ${statusPill.pill}`}>
