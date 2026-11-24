@@ -120,6 +120,96 @@
   }
 }
 
+/* The app shell's entrance (components/app-shell-transition.tsx): an ink
+   panel wipes off to the right while the header, the phone tab bar, and the
+   page ease in behind it. It only plays when the shell arrives with the
+   document; a client-side navigation into the app renders without these
+   classes. Kept in CSS so it starts with the first paint rather than after
+   hydration.
+
+   `backwards` holds each element at its first keyframe through its delay and
+   then releases it, leaving no transform behind once it has landed (a
+   lingering transform would become the containing block for fixed children).
+   The wipe instead stays where it ends, off-screen and hidden. */
+@keyframes shell-intro-wipe {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(101%);
+    visibility: hidden;
+  }
+}
+
+@keyframes shell-intro-wipe-label {
+  from {
+    letter-spacing: 0.55em;
+    opacity: 0;
+  }
+
+  to {
+    letter-spacing: 0.3em;
+    opacity: 1;
+  }
+}
+
+@keyframes shell-intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--shell-intro-offset));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shell-intro-wipe {
+  animation: shell-intro-wipe 0.7s cubic-bezier(0.76, 0, 0.24, 1) 0.08s both;
+}
+
+.shell-intro-wipe-label {
+  letter-spacing: 0.3em;
+  animation: shell-intro-wipe-label 0.45s ease-out both;
+}
+
+.shell-intro-header {
+  --shell-intro-offset: -12px;
+  animation: shell-intro-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+}
+
+.shell-intro-tab-bar {
+  --shell-intro-offset: 24px;
+  animation: shell-intro-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+}
+
+.shell-intro-content {
+  --shell-intro-offset: 18px;
+  animation: shell-intro-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.42s backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-intro-wipe {
+    display: none;
+  }
+
+  .shell-intro-header,
+  .shell-intro-tab-bar,
+  .shell-intro-content {
+    animation: none;
+  }
+}
+
+/* /hackathons is one static page for every URL. When it is opened on a
+   filtered URL the HTML still contains the unfiltered cards, so an inline
+   script marks <html> and this keeps them from being shown until the browser
+   has replaced them with the filtered view (lib/hackathons/catalog-url.ts). */
+html[data-catalog-url="filtered"] [data-catalog-results] {
+  visibility: hidden;
+}
+
 /* Hackathon cover cards (HackathonCard). The 1px outline is painted as
    background layers under a transparent border, and the inner divider lines
    (under the cover, between the columns, above the footer) are their own

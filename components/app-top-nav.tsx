@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useRef, useState, type ElementType } from "react";
 import {
   Building2,
@@ -18,10 +17,13 @@ import {
 } from "lucide-react";
 
 import { useAppNavSlotRef } from "@/components/app-nav-slot";
+import { useShellIntro } from "@/components/app-shell-transition";
 import { BrandLogo } from "@/components/brand-logo";
 import { LoginRequiredLink } from "@/components/login-required-dialog";
 import { NavUnderline } from "@/components/nav-underline";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useViewerAuth } from "@/components/viewer-auth";
+import { isAdminRole } from "@/lib/auth-role";
 
 type NavLink = {
   href: string;
@@ -35,6 +37,11 @@ type NavLink = {
   description?: string;
 };
 
+/* `isSignedIn` is undefined until the browser knows (see useViewerAuth), which
+   is also what the static HTML is rendered with. Unknown is shown as signed
+   out: a browser with no remembered sign-in has almost certainly never signed
+   in here, so the prerendered nav is already right for anonymous visitors
+   and only a returning member's nav changes once the page is interactive. */
 function buildLinks({
   isAdmin,
   isOrganizer,
@@ -42,7 +49,7 @@ function buildLinks({
 }: {
   isAdmin: boolean;
   isOrganizer: boolean;
-  isSignedIn: boolean;
+  isSignedIn: boolean | undefined;
 }): NavLink[] {
   return [
     ...(isAdmin ? [{ href: "/admin", icon: ShieldCheck, label: "Admin" }] : []),
@@ -77,7 +84,7 @@ const circleButton =
 /* Initial-in-a-circle avatar, like Airbnb's; it opens account settings (the
    profile itself is My Profile in the menu). Signed-out visitors get a person
    glyph that leads to sign-in instead. */
-function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
+function ProfileCircle({ isSignedIn }: { isSignedIn: boolean | undefined }) {
   const { user } = useUser();
   const initial = (
     user?.firstName?.[0] ??
@@ -107,7 +114,15 @@ function ProfileCircle({ isSignedIn }: { isSignedIn: boolean }) {
 
 /* The ☰ button: a disclosure that drops down every link the old sidebar held,
    plus the light/dark switch at the bottom. */
-function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSignedIn: boolean; links: NavLink[] }) {
+function NavMenu({
+  activeHref,
+  isSignedIn,
+  links,
+}: {
+  activeHref?: string;
+  isSignedIn: boolean | undefined;
+  links: NavLink[];
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -164,6 +179,10 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
             {links.map(({ description, href, icon: Icon, label, requiresAuth }) => {
               const active = href === activeHref;
               const NavigationLink = requiresAuth && !isSignedIn ? LoginRequiredLink : Link;
+              /* Only a confirmed signed-out visitor is stopped at the prompt;
+                 while the answer is pending the click goes through and the
+                 destination's own protection decides. */
+              const promptProps = requiresAuth && isSignedIn === false ? { forcePrompt: true } : {};
 
               if (description) {
                 /* Featured row: hairlines above and (unless it's last) below,
@@ -178,7 +197,7 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
                       className="-mx-5 flex flex-col gap-1 px-5 py-3 transition-colors hover:bg-ink/[0.04] focus-visible:bg-ink/[0.04] focus-visible:outline-none"
                       href={href}
                       onClick={() => setOpen(false)}
-                      {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
+                      {...promptProps}
                     >
                       <span className={`text-sm font-semibold ${active ? "text-pine" : "text-ink"}`}>{label}</span>
                       <span className="text-xs leading-snug text-ink/55">{description}</span>
@@ -196,7 +215,7 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
                     }`}
                     href={href}
                     onClick={() => setOpen(false)}
-                    {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
+                    {...promptProps}
                   >
                     <Icon aria-hidden="true" className="size-4 shrink-0" />
                     {label}
@@ -216,19 +235,15 @@ function NavMenu({ activeHref, isSignedIn, links }: { activeHref?: string; isSig
   );
 }
 
-export function AppTopNav({
-  isAdmin,
-  isOrganizer,
-  isSignedIn,
-}: {
-  isAdmin: boolean;
-  isOrganizer: boolean;
-  isSignedIn: boolean;
-}) {
+export function AppTopNav() {
   const pathname = usePathname();
-  const prefersReducedMotion = useReducedMotion();
+  const playsIntro = useShellIntro();
   const slotRef = useAppNavSlotRef();
-  const links = buildLinks({ isAdmin, isOrganizer, isSignedIn });
+  /* Read in the browser so the layout (and the static /hackathons page under
+     it) never touches the session on the server. The role only decides which
+     links are shown; /admin and /organizer check it again themselves. */
+  const { isSignedIn, role } = useViewerAuth();
+  const links = buildLinks({ isAdmin: isAdminRole(role), isOrganizer: role === "organizer", isSignedIn });
   const activeHref = activeHrefFor(links, pathname);
 
   return (
@@ -243,11 +258,10 @@ export function AppTopNav({
           wider than the logo. With the search bar below, the header also
           takes the same 1rem on top that the band leaves above the bar,
           so the row sits midway between the page top and the bar's top. */}
-      <motion.header
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent has-[[data-nav-slot]:not(:empty)]:bg-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-4"
-        initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
-        transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      <header
+        className={`relative z-40 border-b border-ink/10 bg-paper has-[[data-nav-slot]:not(:empty)]:border-transparent has-[[data-nav-slot]:not(:empty)]:bg-transparent lg:has-[[data-nav-slot]:not(:empty)]:pt-4 ${
+          playsIntro ? "shell-intro-header" : ""
+        }`}
       >
         <div className="mx-auto flex max-w-[1800px] flex-wrap items-center justify-between gap-x-4 px-5 sm:px-8 lg:grid lg:min-h-20 lg:has-[[data-nav-slot]:not(:empty)]:min-h-[68px] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-12">
           <Link className="flex min-h-16 items-center justify-self-start" href={isSignedIn ? "/hackathons" : "/"}>
@@ -278,16 +292,15 @@ export function AppTopNav({
             <NavMenu activeHref={activeHref} isSignedIn={isSignedIn} links={links} />
           </div>
         </div>
-      </motion.header>
+      </header>
 
       {/* Phone tab bar: fixed to the bottom so it survives scrolling, padded for
           the home-indicator inset, every tab sharing the width evenly. */}
-      <motion.nav
-        animate={{ opacity: 1, y: 0 }}
+      <nav
         aria-label="App navigation"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/15 bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden"
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
-        transition={{ delay: 0.3, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className={`fixed inset-x-0 bottom-0 z-50 border-t border-ink/15 bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden ${
+          playsIntro ? "shell-intro-tab-bar" : ""
+        }`}
       >
         <ul className="flex items-stretch">
           {links.map(({ href, icon: Icon, label, requiresAuth }) => {
@@ -301,7 +314,7 @@ export function AppTopNav({
                   aria-label={label}
                   className="flex h-14 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine"
                   href={href}
-                  {...(requiresAuth && !isSignedIn ? { forcePrompt: true } : {})}
+                  {...(requiresAuth && isSignedIn === false ? { forcePrompt: true } : {})}
                 >
                   <Icon
                     aria-hidden="true"
@@ -313,7 +326,7 @@ export function AppTopNav({
             );
           })}
         </ul>
-      </motion.nav>
+      </nav>
     </>
   );
 }

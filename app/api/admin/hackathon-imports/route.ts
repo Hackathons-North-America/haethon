@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
 import { adminHackathonImportSchema } from "@/lib/validations/hackathon";
 
@@ -33,6 +34,11 @@ export async function POST(request: Request) {
       reviewerUserId: gate.user.id,
       ignoreDuplicates: parsed.data.ignoreDuplicates ?? false,
     });
+
+    // The import invalidates the catalog itself, but before it creates the
+    // Discord channels for auto-approved rows. Invalidate again now that
+    // those exist, or the regenerated page could miss their links.
+    revalidateHackathonCaches();
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

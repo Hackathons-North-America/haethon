@@ -1,49 +1,73 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
-const ease = [0.22, 1, 0.36, 1] as const;
+function subscribeToNothing() {
+  return () => {};
+}
+
+/**
+ * Whether this mount should play the app shell's entrance (the ink wipe, then
+ * the header and content easing in).
+ *
+ * It plays when the shell arrives with the document: a direct visit or a
+ * reload, where it covers the page while the browser is still loading it. It
+ * does not play when the shell mounts during a client-side navigation, such
+ * as clicking through from the landing page. By then the destination is
+ * already in memory, so a 0.8s curtain would be the only thing between the
+ * click and the page.
+ *
+ * The two cases are told apart by how the component first renders: on the
+ * server and while hydrating, useSyncExternalStore reads the server snapshot
+ * (true); on a client-side mount it reads the client one (false). The answer
+ * is kept in state so it doesn't flip to false right after hydration and cut
+ * the animation short.
+ *
+ * The entrance itself is CSS (the shell-intro-* rules in app/globals.css),
+ * so it starts with the first paint instead of waiting for this script, and
+ * prefers-reduced-motion is honored there as well.
+ */
+export function useShellIntro() {
+  const isDocumentRender = useSyncExternalStore(
+    subscribeToNothing,
+    () => false,
+    () => true
+  );
+  const [playsIntro] = useState(isDocumentRender);
+
+  return playsIntro;
+}
 
 export function AppShellContent({ children }: { children: ReactNode }) {
-  const prefersReducedMotion = useReducedMotion();
+  const playsIntro = useShellIntro();
 
   return (
-    <motion.div
-      animate={{ opacity: 1, y: 0 }}
+    <div
       // Clears the fixed phone tab bar (3.5rem + home-indicator inset).
-      className="relative z-10 min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0"
-      initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
-      transition={{ delay: 0.42, duration: 0.55, ease }}
+      className={`relative z-10 min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0 ${
+        playsIntro ? "shell-intro-content" : ""
+      }`}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
 export function AppShellWipe() {
-  const prefersReducedMotion = useReducedMotion();
+  const playsIntro = useShellIntro();
 
-  if (prefersReducedMotion) {
+  if (!playsIntro) {
     return null;
   }
 
   return (
-    <motion.div
-      animate={{ x: "101%" }}
+    <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-ink"
-      initial={{ x: 0 }}
-      transition={{ delay: 0.08, duration: 0.7, ease: [0.76, 0, 0.24, 1] }}
+      className="shell-intro-wipe pointer-events-none fixed inset-0 z-[60] flex items-center justify-center bg-ink"
+      data-shell-wipe=""
     >
-      <motion.span
-        animate={{ letterSpacing: "0.3em", opacity: 1 }}
-        className="font-mono text-xs font-medium uppercase text-paper"
-        initial={{ letterSpacing: "0.55em", opacity: 0 }}
-        transition={{ duration: 0.45, ease: "easeOut" }}
-      >
-        HNA
-      </motion.span>
-    </motion.div>
+      <span className="shell-intro-wipe-label font-mono text-xs font-medium uppercase text-paper">HNA</span>
+    </div>
   );
 }

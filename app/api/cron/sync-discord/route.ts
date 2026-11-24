@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 
 import { syncPublishedHackathonDiscordChannels } from "@/lib/discord/sync";
 import { env } from "@/lib/env";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 
 export const maxDuration = 60;
 
@@ -17,6 +18,10 @@ export async function GET(request: Request) {
 
   try {
     const data = await syncPublishedHackathonDiscordChannels();
+
+    // The sync creates and re-links channels (and series), all of which the
+    // prerendered catalog shows on its cards.
+    revalidateHackathonCaches();
 
     return NextResponse.json({ data });
   } catch (error) {

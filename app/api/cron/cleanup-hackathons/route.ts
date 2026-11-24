@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { deleteExpiredHackathonDiscordChannels } from "@/lib/discord/sync";
 import { env } from "@/lib/env";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { cleanupExpiredRateLimits } from "@/lib/security/rate-limit";
 
 export const maxDuration = 60;
@@ -19,6 +20,10 @@ export async function GET(request: Request) {
     deleteExpiredHackathonDiscordChannels(),
     cleanupExpiredRateLimits(),
   ]);
+
+  // Deleted channels leave dead links on the catalog's cards until its cache
+  // is dropped.
+  revalidateHackathonCaches();
 
   return NextResponse.json(
     { data: { ...data, expiredRateLimitBuckets } },

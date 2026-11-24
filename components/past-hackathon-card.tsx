@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import { HackathonResultActions } from "@/components/hackathon-result-actions";
-import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
+import { useHackathonPanelOpen } from "@/components/hackathon-panel-open";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
 

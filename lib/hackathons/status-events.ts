@@ -17,6 +17,20 @@ export function announceHackathonStatus(hackathonId: string, status: string | nu
   );
 }
 
+/* Every confirmed stage change on the page, whichever hackathon it is for. The
+   catalog uses it to know which cards the viewer has already touched when
+   their server-side state arrives late (see hackathon-search.tsx). */
+export function subscribeToHackathonStatusChanges(onChange: (hackathonId: string, status: string | null) => void) {
+  function handle(event: Event) {
+    const { detail } = event as CustomEvent<StatusEventDetail>;
+
+    onChange(detail.hackathonId, detail.status);
+  }
+
+  window.addEventListener(STATUS_EVENT, handle);
+  return () => window.removeEventListener(STATUS_EVENT, handle);
+}
+
 export function useHackathonStatusListener(hackathonId: string, onChange: (status: string | null) => void) {
   const onChangeRef = useRef(onChange);
 

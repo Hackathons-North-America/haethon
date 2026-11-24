@@ -60,5 +60,9 @@ export async function GET(request: Request) {
 
   const data = await applyUserCardState(cards, userId);
 
-  return NextResponse.json({ data, hasMore });
+  /* signedIn tells the catalog whether this answer included the viewer's own
+     state. A request sent right after a hard load can beat Clerk refreshing
+     an expired session cookie; the browser then asks for that state again
+     once it knows the visitor is signed in. */
+  return NextResponse.json({ data, hasMore, signedIn: Boolean(userId) });
 }

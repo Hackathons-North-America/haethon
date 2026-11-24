@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
 import { previewHackathonDiscordChannel, syncHackathonDiscordChannel } from "@/lib/discord/sync";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { discordChannelDecisionSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -42,6 +43,10 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const result = await syncHackathonDiscordChannel(id);
+
+    // Catalog cards link to the hackathon's channel, and the catalog page is
+    // prerendered, so a new channel only shows up once the cache is dropped.
+    revalidateHackathonCaches();
 
     return NextResponse.json({ data: result });
   } catch (error) {
