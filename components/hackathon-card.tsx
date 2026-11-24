@@ -152,9 +152,13 @@ function trackCardSpotlight(event: PointerEvent<HTMLElement>) {
   const targets = [card, ...card.querySelectorAll<HTMLElement>("[data-card-rule]")];
 
   for (const target of targets) {
+    /* The rect is in screen pixels, which the hover scale enlarges; the
+       gradient paints in the element's own unscaled box, so convert back. */
     const rect = target.getBoundingClientRect();
-    target.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
-    target.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+    const scaleX = rect.width / (target.offsetWidth || rect.width) || 1;
+    const scaleY = rect.height / (target.offsetHeight || rect.height) || 1;
+    target.style.setProperty("--spot-x", `${(event.clientX - rect.left) / scaleX}px`);
+    target.style.setProperty("--spot-y", `${(event.clientY - rect.top) / scaleY}px`);
   }
 }
 
@@ -794,6 +798,8 @@ export function HackathonCard({
   return (
     <article
       className={`card-spotlight group @container relative flex w-full max-w-[56rem] min-w-0 flex-col overflow-hidden rounded-lg ${
+        preview ? "" : "card-spotlight-grow"
+      } ${
         /* Past editions read as faded — dimmed just enough to signal "already
            happened" without hurting text legibility. Hover restores full
            strength so the card is still easy to inspect. */
