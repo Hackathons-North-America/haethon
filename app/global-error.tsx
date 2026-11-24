@@ -1,6 +1,5 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -11,7 +10,16 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    // Loaded on demand: a static import would put the whole Sentry SDK in the
+    // chunks every page downloads, just for the rare time this boundary shows.
+    // Without a DSN there is nowhere to report to, so the SDK is never fetched.
+    if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      return;
+    }
+
+    void import("@/lib/monitoring/sentry-browser")
+      .then((sentry) => sentry.captureException(error))
+      .catch(() => undefined);
   }, [error]);
 
   // global-error replaces the root layout when it renders, so it must

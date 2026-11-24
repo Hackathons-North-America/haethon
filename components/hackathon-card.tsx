@@ -9,6 +9,7 @@ import { DiscordGlyph } from "@/components/discord-glyph";
 import { HackathonVoteControl } from "@/components/hackathon-vote-control";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
 import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
+import { DETAIL_LINK_PREFETCH } from "@/lib/hackathons/detail-link";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { useTrackStatus } from "@/lib/hackathons/use-track-status";
@@ -500,6 +501,7 @@ function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData
     <Link
       className={cardFooterLinkClassName}
       href={`/hackathons/${hackathon.slug}`}
+      prefetch={DETAIL_LINK_PREFETCH}
       // Swapping hackathons replaces the open panel's history entry, so
       // closing it always goes straight back to the list.
       replace={panelOpen}
@@ -549,6 +551,7 @@ function CardStretchedLink({ hackathon, preview }: { hackathon: HackathonCardDat
       className={className}
       draggable={false}
       href={`/hackathons/${hackathon.slug}`}
+      prefetch={DETAIL_LINK_PREFETCH}
       replace={panelOpen}
       scroll={false}
     />
@@ -604,6 +607,7 @@ function BookmarkPageCard({
           className="absolute inset-0 z-[1]"
           draggable={false}
           href={`/hackathons/${hackathon.slug}`}
+          prefetch={DETAIL_LINK_PREFETCH}
           replace={panelOpen}
           scroll={false}
         />

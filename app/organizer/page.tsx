@@ -1,17 +1,17 @@
 import { redirect } from "next/navigation";
 
 import { OrganizerHackathonManager } from "@/components/organizer/organizer-hackathon-manager";
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { listManagedHackathons, splitManagedHackathons } from "@/lib/hackathons/organizer-service";
 
 export default async function OrganizerHackathonsPage() {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     redirect("/sign-in");
   }
 
-  const rows = await listManagedHackathons({ userId: context.user.id, role: context.role });
+  const rows = await listManagedHackathons({ userId: context.userId, role: context.role });
   const { current, past } = splitManagedHackathons(rows);
 
   return (

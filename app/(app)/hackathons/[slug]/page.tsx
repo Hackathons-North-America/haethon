@@ -31,13 +31,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function HackathonDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const [pageData, userId] = await Promise.all([getHackathonPageData(slug), getCurrentUserId()]);
+  // Public data (cached per slug) and the viewer's own state load together:
+  // the user id comes from the session token, so neither waits on the other.
+  const [pageData, viewer] = await Promise.all([
+    getHackathonPageData(slug),
+    getCurrentUserId().then((userId) => getHackathonViewerData(userId, slug)),
+  ]);
 
   if (!pageData) {
     notFound();
   }
-
-  const viewer = await getHackathonViewerData(userId, pageData.hackathon.id);
 
   return (
     <main className="min-h-screen px-5 pb-40 pt-10 sm:px-8 lg:px-12">

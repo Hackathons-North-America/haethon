@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import {
   confirmDevpostVerification,
   DevpostImportError,
@@ -18,7 +18,7 @@ const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;
 const bodySchema = z.object({ intent: z.enum(["start", "confirm"]) });
 
 export async function POST(request: Request) {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   const rateLimit = await consumeRateLimit({
-    key: `devpost-verify:${context.user.id}`,
+    key: `devpost-verify:${context.userId}`,
     limit: MAX_ATTEMPTS,
     windowMs: ATTEMPT_WINDOW_MS,
   });
@@ -45,12 +45,12 @@ export async function POST(request: Request) {
 
   try {
     if (parsed.data.intent === "start") {
-      const { code, handle } = await startDevpostVerification(context.user.id);
+      const { code, handle } = await startDevpostVerification(context.userId);
 
       return NextResponse.json({ data: { code, handle, verified: false } });
     }
 
-    const { handle } = await confirmDevpostVerification(context.user.id);
+    const { handle } = await confirmDevpostVerification(context.userId);
 
     return NextResponse.json({ data: { handle, verified: true } });
   } catch (error) {

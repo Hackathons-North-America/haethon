@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonDates, hackathons, userHackathons } from "@/lib/db/schema";
 import { evaluateCheckinWindow, normalizeCheckinCode } from "@/lib/hackathons/checkin";
@@ -18,7 +18,7 @@ const MAX_FAILED_ATTEMPTS = 10;
 const ATTEMPT_WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(request: Request, context: RouteContext) {
-  const userContext = await getCurrentUserContext();
+  const userContext = await getCurrentIdentity();
 
   if (!userContext) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -55,7 +55,7 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const rateLimit = await consumeRateLimit({
-    key: `checkin:${userContext.user.id}:${id}`,
+    key: `checkin:${userContext.userId}:${id}`,
     limit: MAX_FAILED_ATTEMPTS,
     windowMs: ATTEMPT_WINDOW_MS,
   });
@@ -78,7 +78,7 @@ export async function POST(request: Request, context: RouteContext) {
   const [existing] = await db
     .select({ applicationStatus: userHackathons.applicationStatus })
     .from(userHackathons)
-    .where(and(eq(userHackathons.userId, userContext.user.id), eq(userHackathons.hackathonId, id)))
+    .where(and(eq(userHackathons.userId, userContext.userId), eq(userHackathons.hackathonId, id)))
     .limit(1);
 
   const ended = hackathon.endsAt ? now > hackathon.endsAt : false;
@@ -91,7 +91,7 @@ export async function POST(request: Request, context: RouteContext) {
   const [saved] = await db
     .insert(userHackathons)
     .values({
-      userId: userContext.user.id,
+      userId: userContext.userId,
       hackathonId: id,
       applicationStatus: finalStatus,
       isSaved: true,
@@ -106,7 +106,7 @@ export async function POST(request: Request, context: RouteContext) {
     .returning();
 
   const verifiedDayCount = await writeOrganizerVerifiedAttendanceDays({
-    userIds: [userContext.user.id],
+    userIds: [userContext.userId],
     hackathonId: id,
   });
 

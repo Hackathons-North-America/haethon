@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 
 import { ThemedUserProfile } from "@/components/themed-user-profile";
-import { getCurrentUserRecord } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/auth";
 
 export default async function AccountSettingsPage() {
-  const user = await getCurrentUserRecord();
+  // Only a signed-in check: Clerk's own UI loads the profile client-side, so
+  // the session claim is enough and the users row is never read here.
+  const userId = await getCurrentUserId();
 
-  if (!user) {
+  if (!userId) {
     redirect("/sign-in");
   }
 

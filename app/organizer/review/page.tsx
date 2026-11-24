@@ -2,17 +2,17 @@ import { redirect } from "next/navigation";
 import { Building2, ClipboardCheck } from "lucide-react";
 
 import { SubmissionReviewQueue } from "@/components/admin/submission-review-queue";
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { getApprovedOrganizationIdsForUser, listHackathonSubmissions } from "@/lib/hackathons/review-service";
 
 export default async function OrganizerReviewPage() {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     redirect("/sign-in");
   }
 
-  const organizationIds = await getApprovedOrganizationIdsForUser(context.user.id);
+  const organizationIds = await getApprovedOrganizationIdsForUser(context.userId);
   const submissions = await listHackathonSubmissions({ allowedOrganizationIds: organizationIds, limit: 100 });
   const pending = submissions.filter((submission) => submission.status === "pending");
 

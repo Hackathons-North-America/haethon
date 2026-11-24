@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { OrganizerSidebar } from "@/components/organizer/organizer-sidebar";
-import { getCurrentUserContext, isOrganizerRole } from "@/lib/auth";
+import { getCurrentIdentity, isOrganizerRole } from "@/lib/auth";
 
 export default async function OrganizerLayout({ children }: { children: ReactNode }) {
-  const context = await getCurrentUserContext();
+  const context = await getCurrentIdentity();
 
   if (!context) {
     redirect("/sign-in");

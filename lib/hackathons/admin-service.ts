@@ -65,11 +65,13 @@ export function adminHackathonQuery() {
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId));
 }
 
-async function withDiscordChannelIds<T extends { seriesId: string | null }>(rows: T[]) {
-  const seriesIds = [...new Set(rows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])))];
-
-  if (!env.DISCORD_GUILD_ID || seriesIds.length === 0) {
-    return rows.map((row) => ({ ...row, discordChannelId: null as string | null }));
+/* The configured guild's channel for each series. `seriesIds` narrows the
+   lookup when the caller already knows which series it needs; without it the
+   whole guild's mapping is returned (one row per series, a few hundred at
+   most), which lets a list page fetch it alongside its rows instead of after. */
+async function loadDiscordChannelIdsBySeries(seriesIds?: string[]) {
+  if (!env.DISCORD_GUILD_ID || seriesIds?.length === 0) {
+    return new Map<string, string>();
   }
 
   const mappings = await db
@@ -82,28 +84,45 @@ async function withDiscordChannelIds<T extends { seriesId: string | null }>(rows
     .where(
       and(
         eq(discordGuilds.guildSnowflake, env.DISCORD_GUILD_ID),
-        inArray(discordChannels.seriesId, seriesIds)
+        seriesIds ? inArray(discordChannels.seriesId, seriesIds) : isNotNull(discordChannels.seriesId)
       )
     );
-  const channelIdBySeries = new Map(
+
+  return new Map(
     mappings.flatMap((mapping) =>
       mapping.seriesId ? [[mapping.seriesId, mapping.channelSnowflake] as const] : []
     )
   );
+}
 
+function attachDiscordChannelIds<T extends { seriesId: string | null }>(
+  rows: T[],
+  channelIdBySeries: Map<string, string>
+) {
   return rows.map((row) => ({
     ...row,
     discordChannelId: row.seriesId ? channelIdBySeries.get(row.seriesId) ?? null : null,
   }));
 }
 
+async function withDiscordChannelIds<T extends { seriesId: string | null }>(rows: T[]) {
+  const seriesIds = [...new Set(rows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])))];
+
+  return attachDiscordChannelIds(rows, await loadDiscordChannelIdsBySeries(seriesIds));
+}
+
 export async function listPublishedHackathons() {
-  const rows = await adminHackathonQuery()
-    .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, publicStatuses)))
-    .orderBy(asc(hackathonDates.startsAt));
+  // Both halves of the admin list in one round trip: the channel mapping is
+  // read for the whole guild rather than waiting on the rows for series ids.
+  const [rows, channelIdBySeries] = await Promise.all([
+    adminHackathonQuery()
+      .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, publicStatuses)))
+      .orderBy(asc(hackathonDates.startsAt)),
+    loadDiscordChannelIdsBySeries(),
+  ]);
 
   // Past editions sink to the bottom, ordered by their assumed next-year date.
-  return withDiscordChannelIds(orderAdminHackathonRows(rows, new Date()));
+  return attachDiscordChannelIds(orderAdminHackathonRows(rows, new Date()), channelIdBySeries);
 }
 
 export async function getAdminHackathon(hackathonId: string) {

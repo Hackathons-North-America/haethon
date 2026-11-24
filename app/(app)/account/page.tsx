@@ -6,7 +6,7 @@ import { AttendedHackathonsTable } from "@/components/attended-hackathons-table"
 import { AccountProfileForm } from "@/components/forms/account-profile-form";
 import { ProfileActivity } from "@/components/profile-activity";
 import { ProfilePinnedSection } from "@/components/profile/profile-sections";
-import { getCurrentUserContext, syncCurrentUser } from "@/lib/auth";
+import { getCurrentUserId, getCurrentUserRecord, syncCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userProfiles } from "@/lib/db/schema";
 import { devpostVerificationState } from "@/lib/devpost/import-service";
@@ -14,21 +14,35 @@ import { loadProfilePageData } from "@/lib/profile/profile-page-data";
 
 const sectionTitleClassName = "text-4xl font-semibold tracking-tight text-ink sm:text-5xl";
 
+function loadAccountData(userId: string) {
+  return Promise.all([
+    db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1),
+    loadProfilePageData(userId),
+  ]);
+}
+
 export default async function AccountPage() {
-  // Most pages skip the Clerk profile sync for speed; the account page is
-  // where profile data is shown/edited, so refresh it here explicitly.
-  await syncCurrentUser();
+  // The id comes from the session token, so nothing below has to wait for it.
+  const userId = await getCurrentUserId();
 
-  const context = await getCurrentUserContext();
-
-  if (!context) {
+  if (!userId) {
     redirect("/sign-in");
   }
 
-  const [[profile], profileData] = await Promise.all([
-    db.select().from(userProfiles).where(eq(userProfiles.userId, context.user.id)).limit(1),
-    loadProfilePageData(context.user.id),
-  ]);
+  // Most pages skip the Clerk profile sync for speed; the account page is
+  // where profile data is shown/edited, so refresh it here explicitly. The
+  // sync is a network call to Clerk's API and by far the slowest thing on this
+  // page, so the profile queries run alongside it instead of queueing behind.
+  const [syncedUser, accountData] = await Promise.all([syncCurrentUser(), loadAccountData(userId)]);
+  const user = syncedUser ?? (await getCurrentUserRecord());
+
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  // The claim and the row agree except in the instant after an account is
+  // relinked to a new Clerk identity; trust the row and reload for it.
+  const [[profile], profileData] = user.id === userId ? accountData : await loadAccountData(user.id);
 
   const devpostState = profile
     ? devpostVerificationState(profile)
@@ -46,9 +60,9 @@ export default async function AccountPage() {
         <div className="space-y-10">
           <section id="profile" className="pt-2">
             <AccountProfileForm
-              firstName={context.user.firstName}
-              lastName={context.user.lastName}
-              username={context.user.username}
+              firstName={user.firstName}
+              lastName={user.lastName}
+              username={user.username}
               profile={profile ?? null}
               devpostImport={devpostImport}
             />
