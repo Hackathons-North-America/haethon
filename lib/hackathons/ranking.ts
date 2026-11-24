@@ -1,5 +1,5 @@
 /**
- * Client- and server-safe sorting and tier helpers for the catalog grid. Pure
+ * Client- and server-safe sorting helpers for the catalog grid. Pure
  * functions over already-fetched data — no DB access.
  */
 
@@ -9,29 +9,8 @@ export type StartDateSortable = {
   countryCode?: string | null;
 };
 
-export const TIER_LABELS = ["S", "A", "B", "C", "D"] as const;
-export type TierLabel = (typeof TIER_LABELS)[number];
-
-/* What a card shows in its tier slot: a vote-derived tier, or "unranked" while
-   the hackathon has fewer than MIN_VOTES_FOR_TIER votes. */
-export type CardTier = TierLabel | "unranked";
-
-/* Below this many votes a hackathon's approval rate is too noisy to rank, so
-   it stays "unranked" rather than being placed among rated events. */
-export const MIN_VOTES_FOR_TIER = 5;
-
-/* Cumulative share of ranked hackathons each tier covers, best first:
-   S = top 10%, A = next 20%, B = middle 40%, C = next 20%, D = bottom 10%. */
-const TIER_CUTOFFS: readonly [TierLabel, number][] = [
-  ["S", 0.1],
-  ["A", 0.3],
-  ["B", 0.7],
-  ["C", 0.9],
-  ["D", 1],
-];
-
-/* z for a 95% confidence interval. The SQL sort in catalog.ts inlines the same
-   constants (z, z²/2, z²/4, z²) — keep the two in step. */
+/* z for a 95% confidence interval. The "Top voted" SQL sort in catalog.ts
+   inlines the same constants (z, z²/2, z²/4, z²) — keep the two in step. */
 const WILSON_Z = 1.96;
 
 /**
@@ -53,43 +32,6 @@ export function wilsonLowerBound(upvotes: number, downvotes: number) {
   const margin = WILSON_Z * Math.sqrt((share * (1 - share) + z2 / (4 * total)) / total);
 
   return (centre - margin) / (1 + z2 / total);
-}
-
-export type VoteTotals = { upvotes: number; downvotes: number };
-
-/**
- * Relative tiers from vote totals. Only hackathons with at least
- * MIN_VOTES_FOR_TIER votes are ranked; everything else is absent from the
- * result (the caller shows "unranked"). Ranking is by Wilson lower bound, then
- * net score. Tied scores share the better tier (competition ranking), so two
- * identical records never land in different tiers.
- */
-export function assignVoteTiers(entries: readonly (VoteTotals & { id: string })[]): Map<string, TierLabel> {
-  const ranked = entries
-    .filter((entry) => entry.upvotes + entry.downvotes >= MIN_VOTES_FOR_TIER)
-    .map((entry) => ({
-      id: entry.id,
-      net: entry.upvotes - entry.downvotes,
-      score: wilsonLowerBound(entry.upvotes, entry.downvotes),
-    }))
-    .sort((a, b) => b.score - a.score || b.net - a.net || a.id.localeCompare(b.id));
-
-  const tiers = new Map<string, TierLabel>();
-  let rank = 0;
-
-  ranked.forEach((entry, index) => {
-    const previous = ranked[index - 1];
-
-    if (!previous || previous.score !== entry.score || previous.net !== entry.net) {
-      rank = index;
-    }
-
-    const percentile = rank / ranked.length;
-    const tier = TIER_CUTOFFS.find(([, cutoff]) => percentile < cutoff)?.[0] ?? "D";
-    tiers.set(entry.id, tier);
-  });
-
-  return tiers;
 }
 
 function startTime(card: StartDateSortable) {

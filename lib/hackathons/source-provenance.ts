@@ -18,7 +18,7 @@ export type HackathonSourceBadge = {
   type: HackathonSource;
 };
 
-// A hackathon is only labelled Community when it originated in the public
+// A hackathon is only labelled "User entered" when it originated in the public
 // submission form and a reviewer approved it. Imported URLs never use this.
 export const COMMUNITY_FORM_SOURCE_URL = "https://haethon.local/submissions/community-form";
 
@@ -43,8 +43,8 @@ const SOURCE_LABELS: Record<HackathonSource, string> = {
   devpost: "Devpost",
   hackclub: "Hack Club",
   organizer_site: "Organizer",
-  manual: "Community",
-  other: "Website",
+  manual: "User entered",
+  other: "Other",
 };
 
 export function sourceBadge(type: HackathonSource): HackathonSourceBadge {

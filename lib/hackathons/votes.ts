@@ -1,22 +1,13 @@
-import { unstable_cache } from "next/cache";
-import * as Sentry from "@sentry/nextjs";
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { hackathonDates, hackathonVotes, hackathons } from "@/lib/db/schema";
-import { assignVoteTiers, MIN_VOTES_FOR_TIER, type TierLabel } from "@/lib/hackathons/ranking";
 import {
   EMPTY_VOTE_STATE,
   isVotingClosed,
   type HackathonVoteState,
   type VoteValue,
 } from "@/lib/hackathons/vote-state";
-
-/* Tiers are relative across every ranked hackathon, so they need a full-table
-   aggregate. That runs on a short shared cache rather than per vote or per
-   request; a vote moves a tier within a few minutes. */
-const VOTE_TIERS_REVALIDATE_SECONDS = 300;
-export const VOTE_TIERS_CACHE_TAG = "hackathon-vote-tiers";
 
 /* Mirrors the catalog's public statuses: only listed hackathons take votes. */
 const votableStatuses = ["upcoming", "live", "completed"] as const;
@@ -61,39 +52,6 @@ export async function getVoteStates(
       { upvotes: row.upvotes, downvotes: row.downvotes, viewerVote: toVoteValue(row.viewerVote) },
     ])
   );
-}
-
-/* JSON-safe (a plain record, not a Map) because it crosses the cache boundary. */
-const getCachedVoteTiers = unstable_cache(
-  async (): Promise<Record<string, TierLabel>> => {
-    const rows = await db
-      .select({
-        id: hackathonVotes.hackathonId,
-        upvotes: upvoteCount,
-        downvotes: downvoteCount,
-      })
-      .from(hackathonVotes)
-      .groupBy(hackathonVotes.hackathonId)
-      .having(sql`count(*) >= ${MIN_VOTES_FOR_TIER}`);
-
-    return Object.fromEntries(assignVoteTiers(rows));
-  },
-  [VOTE_TIERS_CACHE_TAG],
-  { revalidate: VOTE_TIERS_REVALIDATE_SECONDS, tags: [VOTE_TIERS_CACHE_TAG] }
-);
-
-/**
- * hackathonId → tier for every ranked hackathon. Anything missing is
- * "unranked". A failure degrades to everything unranked rather than taking the
- * catalog down.
- */
-export async function getVoteTiers(): Promise<Record<string, TierLabel>> {
-  try {
-    return await getCachedVoteTiers();
-  } catch (error) {
-    Sentry.captureException(error, { tags: { feature: "hackathon-vote-tiers" } });
-    return {};
-  }
 }
 
 /* Voting is open for listed hackathons that haven't ended yet. Dates-TBA

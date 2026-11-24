@@ -42,8 +42,8 @@ describe("hackathon source badges", () => {
       { type: "devpost", label: "Devpost" },
       { type: "hackclub", label: "Hack Club" },
       { type: "organizer_site", label: "Organizer" },
-      { type: "manual", label: "Community" },
-      { type: "other", label: "Website" },
+      { type: "manual", label: "User entered" },
+      { type: "other", label: "Other" },
     ]);
   });
 });

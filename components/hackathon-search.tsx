@@ -149,8 +149,8 @@ export type HackathonCardHelpers = {
 
 /* Grid order, picked from the search bar's Sort segment. */
 const sortOptions: { label: string; value: CatalogSort; detail: string }[] = [
-  { label: "Soonest", value: "soonest", detail: "Next start date first" },
-  { label: "Top voted", value: "top", detail: "Most upvoted by hackers first" },
+  { label: "Date", value: "soonest", detail: "Next start date first" },
+  { label: "Votes", value: "top", detail: "Most upvoted by hackers first" },
 ];
 
 export function HackathonSearch({
@@ -354,7 +354,7 @@ export function HackathonSearch({
     [appliedFilters, catalog, origin]
   );
   const originCountryCode = origin?.countryCode ?? null;
-  /* "Top voted" pages arrive already ranked by the server, which is the only
+  /* "Votes" pages arrive already ranked by the server, which is the only
      place that can order across pages, so they are shown as-is. */
   const sortedHackathons = useMemo(
     () => (sort === "top" ? filteredHackathons : sortByStartDateWithLocalBoost(filteredHackathons, originCountryCode)),
@@ -427,7 +427,7 @@ export function HackathonSearch({
   const renderCardNode =
     renderCard ??
     ((hackathon: HackathonCardData) => (
-      <HackathonCard hackathon={hackathon} tier={hackathon.tier ?? "unranked"} />
+      <HackathonCard hackathon={hackathon} showSource />
     ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
@@ -438,7 +438,7 @@ export function HackathonSearch({
       : locationState === "error"
         ? "Location unavailable"
         : `Within ${distanceKm} km`;
-  const selectedSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? "Soonest";
+  const selectedSortLabel = sortOptions.find((option) => option.value === sort)?.label ?? "Date";
   const selectedFeatureLabels = featureTags.filter((tag) => tag.value === "on").map((tag) => tag.label);
 
   function changeSort(next: CatalogSort) {
@@ -629,7 +629,7 @@ export function HackathonSearch({
           plain fade. */}
       <section
         aria-label="Hackathon filters"
-        className="relative isolate border-b border-ink/10 px-5 pb-9 pt-3 sm:px-8 sm:pt-4 lg:px-12"
+        className="relative isolate z-30 border-b border-ink/10 px-5 pb-9 pt-3 sm:px-8 sm:pt-4 lg:px-12"
       >
         <WatercolorBackdrop className="absolute inset-x-0 bottom-0 -z-10 h-[calc(100%+16rem)]" />
         {/* Shared with the results grid below so the filter bar, the heading,
@@ -687,7 +687,7 @@ export function HackathonSearch({
                 pill radius only applies while collapsed — a rounded-full corner
                 on a two-row card reads as a lozenge. */}
             <div
-              className={`flex min-w-0 flex-col rounded-[2rem] border border-ink/12 bg-surface p-2 shadow-[0_6px_20px_-6px_rgba(29,42,68,0.18)] md:p-0 ${
+              className={`group/bar flex min-w-0 flex-col rounded-[2rem] border border-ink/12 bg-surface p-2 shadow-[0_6px_20px_-6px_rgba(29,42,68,0.18)] md:p-0 ${
                 moreFiltersOpen ? "" : "md:rounded-full"
               } md:flex-1`}
             >
@@ -931,7 +931,7 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 md:block" />
+            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
 
             <div className="relative min-h-16 min-w-0 flex-1">
               <input name="datePeriod" type="hidden" value={datePeriod} />
@@ -990,7 +990,7 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 md:block" />
+            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
 
             <div className="relative min-h-16 min-w-0 flex-[1.5]">
               {featureTags.map((tag) =>
@@ -1053,7 +1053,7 @@ export function HackathonSearch({
               ) : null}
             </div>
 
-            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 md:block" />
+            <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
 
             {/* Sort sits in the bar like Airbnb's "Who": the grid order is
                 part of the query. Picking one re-runs the search right away
@@ -1157,7 +1157,7 @@ export function HackathonSearch({
                   />
                 </label>
 
-                <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 md:block" />
+                <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
 
                 <div className="relative min-h-16 min-w-0 flex-1">
                   <input name="format" type="hidden" value={format} />
@@ -1260,8 +1260,12 @@ export function HackathonSearch({
       </section>
 
       <section className="px-5 pb-16 pt-30 sm:px-8 sm:pb-20 lg:px-12">
-        <div className="mx-auto max-w-[1800px]">
-          <h1 className="mb-7 font-serif text-[15px] font-semibold tracking-[-0.02em] text-ink sm:text-lg">
+        {/* The inset is the space the cards gave up when the column gap went from 64px
+            to 32px: one 32px gap per column boundary, split across both sides
+            (2 cols → 16px a side, 3 cols → 32px a side). Card widths stay the
+            same as with a 64px gap; the grid just sits closer to center. */}
+        <div className="mx-auto max-w-[1800px] sm:px-4 min-[90rem]:px-8">
+          <h1 className="mb-7 font-serif text-[19.5px] font-semibold tracking-[-0.02em] text-ink sm:text-[23.4px]">
             Upcoming hackathons
           </h1>
 
@@ -1282,7 +1286,7 @@ export function HackathonSearch({
           ) : filteredHackathons.length ? (
             <>
               {upcomingHackathons.length ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-14 sm:grid-cols-2 min-[90rem]:grid-cols-3">
                   {upcomingHackathons.map((hackathon) => (
                     <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                   ))}
@@ -1300,7 +1304,7 @@ export function HackathonSearch({
                     </span>
                     <span aria-hidden="true" className="h-px flex-1 bg-ink/15" />
                   </summary>
-                  <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 min-[90rem]:grid-cols-3">
+                  <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-14 sm:grid-cols-2 min-[90rem]:grid-cols-3">
                     {pastHackathons.map((hackathon) => (
                       <Fragment key={hackathon.id}>{renderCardNode(hackathon, cardHelpers)}</Fragment>
                     ))}

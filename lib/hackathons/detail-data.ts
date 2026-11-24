@@ -159,7 +159,7 @@ export async function getHackathonViewerData(userId: string | null, hackathonId:
   return {
     trackedStatus: tracked?.applicationStatus ?? null,
     userId,
-    /* Live totals, the viewer's own vote, and the vote tier (null = unranked). */
+    /* Live totals and the viewer's own vote. */
     votes: cardVoteFields(hackathonId, votes),
   };
 }
