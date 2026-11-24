@@ -37,28 +37,27 @@
      espresso brown and a lighter tone from the same family. There is no red
      accent left in the system — destructive actions use the pine brown.
 
-     Dark mode inverts it onto a neutral near-black: paper becomes the deep
-     ground and ink the off-white text, while pine and moss lighten to a tan
-     so `bg-pine text-paper` buttons and `text-pine` links keep their
-     contrast. The warmth lives in the accents and the espresso watercolor
-     band (--watercolor-filter), not in the grounds. */
-  --paper: light-dark(#fbf7f0, #0f0f10);
-  --ink: light-dark(#1b1917, #f4f4f5);
+     Dark mode inverts it into espresso: paper becomes the deep warm ground
+     and ink the cream text, while pine and moss lighten to a tan so
+     `bg-pine text-paper` buttons and `text-pine` links keep their contrast
+     on the dark ground. */
+  --paper: light-dark(#fbf7f0, #1b1917);
+  --ink: light-dark(#1b1917, #f3ece1);
   --pine: light-dark(#362519, #dcb994);
   --moss: light-dark(#6b4a30, #b48e69);
   --ember: light-dark(#e4572e, #f07a52);
 
   /* Raised surfaces (cards, menus, inputs, dialogs): white on the cream
      ground, a step lighter than the ground in dark mode. */
-  --surface: light-dark(#ffffff, #18181b);
+  --surface: light-dark(#ffffff, #252220);
   /* A pale pine wash for "live"/success pills and notices. */
-  --pine-soft: light-dark(#ede5dd, #2a2622);
+  --pine-soft: light-dark(#ede5dd, #3a2c21);
 
   /* Status colors for errors, warnings, and confirmations. */
   --danger: light-dark(#b42318, #f97066);
-  --danger-soft: light-dark(#fef3f2, #2c1514);
+  --danger-soft: light-dark(#fef3f2, #3a1d1a);
   --warning: light-dark(#b54708, #fdb022);
-  --warning-soft: light-dark(#fffaeb, #2a210c);
+  --warning-soft: light-dark(#fffaeb, #33270f);
   --warning-ink: light-dark(#704600, #fec84b);
   --success: light-dark(#137a4c, #47cd89);
 
@@ -68,7 +67,7 @@
   --ink-hairline: color-mix(in oklab, var(--ink) 15%, transparent);
 
   /* Darkens the beige watercolor backdrop into a warm espresso wash in dark
-     mode, so the header band stays brown above the neutral ground. */
+     mode. */
   --watercolor-filter: none;
 }
 
