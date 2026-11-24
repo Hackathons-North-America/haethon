@@ -282,7 +282,7 @@ export function HackathonDetailView({
         <p className="mt-2 text-sm text-ink/55">Track your interest, application, or plans to attend.</p>
         <div className="mt-4">
           {viewer.userId ? (
-            <HackathonStatusTracker hackathonId={hackathon.id} initialStatus={viewer.trackedStatus} />
+            <HackathonStatusTracker hackathonId={hackathon.id} hackathonName={hackathon.name} initialStatus={viewer.trackedStatus} />
           ) : (
             <Link
               className="inline-flex min-h-10 items-center justify-center rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"

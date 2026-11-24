@@ -2,17 +2,12 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { Link2, Pin, Trophy, Undo2 } from "lucide-react";
 
-import { showLoginRequiredDialog } from "@/components/login-required-dialog";
-
-function handleUnauthenticated() {
-  showLoginRequiredDialog();
-}
+import type { PastResultFields } from "@/components/past-hackathon-card";
 
 const buttonClassName =
-  "inline-flex rounded-full min-h-8 items-center gap-1.5 border px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] transition-colors disabled:cursor-wait disabled:opacity-60";
+  "inline-flex rounded-full min-h-8 items-center gap-1.5 border px-3 font-mono text-[11px] font-medium uppercase tracking-[0.12em] transition-colors";
 
 const outlineButtonClassName = `${buttonClassName} border-pine/40 bg-surface text-pine hover:bg-pine hover:text-paper`;
 
@@ -24,145 +19,122 @@ const submitButtonClassName =
 const cancelButtonClassName =
   "min-h-8 px-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink/55 hover:text-ink";
 
-async function patchUserHackathon(userHackathonId: string, body: Record<string, unknown>) {
-  const response = await fetch(`/api/user-hackathons/${encodeURIComponent(userHackathonId)}`, {
-    body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
-    method: "PATCH",
-  });
+/** One background save of a past hackathon's result fields. */
+export type ResultSave = {
+  /* Saves with the same key replace each other (last click wins). */
+  key: "pin" | "result" | "link";
+  patch: Partial<PastResultFields>;
+  failureMessage: string;
+  /* Called when the save fails, after the fields are rolled back. */
+  onFailed?: () => void;
+};
 
-  if (response.status === 401) {
-    handleUnauthenticated();
-    return { ok: false as const, error: null };
-  }
-
-  const payload = (await response.json().catch(() => null)) as { error?: unknown } | null;
-
-  if (!response.ok) {
-    return { ok: false as const, error: typeof payload?.error === "string" ? payload.error : "Something went wrong. Try again." };
-  }
-
-  return { ok: true as const, error: null };
-}
-
+/* Pin, win and project-link controls for an attended past hackathon. Every
+   action is applied immediately by the owning PastHackathonCard (onSave) and
+   saved in the background; forms close on submit and reopen with what was
+   typed if the server rejects it. */
 export function HackathonResultActions({
-  userHackathonId,
-  status,
-  isPinned,
   awardName,
   devpostUrl,
+  hackathonName,
+  isPinned,
+  onSave,
+  status,
 }: {
-  userHackathonId: string;
-  status: "attended" | "won";
-  isPinned: boolean;
   awardName: string | null;
   devpostUrl: string | null;
+  hackathonName: string;
+  isPinned: boolean;
+  onSave: (save: ResultSave) => void;
+  status: "attended" | "won";
 }) {
-  const router = useRouter();
   const won = status === "won";
-  const [pinned, setPinned] = useState(isPinned);
   const [openForm, setOpenForm] = useState<"win" | "link" | null>(null);
   const [award, setAward] = useState(awardName ?? "");
   const [link, setLink] = useState(devpostUrl ?? "");
-  const [pending, setPending] = useState<"pin" | "win" | "undo" | "link" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function runPatch(kind: "pin" | "win" | "undo" | "link", body: Record<string, unknown>) {
-    setPending(kind);
-    setError(null);
-
-    const result = await patchUserHackathon(userHackathonId, body);
-
-    if (!result.ok) {
-      if (result.error) {
-        setError(result.error);
-      }
-      setPending(null);
-      return false;
-    }
-
-    router.refresh();
-    setPending(null);
-    return true;
-  }
 
   function toggleForm(form: "win" | "link") {
-    setError(null);
     setAward(awardName ?? "");
     setLink(devpostUrl ?? "");
     setOpenForm((current) => (current === form ? null : form));
   }
 
-  async function togglePinned() {
-    if (pending) {
-      return;
-    }
+  function togglePinned() {
+    const nextPinned = !isPinned;
 
-    const nextPinned = !pinned;
-    setPinned(nextPinned);
-
-    if (!(await runPatch("pin", { isPinned: nextPinned }))) {
-      setPinned(!nextPinned);
-    }
-  }
-
-  async function submitWin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!award.trim() || pending) {
-      return;
-    }
-
-    const saved = await runPatch("win", {
-      applicationStatus: "won",
-      awardName: award.trim(),
-      devpostUrl: link.trim() || null,
+    onSave({
+      key: "pin",
+      patch: { isPinned: nextPinned },
+      failureMessage: nextPinned ? `Couldn't pin ${hackathonName} to your profile.` : `Couldn't unpin ${hackathonName}.`,
     });
-
-    if (saved) {
-      setOpenForm(null);
-    }
   }
 
-  async function undoWin() {
-    if (pending) {
-      return;
-    }
-
-    if (await runPatch("undo", { applicationStatus: "attended", awardName: null })) {
-      setOpenForm(null);
-      setAward("");
-    }
-  }
-
-  async function submitLink(event: FormEvent<HTMLFormElement>) {
+  function submitWin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (pending) {
+    if (!award.trim()) {
       return;
     }
 
-    if (await runPatch("link", { devpostUrl: link.trim() || null })) {
-      setOpenForm(null);
-    }
+    const typedAward = award;
+    const typedLink = link;
+
+    setOpenForm(null);
+    onSave({
+      key: "result",
+      patch: { status: "won", awardName: award.trim(), devpostUrl: link.trim() || null },
+      failureMessage: `Couldn't save your win for ${hackathonName}.`,
+      // Reopen the form with what was typed so nothing has to be re-entered.
+      onFailed: () => {
+        setAward(typedAward);
+        setLink(typedLink);
+        setOpenForm("win");
+      },
+    });
+  }
+
+  function undoWin() {
+    setOpenForm(null);
+    setAward("");
+    onSave({
+      key: "result",
+      patch: { status: "attended", awardName: null },
+      failureMessage: `Couldn't undo the win for ${hackathonName}.`,
+    });
+  }
+
+  function submitLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const typedLink = link;
+
+    setOpenForm(null);
+    onSave({
+      key: "link",
+      patch: { devpostUrl: link.trim() || null },
+      failureMessage: `Couldn't save the project link for ${hackathonName}.`,
+      onFailed: () => {
+        setLink(typedLink);
+        setOpenForm("link");
+      },
+    });
   }
 
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <button
-          aria-pressed={pinned}
+          aria-pressed={isPinned}
           className={`${buttonClassName} ${
-            pinned
+            isPinned
               ? "border-pine bg-pine text-paper hover:bg-pine/90"
               : "border-pine/40 bg-surface text-pine hover:bg-pine hover:text-paper"
           }`}
-          disabled={pending === "pin"}
           onClick={togglePinned}
           type="button"
         >
-          <Pin aria-hidden="true" className={`size-3.5 ${pinned ? "fill-current" : ""}`} />
-          {pinned ? "Unpin from profile" : "Pin to profile"}
+          <Pin aria-hidden="true" className={`size-3.5 ${isPinned ? "fill-current" : ""}`} />
+          {isPinned ? "Unpin from profile" : "Pin to profile"}
         </button>
 
         <button className={outlineButtonClassName} onClick={() => toggleForm("win")} type="button">
@@ -171,9 +143,9 @@ export function HackathonResultActions({
         </button>
 
         {won ? (
-          <button className={outlineButtonClassName} disabled={pending === "undo"} onClick={undoWin} type="button">
+          <button className={outlineButtonClassName} onClick={undoWin} type="button">
             <Undo2 aria-hidden="true" className="size-3.5" />
-            {pending === "undo" ? "Undoing…" : "Undo win"}
+            Undo win
           </button>
         ) : null}
 
@@ -202,8 +174,8 @@ export function HackathonResultActions({
             type="url"
             value={link}
           />
-          <button className={submitButtonClassName} disabled={pending === "win" || !award.trim()} type="submit">
-            {pending === "win" ? "Saving…" : "Save win"}
+          <button className={submitButtonClassName} disabled={!award.trim()} type="submit">
+            Save win
           </button>
           <button className={cancelButtonClassName} onClick={() => setOpenForm(null)} type="button">
             Cancel
@@ -222,8 +194,8 @@ export function HackathonResultActions({
             type="url"
             value={link}
           />
-          <button className={submitButtonClassName} disabled={pending === "link"} type="submit">
-            {pending === "link" ? "Saving…" : "Save link"}
+          <button className={submitButtonClassName} type="submit">
+            Save link
           </button>
           <button className={cancelButtonClassName} onClick={() => setOpenForm(null)} type="button">
             Cancel
@@ -234,7 +206,6 @@ export function HackathonResultActions({
         </form>
       ) : null}
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </div>
   );
 }

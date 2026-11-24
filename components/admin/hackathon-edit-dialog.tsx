@@ -35,26 +35,71 @@ function itemToPreviewPayload(item: AdminHackathonListItem): Record<string, unkn
   };
 }
 
+/* "2026-11-01" from a date input -> the ISO string the server would store
+   (dateToInputValue reads dates back in UTC, so this round-trips). */
+function dateInputToIso(value: string) {
+  return value ? `${value}T00:00:00.000Z` : null;
+}
+
+/* The listing as it will look once the PATCH lands, so the grid card can
+   update the moment the dialog closes. The server's response replaces it. */
+function optimisticItem(item: AdminHackathonListItem, body: Record<string, string | boolean>): AdminHackathonListItem {
+  const text = (key: string) => (typeof body[key] === "string" && (body[key] as string).trim()) || null;
+  const prize = Number(body.prizeAmountUsd);
+
+  return {
+    ...item,
+    name: text("name") ?? item.name,
+    shortDescription: text("shortDescription"),
+    websiteUrl: text("websiteUrl"),
+    imageUrl: text("imageUrl"),
+    applicationUrl: text("applicationUrl"),
+    venue: text("venue"),
+    city: text("city"),
+    region: text("region"),
+    country: text("country"),
+    startsAt: dateInputToIso(String(body.startDate ?? "")),
+    endsAt: dateInputToIso(String(body.endDate ?? "")),
+    applicationOpensAt: dateInputToIso(String(body.applicationOpensAt ?? "")),
+    applicationClosesAt: dateInputToIso(String(body.applicationClosesAt ?? "")),
+    acceptanceAt: dateInputToIso(String(body.acceptanceAt ?? "")),
+    format: body.format === "online" ? "online" : "in_person",
+    beginnerFriendly: body.beginnerFriendly === true,
+    travelReimbursement: body.travelReimbursement === true,
+    highSchoolersOnly: body.highSchoolersOnly === true,
+    prizeAmountUsd: body.prizeAmountUsd !== "" && Number.isFinite(prize) ? prize : null,
+    discordChannelId: text("discordChannelId"),
+    source: text("source") as AdminHackathonListItem["source"],
+  };
+}
+
 /* Modal editor for a single published hackathon. Opens with every known field
    pre-populated; a live preview card at the top mirrors edits as they are typed.
-   Saving PATCHes the admin endpoint and hands the fresh record back to the
-   caller so the grid card can update in place. */
+   Saving hands the request body and an optimistic copy of the listing to the
+   caller, which closes (hides) the dialog and PATCHes in the background. The
+   dialog stays mounted while hidden, so a rejected save can reopen it with
+   every edit intact and the server's error shown. */
 export function HackathonEditDialog({
+  error,
+  hidden = false,
   item,
   onClose,
-  onSaved,
+  onSubmit,
 }: {
+  error: string | null;
+  hidden?: boolean;
   item: AdminHackathonListItem;
   onClose: () => void;
-  onSaved: (updated: AdminHackathonListItem) => void;
+  onSubmit: (body: Record<string, string | boolean>, optimistic: AdminHackathonListItem) => void;
 }) {
-  const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
   const [previewPayload, setPreviewPayload] = useState<Record<string, unknown>>(() => itemToPreviewPayload(item));
-  const saving = status === "saving";
 
-  // Close on Escape, and lock body scroll while the modal is open.
+  // Close on Escape, and lock body scroll while the modal is visible.
   useEffect(() => {
+    if (hidden) {
+      return;
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
@@ -69,7 +114,7 @@ export function HackathonEditDialog({
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [onClose]);
+  }, [hidden, onClose]);
 
   function updatePreview(key: string, nextValue: unknown) {
     if (!key) {
@@ -79,12 +124,9 @@ export function HackathonEditDialog({
     setPreviewPayload((current) => ({ ...current, [key]: nextValue }));
   }
 
-  async function saveChanges(event: FormEvent<HTMLFormElement>) {
+  function saveChanges(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-
-    setStatus("saving");
-    setMessage(null);
 
     const body = {
       name: formData.get("name")?.toString() ?? item.name,
@@ -111,26 +153,13 @@ export function HackathonEditDialog({
       source: formData.get("source")?.toString() ?? "",
     };
 
-    const response = await fetch(`/api/admin/hackathons/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const result = (await response.json().catch(() => ({}))) as { data?: AdminHackathonListItem; error?: unknown };
-
-    if (!response.ok || !result.data) {
-      setStatus("error");
-      setMessage(typeof result.error === "string" ? result.error : "Could not save changes. Check the required fields.");
-      return;
-    }
-
-    onSaved(result.data);
+    onSubmit(body, optimisticItem(item, body));
   }
 
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/50 p-4 backdrop-blur-sm sm:p-6"
+      className={`fixed inset-0 z-50 ${hidden ? "hidden" : "flex"} items-start justify-center overflow-y-auto bg-ink/50 p-4 backdrop-blur-sm sm:p-6`}
       onMouseDown={(event) => {
         // Only dismiss when the backdrop itself is pressed, not on a drag that
         // started inside the panel and released on the overlay.
@@ -432,20 +461,18 @@ export function HackathonEditDialog({
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <button
                 className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-5 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
-                disabled={saving}
                 type="submit"
               >
-                {saving ? "Saving..." : "Save changes"}
+                Save changes
               </button>
               <button
                 className="inline-flex min-h-10 items-center gap-2 rounded-full border border-ink/15 px-4 text-sm font-semibold text-ink disabled:opacity-50"
-                disabled={saving}
                 onClick={onClose}
                 type="button"
               >
                 Cancel
               </button>
-              {message ? <p className="text-sm font-semibold text-danger">{message}</p> : null}
+              {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
             </div>
           </form>
         </div>

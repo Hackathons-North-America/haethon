@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import dynamic from "next/dynamic";
 
 import { LoginRequiredDialog, LoginRequiredProvider } from "@/components/login-required-dialog";
+import { Toaster } from "@/components/toaster";
 
 const PostHogBootstrap = dynamic(
   () => import("@/components/providers/posthog-provider").then((module) => module.PostHogBootstrap),
@@ -17,6 +18,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <PostHogBootstrap />
         {children}
         <LoginRequiredDialog />
+        <Toaster />
       </LoginRequiredProvider>
     </ClerkProvider>
   );

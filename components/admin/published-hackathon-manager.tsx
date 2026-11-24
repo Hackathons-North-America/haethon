@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Repeat, Trash2 } from "lucide-react";
 
 import type { AdminHackathonListItem } from "@/components/admin/hackathon-admin-item";
 import { HackathonEditDialog } from "@/components/admin/hackathon-edit-dialog";
 import { previewPayloadToCard } from "@/components/admin/hackathon-card-preview";
 import { HackathonCard } from "@/components/hackathon-card";
+import { reportBackgroundFailure, scheduleUndoableRequest } from "@/lib/client/background-actions";
+import { RequestError, sendRequest } from "@/lib/client/request";
+import { showToast } from "@/lib/client/toast-store";
+import { useLatestSave } from "@/lib/client/use-latest-save";
 
 // Kept as a re-export for the organizer manager, which shares this serialized
 // server-to-client shape with the admin view.
@@ -36,59 +40,44 @@ function AdminHackathonCard({
   item,
   onDelete,
   onEdit,
-  onUpdate,
+  onPatch,
 }: {
   item: AdminHackathonListItem;
-  onDelete: (hackathonId: string) => void;
+  onDelete: (item: AdminHackathonListItem) => void;
   onEdit: (item: AdminHackathonListItem) => void;
-  onUpdate: (item: AdminHackathonListItem) => void;
+  onPatch: (hackathonId: string, patch: Partial<AdminHackathonListItem>) => void;
 }) {
-  const [status, setStatus] = useState<"idle" | "deleting" | "toggling" | "error">("idle");
-  const [message, setMessage] = useState<string | null>(null);
-  const deleting = status === "deleting";
-  const busy = deleting || status === "toggling";
+  /* The recurring flag the server last confirmed; a failed toggle snaps back to it. */
+  const confirmedRecurringRef = useRef(item.isRecurring);
 
-  async function deleteHackathon() {
-    setStatus("deleting");
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/admin/hackathons/${item.id}`, { method: "DELETE" });
-
-      if (!response.ok) {
-        const result = (await response.json().catch(() => ({}))) as { error?: unknown };
-        throw new Error(typeof result.error === "string" ? result.error : "Could not delete hackathon.");
-      }
-
-      onDelete(item.id);
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Could not delete hackathon.");
-    }
-  }
-
-  async function toggleRecurring() {
-    setStatus("toggling");
-    setMessage(null);
-
-    try {
-      const response = await fetch(`/api/admin/hackathons/${item.id}/recurring`, {
+  /* Flips instantly; saves run one at a time with the last click winning. */
+  const { save } = useLatestSave<boolean, AdminHackathonListItem>(
+    (isRecurring) =>
+      sendRequest<AdminHackathonListItem>(`/api/admin/hackathons/${item.id}/recurring`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isRecurring: !item.isRecurring }),
-      });
-      const result = (await response.json().catch(() => ({}))) as { data?: AdminHackathonListItem; error?: unknown };
+        json: { isRecurring },
+      }),
+    {
+      onSuccess: (saved, _value, { latest }) => {
+        confirmedRecurringRef.current = saved.isRecurring;
 
-      if (!response.ok || !result.data) {
-        throw new Error(typeof result.error === "string" ? result.error : "Could not update the recurring flag.");
-      }
-
-      setStatus("idle");
-      onUpdate(result.data);
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Could not update the recurring flag.");
+        if (latest) {
+          onPatch(item.id, { isRecurring: saved.isRecurring });
+        }
+      },
+      onError: (error, value) => {
+        onPatch(item.id, { isRecurring: confirmedRecurringRef.current });
+        reportBackgroundFailure(error, {
+          message: `Couldn't update the recurring flag for ${item.name}.`,
+          retry: () => setRecurring(value),
+        });
+      },
     }
+  );
+
+  function setRecurring(isRecurring: boolean) {
+    onPatch(item.id, { isRecurring });
+    save(isRecurring);
   }
 
   return (
@@ -102,7 +91,6 @@ function AdminHackathonCard({
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
-          disabled={deleting}
           onClick={() => onEdit(item)}
           type="button"
         >
@@ -111,43 +99,152 @@ function AdminHackathonCard({
         </button>
         <button
           aria-pressed={item.isRecurring}
-          className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold disabled:opacity-50 ${
+          className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
             item.isRecurring
               ? "border-pine bg-pine text-paper"
               : "border-ink/20 text-ink/70"
           }`}
-          disabled={busy}
-          onClick={() => void toggleRecurring()}
+          onClick={() => setRecurring(!item.isRecurring)}
           type="button"
         >
           <Repeat aria-hidden="true" className="size-4" />
-          {status === "toggling" ? "Saving..." : item.isRecurring ? "Repeats yearly" : "Not repeating"}
+          {item.isRecurring ? "Repeats yearly" : "Not repeating"}
         </button>
         <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
-          disabled={busy}
-          onClick={() => void deleteHackathon()}
+          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger"
+          onClick={() => onDelete(item)}
           type="button"
         >
           <Trash2 aria-hidden="true" className="size-4" />
-          {deleting ? "Deleting..." : "Delete"}
+          Delete
         </button>
-        {message ? <p className="w-full text-sm font-semibold text-danger">{message}</p> : null}
       </div>
     </div>
   );
 }
 
-export function PublishedHackathonManager({ hackathons }: { hackathons: AdminHackathonListItem[] }) {
-  const [items, setItems] = useState(hackathons);
-  const [editingItem, setEditingItem] = useState<AdminHackathonListItem | null>(null);
+/* An open (or parked) edit dialog. Dialogs stay mounted while their save runs
+   in the background, so a rejected save can reopen with every typed edit. */
+type Editor = {
+  item: AdminHackathonListItem;
+  phase: "editing" | "saving" | "failed";
+  error?: string;
+};
 
-  function updateItem(updated: AdminHackathonListItem) {
-    setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    setEditingItem(null);
+function withoutKey<T>(record: Record<string, T>, key: string) {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
+/* Puts a restored item back where it sat in the server's original ordering. */
+function restoreInOrder(current: AdminHackathonListItem[], target: AdminHackathonListItem, order: string[]) {
+  if (current.some((item) => item.id === target.id)) {
+    return current;
   }
 
-  if (!items.length) {
+  const rank = (id: string) => order.indexOf(id);
+  const index = current.findIndex((item) => rank(item.id) > rank(target.id));
+  const next = [...current];
+  next.splice(index === -1 ? next.length : index, 0, target);
+  return next;
+}
+
+/* Every action here is optimistic: deletes hide the card behind an undo
+   toast, the recurring toggle flips instantly, and edits close the dialog and
+   update the card while the PATCH runs. Failures restore the previous state
+   and explain why in a toast. */
+export function PublishedHackathonManager({ hackathons }: { hackathons: AdminHackathonListItem[] }) {
+  const [items, setItems] = useState(hackathons);
+  const [order] = useState(() => hackathons.map((item) => item.id));
+  const [editors, setEditors] = useState<Record<string, Editor>>({});
+  const [visibleEditorId, setVisibleEditorId] = useState<string | null>(null);
+
+  function patchItem(hackathonId: string, patch: Partial<AdminHackathonListItem>) {
+    setItems((current) => current.map((item) => (item.id === hackathonId ? { ...item, ...patch } : item)));
+  }
+
+  function deleteItem(target: AdminHackathonListItem) {
+    setItems((current) => current.filter((item) => item.id !== target.id));
+    setEditors((current) => withoutKey(current, target.id));
+
+    scheduleUndoableRequest({
+      message: `Deleted ${target.name}.`,
+      failureMessage: `Couldn't delete ${target.name}.`,
+      url: `/api/admin/hackathons/${target.id}`,
+      init: { method: "DELETE" },
+      onUndo: () => setItems((current) => restoreInOrder(current, target, order)),
+      retry: () => deleteItem(target),
+    });
+  }
+
+  function openEditor(item: AdminHackathonListItem) {
+    const existing = editors[item.id];
+
+    if (existing?.phase === "saving") {
+      showToast({ message: `Still saving your last changes to ${item.name}.` });
+      return;
+    }
+
+    setEditors((current) => {
+      // Opening another listing closes a plain (unsaved, unfailed) draft.
+      const next =
+        visibleEditorId && visibleEditorId !== item.id && current[visibleEditorId]?.phase === "editing"
+          ? withoutKey(current, visibleEditorId)
+          : current;
+
+      // A failed draft reopens as-is, with the user's edits and the error.
+      return next[item.id] ? next : { ...next, [item.id]: { item, phase: "editing" } };
+    });
+    setVisibleEditorId(item.id);
+  }
+
+  function closeEditor(hackathonId: string) {
+    setEditors((current) => withoutKey(current, hackathonId));
+    setVisibleEditorId((current) => (current === hackathonId ? null : current));
+  }
+
+  function submitEdit(hackathonId: string, body: Record<string, unknown>, optimistic: AdminHackathonListItem) {
+    const before = items.find((item) => item.id === hackathonId);
+
+    setEditors((current) =>
+      current[hackathonId] ? { ...current, [hackathonId]: { ...current[hackathonId], phase: "saving", error: undefined } } : current
+    );
+    setVisibleEditorId((current) => (current === hackathonId ? null : current));
+    patchItem(hackathonId, withoutRecurring(optimistic));
+
+    sendRequest<AdminHackathonListItem>(`/api/admin/hackathons/${hackathonId}`, { method: "PATCH", json: body })
+      .then((saved) => {
+        patchItem(hackathonId, withoutRecurring(saved));
+        setEditors((current) => withoutKey(current, hackathonId));
+      })
+      .catch((error: unknown) => {
+        if (before) {
+          patchItem(hackathonId, withoutRecurring(before));
+        }
+
+        const reason =
+          error instanceof RequestError && error.serverMessage
+            ? error.serverMessage
+            : "Could not save changes. Check the required fields.";
+
+        setEditors((current) =>
+          current[hackathonId]
+            ? { ...current, [hackathonId]: { ...current[hackathonId], phase: "failed", error: reason } }
+            : current
+        );
+        // Reopen right away unless another dialog is in use; the toast can
+        // reopen it later either way.
+        setVisibleEditorId((current) => current ?? hackathonId);
+        reportBackgroundFailure(error, {
+          message: `Couldn't save changes to ${optimistic.name}.`,
+          undoneNote: "Your edits were kept in the editor.",
+          action: { label: "Reopen", onClick: () => setVisibleEditorId(hackathonId) },
+        });
+      });
+  }
+
+  if (!items.length && !Object.keys(editors).length) {
     return (
       <p className="rounded-xl border border-ink/10 bg-surface p-6 text-sm text-ink/55">
         No hackathons are currently displayed on the hackathons page.
@@ -162,13 +259,29 @@ export function PublishedHackathonManager({ hackathons }: { hackathons: AdminHac
           <AdminHackathonCard
             item={item}
             key={item.id}
-            onDelete={(hackathonId) => setItems((current) => current.filter((entry) => entry.id !== hackathonId))}
-            onEdit={setEditingItem}
-            onUpdate={updateItem}
+            onDelete={deleteItem}
+            onEdit={openEditor}
+            onPatch={patchItem}
           />
         ))}
       </div>
-      {editingItem ? <HackathonEditDialog item={editingItem} onClose={() => setEditingItem(null)} onSaved={updateItem} /> : null}
+      {Object.entries(editors).map(([hackathonId, editor]) => (
+        <HackathonEditDialog
+          error={editor.error ?? null}
+          hidden={visibleEditorId !== hackathonId}
+          item={editor.item}
+          key={hackathonId}
+          onClose={() => closeEditor(hackathonId)}
+          onSubmit={(body, optimistic) => submitEdit(hackathonId, body, optimistic)}
+        />
+      ))}
     </>
   );
+}
+
+/* The recurring flag has its own toggle and endpoint, so edits never touch it. */
+function withoutRecurring(item: AdminHackathonListItem): Partial<AdminHackathonListItem> {
+  const rest: Partial<AdminHackathonListItem> = { ...item };
+  delete rest.isRecurring;
+  return rest;
 }
