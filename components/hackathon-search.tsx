@@ -326,6 +326,9 @@ export function HackathonSearch({
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const autoLoadedOffsetRef = useRef(-1);
   const searchGenerationRef = useRef(0);
+  /* The request currently in flight. A newer search aborts it, so a
+     superseded response is neither downloaded nor left running on the server. */
+  const searchAbortRef = useRef<AbortController | null>(null);
   const [loadMoreVisible, setLoadMoreVisible] = useState(false);
 
   useEffect(() => {
@@ -349,6 +352,9 @@ export function HackathonSearch({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  // Leaving the page drops whatever search is still on the wire.
+  useEffect(() => () => searchAbortRef.current?.abort(), []);
 
   useEffect(() => {
     if (openPopover === "location" && locationMode === "country") {
@@ -641,7 +647,12 @@ export function HackathonSearch({
     if (!append) {
       // New result set, so the auto-load guard starts over.
       autoLoadedOffsetRef.current = -1;
+      // Whatever was loading belongs to the previous result set.
+      searchAbortRef.current?.abort();
     }
+
+    const abortController = new AbortController();
+    searchAbortRef.current = abortController;
 
     if (filters.distanceKm !== "any" && !origin && locationState !== "locating") {
       void locate();
@@ -673,7 +684,7 @@ export function HackathonSearch({
     }
 
     try {
-      const response = await fetch(`/api/hackathons?${params.toString()}`);
+      const response = await fetch(`/api/hackathons?${params.toString()}`, { signal: abortController.signal });
 
       if (!response.ok) {
         throw new Error("Search request failed.");
@@ -693,7 +704,8 @@ export function HackathonSearch({
       setAppliedFilters(filters);
       setHasSearched(true);
     } catch {
-      if (searchGeneration !== searchGenerationRef.current) {
+      // Aborted by a newer search (or by leaving the page): not an error.
+      if (abortController.signal.aborted || searchGeneration !== searchGenerationRef.current) {
         return;
       }
 

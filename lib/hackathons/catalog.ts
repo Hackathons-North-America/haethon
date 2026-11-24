@@ -1,9 +1,11 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import * as Sentry from "@sentry/nextjs";
-import { and, asc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
+  discordChannels,
+  discordGuilds,
   hackathonDates,
   hackathonLocations,
   hackathonTags,
@@ -14,125 +16,55 @@ import {
   userHackathons,
 } from "@/lib/db/schema";
 import { formatDateRange, formatLocationParts } from "@/lib/hackathons/card-format";
-import { isPastCatalogRow, pastRecurringSeriesIds, selectVisibleCatalogRows } from "@/lib/hackathons/catalog-visibility";
-import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
+import {
+  pruneCatalogSnapshot,
+  selectCatalogPage,
+  type CatalogPage,
+  type CatalogSnapshotEntry,
+} from "@/lib/hackathons/catalog-snapshot";
 import type { CatalogSort } from "@/lib/hackathons/search-filters";
 import { EMPTY_VOTE_STATE, type HackathonVoteState } from "@/lib/hackathons/vote-state";
 import { getVoteStates } from "@/lib/hackathons/votes";
-import { sourceBadge, type HackathonSourceBadge } from "@/lib/hackathons/source-badges";
+import { sourceBadge } from "@/lib/hackathons/source-badges";
+
+export type { CatalogPage } from "@/lib/hackathons/catalog-snapshot";
 
 /* One page of catalog results. The listing page and the search API both read
    through this module so the public catalog is queried (and cached) once. */
 export const CATALOG_PAGE_SIZE = 30;
 
 /* Public catalog entries change on ingest/admin actions, not per request, so a
-   10-minute window trades a little freshness for skipping the whole
-   query fan-out on nearly every page view. */
+   10-minute window trades a little freshness for skipping the database on
+   nearly every page view and search. */
 const CATALOG_REVALIDATE_SECONDS = 600;
 
 export const CATALOG_CACHE_TAG = "hackathon-catalog";
 const DETAIL_CACHE_TAG = "hackathon-detail";
 
+/* The snapshot is one cache entry, and the data cache refuses values over
+   2 MB (the search would still work, but would reload the catalog from the
+   database on every request). An entry is roughly 1.2 kB of JSON, so report
+   at about half of that limit: past this many listed hackathons, move the
+   filtering back into SQL or split the snapshot. */
+const SNAPSHOT_SIZE_WARNING_ENTRIES = 800;
+
 /* Status is derived once at approval and never re-derived, so it cannot gate
-   visibility over time — date-based rules in queryCatalogPage do that instead.
-   "completed" is included so recurring events approved after their dates
-   passed remain eligible. */
+   visibility over time — the date-based rules in catalog-visibility.ts do
+   that instead. "completed" is included so recurring events approved after
+   their dates passed remain eligible. */
 const publicStatuses = ["upcoming", "live", "completed"] as const;
 
-type CatalogQuery = {
-  name: string;
-  countries: string[];
-  format: "online" | "in_person" | null;
-  beginnerFriendly: boolean | null;
-  travelReimbursement: boolean | null;
-  highSchoolersOnly: boolean | null;
-  /* ISO strings (not Dates) so the serialized cache key is stable. */
-  startsAfter: string | null;
-  startsBefore: string | null;
-  limit: number;
-  offset: number;
-  sort: CatalogSort;
-};
-
-/* The user-independent portion of a hackathon card. Everything here is
-   JSON-safe because it crosses the unstable_cache boundary — dates are
-   pre-formatted, with no Date objects. */
-type PublicHackathonCard = {
-  beginnerFriendly: boolean;
-  country: string | null;
-  /* Two-letter ISO code, used to match the visitor's IP-geo country for the
-     "push local hackathons to the top" boost — display name alone isn't a
-     reliable join key. */
-  countryCode: string | null;
-  date: string;
-  description: string | null;
-  /* Deep link to the event's Discord channel, when available. */
-  discordUrl: string | null;
-  format: "online" | "in_person";
-  hasDiscord: boolean;
-  highSchoolersOnly: boolean;
-  id: string;
-  image: string | null;
-  /* City-centroid coordinates (from the GeoNames-backed cities table); null
-     for online events and unresolved cities. Shipped with the snapshot so the
-     "within N km" filter runs entirely in the browser. */
-  latitude: number | null;
-  longitude: number | null;
-  location: string;
-  name: string;
-  prizeAmountUsd: number | null;
-  slug: string;
-  /* True when the event's dates have passed. Only recurring-series editions
-     survive in the catalog once past, badged as "last held" until the next
-     edition is published. */
-  isPast: boolean;
-  source: HackathonSourceBadge | null;
-  startsAt: string | null;
-  /* Null when only a start date is known. */
-  endsAt: string | null;
-  tags: string[];
-  travelReimbursement: boolean;
-  /* The organizer's own site, when the listing has one — powers the card's
-     "Visit website" footer link. Application URLs are deliberately not used as
-     a stand-in; the link promises the event's site. */
-  websiteUrl: string | null;
-};
-
-export type CatalogPage = {
-  cards: PublicHackathonCard[];
-  hasMore: boolean;
-};
-
-/* Date-filter boundaries are rounded down to the hour so "next 30 days"-style
-   ranges computed at slightly different moments share one cache entry instead
-   of missing on every millisecond-fresh timestamp. */
-function roundDownToHourIso(value: Date | string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  date.setUTCMinutes(0, 0, 0);
-
-  return date.toISOString();
-}
-
-async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
-  const name = query.name.trim();
-  const startsAfter = query.startsAfter ? new Date(query.startsAfter) : null;
-  const startsBefore = query.startsBefore ? new Date(query.startsBefore) : null;
-  // One clock for the SQL comparisons and the JS visibility pass below. The
-  // cache key carries no timestamp, so "now" is up to CATALOG_REVALIDATE_SECONDS
-  // stale — fine at whole-day event granularity.
-  const now = new Date();
-
-  /* Per-hackathon vote totals, joined only to order "Top voted" pages. The
-     displayed counts are NOT read from here — this page is cached, so cards
+/**
+ * Loads every hackathon the public catalog can list, in ONE statement: the
+ * card columns, each hackathon's tags and Discord channel (correlated
+ * subqueries) and its vote totals. Nothing here depends on the visitor or on
+ * the filters they picked, which is what lets a single cached copy serve every
+ * search. Exported uncached for the benchmark and the integration test; app
+ * code reads it through getPublicHackathonCatalog.
+ */
+export async function loadCatalogSnapshot(now = new Date()): Promise<CatalogSnapshotEntry[]> {
+  /* Per-hackathon vote totals, carried only to order "Top voted" pages. The
+     displayed counts are NOT read from here — the snapshot is cached, so cards
      get live totals from applyUserCardState instead. */
   const voteTotals = db
     .select({
@@ -143,23 +75,30 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
     .from(hackathonVotes)
     .groupBy(hackathonVotes.hackathonId)
     .as("vote_totals");
-  const ups = sql`coalesce(${voteTotals.upvotes}, 0)::float8`;
-  const downs = sql`coalesce(${voteTotals.downvotes}, 0)::float8`;
-  const total = sql`(${ups} + ${downs})`;
-  /* Wilson lower bound at 95% (z = 1.96: z²/2 = 1.9208, z²/4 = 0.9604,
-     z² = 3.8416) — the same score as wilsonLowerBound() in ranking.ts. */
-  const wilsonScore = sql`case when ${total} = 0 then 0 else (
-      ${ups} / ${total} + 1.9208 / ${total}
-      - 1.96 * sqrt((${ups} / ${total}) * (1 - ${ups} / ${total}) / ${total} + 0.9604 / (${total} * ${total}))
-    ) / (1 + 3.8416 / ${total}) end`;
-  const pastGroup = sql`case when coalesce(${hackathonDates.endsAt}, ${hackathonDates.startsAt}) < ${now} then 1 else 0 end`;
-  const startsAtOrder = sql`${hackathonDates.startsAt} asc nulls last`;
-  // Past (recurring) editions stay grouped after everything upcoming in both
-  // orders, mirroring the archive split below the grid.
-  const orderBy =
-    query.sort === "top"
-      ? [pastGroup, sql`${wilsonScore} desc`, sql`${ups} - ${downs} desc`, startsAtOrder, asc(hackathons.id)]
-      : [pastGroup, startsAtOrder, asc(hackathons.id)];
+
+  /* Tag names, alphabetical, as one array per hackathon. */
+  const tagNames = sql<string[]>`coalesce((
+      select array_agg(${hackathonTagDefinitions.name}::text order by ${hackathonTagDefinitions.name})
+      from ${hackathonTags}
+      inner join ${hackathonTagDefinitions} on ${hackathonTagDefinitions.id} = ${hackathonTags.tagId}
+      where ${hackathonTags.hackathonId} = ${hackathons.id}
+    ), '{}'::text[])`;
+
+  /* "<guild>/<channel>" for the event's Discord deep link. Channels are keyed
+     per series (recycled across a series' events), so a hackathon resolves
+     through its own id first and falls back to its series' channel — the same
+     rule as getDiscordLinksByHackathon, with oldest-first as the tiebreak. */
+  const discordPath = sql<string | null>`(
+      select ${discordGuilds.guildSnowflake} || '/' || ${discordChannels.channelSnowflake}
+      from ${discordChannels}
+      inner join ${discordGuilds} on ${discordGuilds.id} = ${discordChannels.guildId}
+      where ${discordChannels.hackathonId} = ${hackathons.id}
+        or ${discordChannels.seriesId} = ${hackathons.seriesId}
+      order by (${discordChannels.hackathonId} = ${hackathons.id}) desc nulls last,
+        ${discordChannels.createdAt},
+        ${discordChannels.id}
+      limit 1
+    )`;
 
   const rows = await db
     .select({
@@ -186,6 +125,10 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
       longitude: hackathonLocations.longitude,
       startsAt: hackathonDates.startsAt,
       endsAt: hackathonDates.endsAt,
+      tags: tagNames,
+      discordPath,
+      upvotes: sql`coalesce(${voteTotals.upvotes}, 0)`.mapWith(Number),
+      downvotes: sql`coalesce(${voteTotals.downvotes}, 0)`.mapWith(Number),
     })
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
@@ -202,99 +145,27 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
           isNull(hackathonDates.endsAt),
           gte(hackathonDates.endsAt, now),
           eq(hackathonSeries.isRecurring, true)
-        ),
-        name ? ilike(hackathons.name, `%${name}%`) : undefined,
-        query.countries.length ? inArray(hackathonLocations.country, query.countries) : undefined,
-        query.format ? eq(hackathons.format, query.format) : undefined,
-        query.beginnerFriendly === null ? undefined : eq(hackathons.beginnerFriendly, query.beginnerFriendly),
-        query.travelReimbursement === null ? undefined : eq(hackathons.travelReimbursement, query.travelReimbursement),
-        query.highSchoolersOnly === null ? undefined : eq(hackathons.highSchoolersOnly, query.highSchoolersOnly),
-        startsAfter ? gte(hackathonDates.startsAt, startsAfter) : undefined,
-        startsBefore ? lte(hackathonDates.startsAt, startsBefore) : undefined
-      )
-    )
-    // Pagination must hand out pages in the grid's own order — the client
-    // re-sorts only what it has loaded and cannot pull the true first card out
-    // of a page it hasn't fetched yet. For "soonest", dates-TBA rows sort last
-    // and the id tiebreak matches the client's sortByStartDate(). "Top voted"
-    // is ordered here only; the client keeps the server order as-is.
-    .orderBy(...orderBy)
-    .limit(query.limit + 1)
-    .offset(query.offset);
-
-  const hasMore = rows.length > query.limit;
-  const fetchedRows = hasMore ? rows.slice(0, query.limit) : rows;
-
-  // A past edition of a recurring series is only listed while no current
-  // edition exists. That current edition may sit outside this page (or be
-  // excluded by filters), so it is checked with a direct query rather than
-  // against the fetched rows.
-  const guardSeriesIds = pastRecurringSeriesIds(fetchedRows, now);
-  const seriesWithCurrentEdition = new Set<string>();
-
-  if (guardSeriesIds.length) {
-    const currentEditionRows = await db
-      .selectDistinct({ seriesId: hackathons.seriesId })
-      .from(hackathons)
-      .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
-      .where(
-        and(
-          isNotNull(hackathons.publishedAt),
-          inArray(hackathons.status, publicStatuses),
-          inArray(hackathons.seriesId, guardSeriesIds),
-          gte(hackathonDates.endsAt, now)
         )
-      );
+      )
+    );
 
-    for (const row of currentEditionRows) {
-      if (row.seriesId) {
-        seriesWithCurrentEdition.add(row.seriesId);
-      }
-    }
-  }
+  const entries = rows.map((row): CatalogSnapshotEntry => {
+    const location = formatLocationParts(row);
+    const discordUrl = row.discordPath ? `https://discord.com/channels/${row.discordPath}` : null;
 
-  // Dropping rows after the LIMIT can shorten a paginated API page by at most
-  // one row per recurring series; hasMore already reflects the underlying set.
-  const pageRows = selectVisibleCatalogRows(fetchedRows, seriesWithCurrentEdition, now);
-  const [discordLinks, tagRows] = await Promise.all([
-    getDiscordLinksByHackathon(pageRows),
-    pageRows.length
-      ? db
-          .select({
-            hackathonId: hackathonTags.hackathonId,
-            name: hackathonTagDefinitions.name,
-          })
-          .from(hackathonTags)
-          .innerJoin(hackathonTagDefinitions, eq(hackathonTagDefinitions.id, hackathonTags.tagId))
-          .where(inArray(hackathonTags.hackathonId, pageRows.map((row) => row.id)))
-          .orderBy(asc(hackathonTagDefinitions.name))
-      : Promise.resolve([]),
-  ]);
-  const tagNamesByHackathonId = new Map<string, string[]>();
-
-  for (const tag of tagRows) {
-    const names = tagNamesByHackathonId.get(tag.hackathonId) ?? [];
-    names.push(tag.name);
-    tagNamesByHackathonId.set(tag.hackathonId, names);
-  }
-
-  return {
-    cards: pageRows.map((row) => {
-      const location = formatLocationParts(row);
-
-      return {
+    return {
+      card: {
         beginnerFriendly: row.beginnerFriendly,
         country: location.country,
         countryCode: row.countryCode ?? null,
         date: formatDateRange(row.startsAt, row.endsAt),
         description: row.description,
-        discordUrl: discordLinks.get(row.id) ?? null,
+        discordUrl,
         format: row.format,
-        hasDiscord: discordLinks.has(row.id),
+        hasDiscord: discordUrl !== null,
         highSchoolersOnly: row.highSchoolersOnly,
         id: row.id,
         image: row.imageUrl,
-        isPast: isPastCatalogRow(row, now),
         latitude: row.latitude === null ? null : Number(row.latitude),
         longitude: row.longitude === null ? null : Number(row.longitude),
         location: location.locality ?? "Location TBA",
@@ -304,16 +175,35 @@ async function queryCatalogPage(query: CatalogQuery): Promise<CatalogPage> {
         source: row.source ? sourceBadge(row.source) : null,
         startsAt: row.startsAt?.toISOString() ?? null,
         endsAt: row.endsAt?.toISOString() ?? null,
-        tags: tagNamesByHackathonId.get(row.id) ?? [],
+        tags: row.tags ?? [],
         travelReimbursement: row.travelReimbursement,
         websiteUrl: row.websiteUrl,
-      };
-    }),
-    hasMore,
-  };
+      },
+      seriesId: row.seriesId,
+      isRecurring: row.isRecurring,
+      upvotes: row.upvotes,
+      downvotes: row.downvotes,
+    };
+  });
+
+  // Older past editions of recurring series can never be listed again; keep
+  // them out of the cached value.
+  const snapshot = pruneCatalogSnapshot(entries, now);
+
+  if (snapshot.length > SNAPSHOT_SIZE_WARNING_ENTRIES) {
+    Sentry.captureMessage("Catalog snapshot is approaching the data cache's 2 MB entry limit", {
+      level: "warning",
+      extra: { entries: snapshot.length },
+      tags: { feature: "catalog-snapshot" },
+    });
+  }
+
+  return snapshot;
 }
 
-const getCachedCatalogPage = unstable_cache(queryCatalogPage, [CATALOG_CACHE_TAG], {
+/* No arguments, so the whole catalog is one cache entry that every search
+   shares. The no-argument wrapper keeps the load's clock out of the cache key. */
+const getCachedCatalogSnapshot = unstable_cache(() => loadCatalogSnapshot(), [CATALOG_CACHE_TAG, "snapshot"], {
   revalidate: CATALOG_REVALIDATE_SECONDS,
   tags: [CATALOG_CACHE_TAG],
 });
@@ -323,12 +213,24 @@ export function revalidateHackathonCaches() {
   revalidateTag(DETAIL_CACHE_TAG, "max");
 }
 
+function toDateOrNull(value: Date | string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /**
- * Fetches one page of the public hackathon catalog through the shared cache.
- * Inputs are normalized (trimmed, sorted, hour-rounded, clamped) before they
- * become part of the cache key so equivalent searches share an entry.
+ * Fetches one page of the public hackathon catalog. The catalog itself comes
+ * from the shared snapshot cache; the filters, the sort and the paging are
+ * applied to it in memory, so a search never issues its own database query —
+ * a country, a name or a date range nobody has asked for before is as fast as
+ * the unfiltered first page.
  */
-export function getPublicHackathonCatalog(input: {
+export async function getPublicHackathonCatalog(input: {
   name?: string;
   countries?: string[];
   format?: "online" | "in_person" | null;
@@ -341,21 +243,27 @@ export function getPublicHackathonCatalog(input: {
   offset?: number;
   sort?: CatalogSort;
 }): Promise<CatalogPage> {
-  return getCachedCatalogPage({
-    /* ILIKE is case-insensitive, so normalize equivalent searches onto one
-       cache entry instead of paying for "Toronto" and "toronto" separately. */
-    name: (input.name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US"),
-    countries: [...(input.countries ?? [])].sort(),
-    format: input.format ?? null,
-    beginnerFriendly: input.beginnerFriendly ?? null,
-    travelReimbursement: input.travelReimbursement ?? null,
-    highSchoolersOnly: input.highSchoolersOnly ?? null,
-    startsAfter: roundDownToHourIso(input.startsAfter),
-    startsBefore: roundDownToHourIso(input.startsBefore),
-    limit: Math.min(Math.max(input.limit ?? CATALOG_PAGE_SIZE, 1), 50),
-    offset: Math.min(Math.max(input.offset ?? 0, 0), 10_000),
-    sort: input.sort === "top" ? "top" : "soonest",
-  });
+  const snapshot = await getCachedCatalogSnapshot();
+
+  // Visibility ("has this event ended?") is decided against the current
+  // clock here, not the clock the snapshot was loaded with.
+  return selectCatalogPage(
+    snapshot,
+    {
+      name: (input.name ?? "").trim().replace(/\s+/g, " "),
+      countries: input.countries ?? [],
+      format: input.format ?? null,
+      beginnerFriendly: input.beginnerFriendly ?? null,
+      travelReimbursement: input.travelReimbursement ?? null,
+      highSchoolersOnly: input.highSchoolersOnly ?? null,
+      startsAfter: toDateOrNull(input.startsAfter),
+      startsBefore: toDateOrNull(input.startsBefore),
+      limit: Math.min(Math.max(input.limit ?? CATALOG_PAGE_SIZE, 1), 50),
+      offset: Math.min(Math.max(input.offset ?? 0, 0), 10_000),
+      sort: input.sort === "top" ? "top" : "soonest",
+    },
+    new Date()
+  );
 }
 
 /**
