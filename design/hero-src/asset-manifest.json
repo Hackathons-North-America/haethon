@@ -1,0 +1,159 @@
+{
+  "canvas": {
+    "width": 900,
+    "height": 870
+  },
+  "totalBytes": {
+    "2x": 509112,
+    "3x": 1069872
+  },
+  "layers": [
+    {
+      "name": "case-back",
+      "left": 34,
+      "top": 425,
+      "width": 832,
+      "height": 158,
+      "files": {
+        "3x": {
+          "file": "case-back@3x.png",
+          "width": 832,
+          "height": 158,
+          "bytes": 130696
+        },
+        "2x": {
+          "file": "case-back@2x.png",
+          "width": 555,
+          "height": 106,
+          "bytes": 61526
+        }
+      }
+    },
+    {
+      "name": "laptop",
+      "left": 52,
+      "top": 150,
+      "width": 415,
+      "height": 367,
+      "files": {
+        "3x": {
+          "file": "laptop@3x.png",
+          "width": 415,
+          "height": 367,
+          "bytes": 164727
+        },
+        "2x": {
+          "file": "laptop@2x.png",
+          "width": 277,
+          "height": 245,
+          "bytes": 83810
+        }
+      }
+    },
+    {
+      "name": "can",
+      "left": 325,
+      "top": 33,
+      "width": 240,
+      "height": 514,
+      "files": {
+        "3x": {
+          "file": "can@3x.png",
+          "width": 240,
+          "height": 514,
+          "bytes": 131415
+        },
+        "2x": {
+          "file": "can@2x.png",
+          "width": 160,
+          "height": 343,
+          "bytes": 65314
+        }
+      }
+    },
+    {
+      "name": "badge",
+      "left": 466,
+      "top": 58,
+      "width": 310,
+      "height": 502,
+      "files": {
+        "3x": {
+          "file": "badge@3x.png",
+          "width": 310,
+          "height": 502,
+          "bytes": 138953
+        },
+        "2x": {
+          "file": "badge@2x.png",
+          "width": 207,
+          "height": 335,
+          "bytes": 69870
+        }
+      }
+    },
+    {
+      "name": "pizza",
+      "left": 642,
+      "top": 247,
+      "width": 242,
+      "height": 311,
+      "files": {
+        "3x": {
+          "file": "pizza@3x.png",
+          "width": 242,
+          "height": 311,
+          "bytes": 93943
+        },
+        "2x": {
+          "file": "pizza@2x.png",
+          "width": 162,
+          "height": 208,
+          "bytes": 45669
+        }
+      }
+    },
+    {
+      "name": "stickers",
+      "left": 58,
+      "top": 365,
+      "width": 218,
+      "height": 202,
+      "files": {
+        "3x": {
+          "file": "stickers@3x.png",
+          "width": 218,
+          "height": 202,
+          "bytes": 58640
+        },
+        "2x": {
+          "file": "stickers@2x.png",
+          "width": 146,
+          "height": 135,
+          "bytes": 31730
+        }
+      }
+    },
+    {
+      "name": "case-front",
+      "left": 20,
+      "top": 503,
+      "width": 860,
+      "height": 344,
+      "files": {
+        "3x": {
+          "file": "case-front@3x.png",
+          "width": 860,
+          "height": 344,
+          "bytes": 351498
+        },
+        "2x": {
+          "file": "case-front@2x.png",
+          "width": 574,
+          "height": 230,
+          "bytes": 151193
+        }
+      }
+    }
+  ]
+}
