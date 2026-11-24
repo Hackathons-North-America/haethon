@@ -142,6 +142,25 @@ export async function requireAdminUser() {
   return { ok: true as const, ...context };
 }
 
+/**
+ * requireAdminUser for routes that only need to know which admin is asking.
+ * The id comes from the session claims (getCurrentUserId), so once the
+ * appUserId claim is in place the check costs no database query.
+ */
+export async function requireAdminUserId() {
+  const [userId, role] = await Promise.all([getCurrentUserId(), getCurrentRole()]);
+
+  if (!userId) {
+    return { ok: false as const, reason: "unauthenticated" as const };
+  }
+
+  if (!isAdminRole(role)) {
+    return { ok: false as const, reason: "forbidden" as const };
+  }
+
+  return { ok: true as const, role, userId };
+}
+
 export async function syncCurrentUser() {
   const user = await currentUser();
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, Pencil, RotateCcw, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { DiscordChannelJobLine, describeDiscordChannelJob, useDiscordChannelJobs } from "@/components/admin/discord-channel-jobs";
 import { HackathonCardPreview, HackathonPayloadDetails, type PreviewPayload } from "@/components/admin/hackathon-card-preview";
 import { HackathonImportEditDialog } from "@/components/admin/hackathon-import-edit-dialog";
 
@@ -20,12 +21,15 @@ type DiscordPreview =
 
 type EligibleDiscordPreview = Extract<DiscordPreview, { eligible: true }>;
 
-type DiscordSyncResult =
-  | { action: "created" | "recycled"; categoryName: string; channelSnowflake: string; name: string; status: "synced" }
-  | { reason?: string; status: "denied" | "skipped" };
+// What approving a channel answers with: the channel itself is made after the
+// response, as a queued job this page then follows.
+type DiscordDecisionResult = { jobId: string; status: "queued" } | { reason?: string; status: "skipped" };
 
-// The Discord step the server runs on its own for an auto-approved row.
-type AutoDiscordSync = DiscordSyncResult | { channelSnowflake: string; status: "unchanged" } | { status: "failed" };
+// The Discord step the server queues on its own for an auto-approved row.
+type AutoDiscordSync = { jobId: string; status: "queued" };
+
+// A channel this page asked for, by approving it or through an auto-approved row.
+type ChannelRequest = { error?: string; hackathonId: string; jobId?: string; name: string; note?: string };
 
 type ImportResult = {
   autoApprove?: boolean;
@@ -44,7 +48,7 @@ type ImportResult = {
 };
 
 type DiscordDecisionResponse = {
-  data?: DiscordSyncResult;
+  data?: DiscordDecisionResult;
   error?: unknown;
 };
 
@@ -68,6 +72,10 @@ type DuplicateMatch = { duplicateScore: number; matchedName: string | null };
 type QueueItem = { duplicate?: DuplicateMatch; error?: string; payload: PreviewPayload };
 
 type AutoRun = { done: number; failed: number; flagged: number; results: ImportResult[]; total: number };
+
+// Auto-approved cards go to the server this many at a time: the whole chunk is
+// read and written in a couple of database round trips, and Discord is queued.
+const AUTO_IMPORT_CHUNK = 25;
 
 const sampleJson = `[
   {
@@ -100,27 +108,6 @@ function isAutoApproved(payload: PreviewPayload) {
   return payload.autoApprove === true;
 }
 
-function discordSyncNote(sync: AutoDiscordSync | undefined) {
-  if (!sync) {
-    return null;
-  }
-
-  switch (sync.status) {
-    case "synced":
-      return sync.action === "created"
-        ? `Created Discord channel #${sync.name} in ${sync.categoryName}.`
-        : `Reused the existing Discord channel as #${sync.name} in ${sync.categoryName}.`;
-    case "unchanged":
-      return "Kept its existing Discord channel.";
-    case "failed":
-      return "The Discord channel could not be set up. The daily Discord sync will try again.";
-    case "skipped":
-      return sync.reason ?? "No Discord channel.";
-    default:
-      return null;
-  }
-}
-
 function importStatusLabel(status: ImportResult["status"]) {
   switch (status) {
     case "imported":
@@ -134,14 +121,14 @@ function importStatusLabel(status: ImportResult["status"]) {
   }
 }
 
-async function postImport(payload: PreviewPayload, options?: { ignoreDuplicates?: boolean }) {
+async function postImport(payloads: PreviewPayload[], options?: { ignoreDuplicates?: boolean }) {
   try {
     const response = await fetch("/api/admin/hackathon-imports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // The bare array is the normal import; the wrapped form carries the override that
       // republishes a flagged card as a brand-new hackathon.
-      body: JSON.stringify(options?.ignoreDuplicates ? { hackathons: [payload], ignoreDuplicates: true } : [payload]),
+      body: JSON.stringify(options?.ignoreDuplicates ? { hackathons: payloads, ignoreDuplicates: true } : payloads),
     });
     const body = (await response.json().catch(() => ({}))) as ImportResponse;
 
@@ -165,8 +152,13 @@ export function HackathonJsonImporter() {
   const [autoRun, setAutoRun] = useState<AutoRun | null>(null);
   const [pendingDiscord, setPendingDiscord] = useState<{ discord: EligibleDiscordPreview; hackathonId: string } | null>(null);
   const [pendingDuplicate, setPendingDuplicate] = useState<DuplicateMatch | null>(null);
-  const [discordBusy, setDiscordBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [channels, setChannels] = useState<ChannelRequest[]>([]);
+  const jobs = useDiscordChannelJobs(channels.flatMap((channel) => (channel.jobId ? [channel.jobId] : [])));
+  // Hackathons whose channel prompt was already answered. The prompt closes
+  // without waiting for the server, so a second click on it can arrive before
+  // it is gone and must not skip the next card.
+  const decidedDiscord = useRef(new Set<string>());
 
   const activeItem = queue[currentIndex];
   const activePayload = activeItem?.payload;
@@ -197,6 +189,7 @@ export function HackathonJsonImporter() {
     setAutoRun(null);
     setPendingDiscord(null);
     setPendingDuplicate(null);
+    setChannels([]);
 
     let parsed: unknown;
 
@@ -226,20 +219,18 @@ export function HackathonJsonImporter() {
     }
 
     // Auto-approved cards need no yes or no, so they are imported first, before
-    // any card is shown. The server also makes or reuses each Canadian or US
-    // event's Discord channel. One card per request keeps every request well
-    // inside the route's time limit, even when a channel has to be created.
+    // any card is shown, a chunk per request. The server publishes them and
+    // queues each Canadian or US event's Discord channel, which is made after
+    // the response; the channel list below follows those jobs.
     setStatus("submitting");
     const run: AutoRun = { done: 0, failed: 0, flagged: 0, results: [], total: autoPayloads.length };
     const leftovers: QueueItem[] = [];
     setAutoRun({ ...run });
 
-    for (const payload of autoPayloads) {
-      const outcome = await postImport(payload);
-
+    const record = (sent: PreviewPayload[], outcome: Awaited<ReturnType<typeof postImport>>) => {
       if (!outcome.ok) {
-        run.failed += 1;
-        leftovers.push({ error: outcome.error, payload });
+        run.failed += sent.length;
+        leftovers.push(...sent.map((payload) => ({ error: outcome.error, payload })));
       } else {
         for (const result of outcome.data.results) {
           if (result.status === "duplicate_flagged") {
@@ -247,7 +238,7 @@ export function HackathonJsonImporter() {
             run.flagged += 1;
             leftovers.push({
               duplicate: { duplicateScore: result.duplicateScore, matchedName: result.matchedName ?? null },
-              payload,
+              payload: sent[result.index],
             });
           } else {
             run.results.push(result);
@@ -255,9 +246,33 @@ export function HackathonJsonImporter() {
         }
       }
 
-      run.done += 1;
+      run.done += sent.length;
       setAutoRun({ ...run, results: [...run.results] });
+    };
+
+    for (let offset = 0; offset < autoPayloads.length; offset += AUTO_IMPORT_CHUNK) {
+      const chunk = autoPayloads.slice(offset, offset + AUTO_IMPORT_CHUNK);
+      const outcome = await postImport(chunk);
+
+      if (outcome.ok || chunk.length === 1) {
+        record(chunk, outcome);
+        continue;
+      }
+
+      // One bad card fails its whole chunk. Send that chunk a card at a time
+      // so only the bad card is left for the admin.
+      for (const payload of chunk) {
+        record([payload], await postImport([payload]));
+      }
     }
+
+    setChannels(
+      run.results.flatMap((result) =>
+        result.discordSync && result.hackathonId
+          ? [{ hackathonId: result.hackathonId, jobId: result.discordSync.jobId, name: result.name }]
+          : []
+      )
+    );
 
     const toReview = leftovers.length + manualItems.length;
     setResults(run.results);
@@ -278,7 +293,7 @@ export function HackathonJsonImporter() {
     setMessage(null);
     setPendingDuplicate(null);
 
-    const outcome = await postImport(activePayload, options);
+    const outcome = await postImport([activePayload], options);
 
     if (!outcome.ok) {
       setStatus("error");
@@ -293,9 +308,15 @@ export function HackathonJsonImporter() {
     router.refresh();
 
     const first = data.results[0];
-    // Set when the card was auto-approved: the server already handled its channel.
-    const discordNote = discordSyncNote(first?.discordSync);
-    const withDiscordNote = (text: string) => (discordNote ? `${text} ${discordNote}` : text);
+    // Set when the card was auto-approved: the server queued its channel, and
+    // the channel list below shows how that goes.
+    const queuedChannel = first?.discordSync;
+    const withDiscordNote = (text: string) => (queuedChannel ? `${text} Its Discord channel is listed below.` : text);
+
+    if (queuedChannel && first.hackathonId) {
+      const channel = { hackathonId: first.hackathonId, jobId: queuedChannel.jobId, name: first.name };
+      setChannels((current) => [...current.filter((entry) => entry.hackathonId !== channel.hackathonId), channel]);
+    }
 
     // A clear match was merged server-side into the existing hackathon — nothing to decide.
     if (first?.status === "auto_merged") {
@@ -364,43 +385,57 @@ export function HackathonJsonImporter() {
     setMessage("Skipped the duplicate. Nothing was queued.");
   }
 
-  async function decideDiscord(action: "approve" | "deny") {
-    if (!pendingDiscord) {
+  /* Asks for a hackathon's channel. The answer is a queued job, so this never
+     waits for Discord; whatever comes back lands in the channel list. */
+  async function requestChannel(hackathonId: string, name: string) {
+    const update = (patch: Partial<ChannelRequest>) =>
+      setChannels((current) => [
+        ...current.filter((entry) => entry.hackathonId !== hackathonId),
+        { hackathonId, name, ...patch },
+      ]);
+
+    update({});
+
+    try {
+      const response = await fetch(`/api/admin/hackathons/${hackathonId}/discord-channel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve" }),
+      });
+      const body = (await response.json().catch(() => ({}))) as DiscordDecisionResponse;
+
+      if (!response.ok || !body.data) {
+        update({ error: body.error ? stringifyError(body.error) : "Discord channel action failed." });
+      } else if (body.data.status === "queued") {
+        update({ jobId: body.data.jobId });
+      } else {
+        update({ note: body.data.reason ?? "No Discord channel was created." });
+      }
+    } catch {
+      update({ error: "The request did not reach the server. Check your connection and retry." });
+    }
+  }
+
+  function decideDiscord(action: "approve" | "deny") {
+    if (!pendingDiscord || decidedDiscord.current.has(pendingDiscord.hackathonId)) {
       return;
     }
 
-    setDiscordBusy(true);
-    setMessage(null);
+    decidedDiscord.current.add(pendingDiscord.hackathonId);
 
-    const response = await fetch(`/api/admin/hackathons/${pendingDiscord.hackathonId}/discord-channel`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    const body = (await response.json()) as DiscordDecisionResponse;
-    setDiscordBusy(false);
-
-    if (!response.ok || !body.data) {
-      setStatus("error");
-      setMessage(body.error ? stringifyError(body.error) : "Discord channel action failed.");
-      return;
-    }
-
-    const result = body.data;
-    setStatus("success");
-
-    if ("action" in result) {
-      setMessage(
-        result.action === "created"
-          ? `Created a new channel #${result.name} in ${result.categoryName}.`
-          : `Recycled the existing channel as #${result.name} in ${result.categoryName}.`
+    // Nothing here waits: denying has no server side at all, and approving
+    // only queues the channel, so the next card is shown straight away.
+    if (action === "approve") {
+      void requestChannel(
+        pendingDiscord.hackathonId,
+        typeof activePayload?.name === "string" ? activePayload.name : pendingDiscord.discord.name
       );
-    } else if (result.status === "denied") {
-      setMessage("Discord channel denied. The hackathon stays published without one.");
+      setMessage(`Imported. Discord channel #${pendingDiscord.discord.name} is being set up; it is listed below.`);
     } else {
-      setMessage(result.reason ?? "No Discord channel was created.");
+      setMessage("Discord channel denied. The hackathon stays published without one.");
     }
 
+    setStatus("success");
     setPendingDiscord(null);
     setCurrentIndex((current) => current + 1);
   }
@@ -432,6 +467,7 @@ export function HackathonJsonImporter() {
     setPendingDiscord(null);
     setPendingDuplicate(null);
     setEditing(false);
+    setChannels([]);
   }
 
   if (queue.length || autoRun) {
@@ -468,6 +504,14 @@ export function HackathonJsonImporter() {
         </div>
 
         {autoRun ? <AutoRunSummary run={autoRun} running={autoRunning} /> : null}
+
+        {channels.length ? (
+          <DiscordChannelList
+            channels={channels}
+            jobs={jobs}
+            onRetry={(channel) => void requestChannel(channel.hackathonId, channel.name)}
+          />
+        ) : null}
 
         {activePayload && !autoRunning ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,42rem)_18rem] xl:items-start xl:justify-between">
@@ -525,7 +569,6 @@ export function HackathonJsonImporter() {
                 <div className="mt-5 grid gap-3">
                   <button
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper disabled:opacity-50"
-                    disabled={discordBusy}
                     onClick={() => decideDiscord("approve")}
                     type="button"
                   >
@@ -534,7 +577,6 @@ export function HackathonJsonImporter() {
                   </button>
                   <button
                     className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
-                    disabled={discordBusy}
                     onClick={() => decideDiscord("deny")}
                     type="button"
                   >
@@ -609,7 +651,6 @@ export function HackathonJsonImporter() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <button
                   className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-pine px-4 text-base font-semibold text-paper disabled:opacity-50"
-                  disabled={discordBusy}
                   onClick={() => decideDiscord("approve")}
                   type="button"
                 >
@@ -618,7 +659,6 @@ export function HackathonJsonImporter() {
                 </button>
                 <button
                   className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-danger px-4 text-base font-semibold text-danger disabled:opacity-50"
-                  disabled={discordBusy}
                   onClick={() => decideDiscord("deny")}
                   type="button"
                 >
@@ -721,11 +761,6 @@ export function HackathonJsonImporter() {
 
 function AutoRunSummary({ run, running }: { run: AutoRun; running: boolean }) {
   const count = (status: ImportResult["status"]) => run.results.filter((result) => result.status === status).length;
-  const syncs = run.results.map((result) => result.discordSync);
-  const created = syncs.filter((sync) => sync?.status === "synced" && sync.action === "created").length;
-  const reused = syncs.filter((sync) => sync?.status === "synced" && sync.action === "recycled").length;
-  const kept = syncs.filter((sync) => sync?.status === "unchanged").length;
-  const failed = syncs.filter((sync) => sync?.status === "failed").length;
   const progress = run.total ? Math.round((run.done / run.total) * 100) : 100;
 
   return (
@@ -749,9 +784,6 @@ function AutoRunSummary({ run, running }: { run: AutoRun; running: boolean }) {
         {count("imported")} published · {count("auto_merged")} merged · {count("updated")} updated ·{" "}
         {run.flagged} possible duplicates · {run.failed} failed
       </p>
-      <p className="text-sm leading-6 text-ink/55">
-        Discord: {created} created · {reused} reused · {kept} kept · {failed} failed
-      </p>
       {!running && run.flagged + run.failed > 0 ? (
         <p className="mt-1 text-sm leading-6 text-ink/55">
           Possible duplicates and failed cards are queued below, before the cards that need a yes or no.
@@ -762,16 +794,68 @@ function AutoRunSummary({ run, running }: { run: AutoRun; running: boolean }) {
           <summary className="cursor-pointer text-sm font-semibold text-pine">Show each card</summary>
           <ul className="mt-2 max-h-72 divide-y divide-ink/10 overflow-y-auto rounded-lg border border-ink/10 bg-surface">
             {run.results.map((result, position) => (
-              // Cards are imported one at a time, so the list position is stable.
+              // Cards are listed in the order they were sent, so the position is stable.
               <li className="grid gap-1 px-3 py-2 text-sm sm:grid-cols-[1fr_auto]" key={`${position}-${result.name}`}>
                 <span className="font-semibold text-ink">{result.name}</span>
                 <span className="text-pine">{importStatusLabel(result.status)}</span>
-                <span className="text-ink/55 sm:col-span-2">{discordSyncNote(result.discordSync)}</span>
               </li>
             ))}
           </ul>
         </details>
       ) : null}
+    </div>
+  );
+}
+
+/* Every channel this import asked for. Channels are made after the click that
+   asked for them, so this is where the link, or the reason it failed, shows up. */
+function DiscordChannelList({
+  channels,
+  jobs,
+  onRetry,
+}: {
+  channels: ChannelRequest[];
+  jobs: ReturnType<typeof useDiscordChannelJobs>;
+  onRetry: (channel: ChannelRequest) => void;
+}) {
+  const tones = channels.map((channel) =>
+    channel.error ? "failed" : channel.note ? "done" : describeDiscordChannelJob(channel.jobId ? jobs[channel.jobId] : undefined).tone
+  );
+  const working = tones.filter((tone) => tone === "working").length;
+  const failed = tones.filter((tone) => tone === "failed").length;
+
+  return (
+    <div className="rounded-xl border border-ink/10 bg-paper p-4">
+      <p className="text-sm font-semibold text-ink">Discord channels</p>
+      <p aria-live="polite" className="mt-1 text-sm leading-6 text-ink/55">
+        {working ? `${working} being set up · ` : ""}
+        {channels.length - working - failed} done · {failed} failed
+      </p>
+      <ul className="mt-2 max-h-72 divide-y divide-ink/10 overflow-y-auto rounded-lg border border-ink/10 bg-surface">
+        {channels.map((channel) =>
+          channel.error || channel.note ? (
+            <li
+              className="grid gap-1 px-3 py-2 text-sm sm:grid-cols-[minmax(0,14rem)_1fr_auto] sm:items-baseline sm:gap-3"
+              key={channel.hackathonId}
+            >
+              <span className="truncate font-semibold text-ink">{channel.name}</span>
+              <span className={channel.error ? "text-danger" : "text-ink/55"}>{channel.error ?? channel.note}</span>
+              {channel.error ? (
+                <button className="font-semibold text-pine underline" onClick={() => onRetry(channel)} type="button">
+                  Retry
+                </button>
+              ) : null}
+            </li>
+          ) : (
+            <DiscordChannelJobLine
+              job={channel.jobId ? jobs[channel.jobId] : undefined}
+              key={channel.hackathonId}
+              label={channel.name}
+              onRetry={() => onRetry(channel)}
+            />
+          )
+        )}
+      </ul>
     </div>
   );
 }

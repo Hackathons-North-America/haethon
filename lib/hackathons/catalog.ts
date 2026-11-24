@@ -9,7 +9,7 @@ import {
   hackathonDates,
   hackathonLocations,
   hackathonTags,
-  hackathonVotes,
+  hackathonVoteTotals,
   hackathons,
   hackathonSeries,
   tags as hackathonTagDefinitions,
@@ -63,18 +63,11 @@ const publicStatuses = ["upcoming", "live", "completed"] as const;
  * code reads it through getPublicHackathonCatalog.
  */
 export async function loadCatalogSnapshot(now = new Date()): Promise<CatalogSnapshotEntry[]> {
-  /* Per-hackathon vote totals, carried only to order "Top voted" pages. The
-     displayed counts are NOT read from here — the snapshot is cached, so cards
-     get live totals from applyUserCardState instead. */
-  const voteTotals = db
-    .select({
-      hackathonId: hackathonVotes.hackathonId,
-      upvotes: sql<number>`count(*) filter (where ${hackathonVotes.value} = 1)`.as("upvotes"),
-      downvotes: sql<number>`count(*) filter (where ${hackathonVotes.value} = -1)`.as("downvotes"),
-    })
-    .from(hackathonVotes)
-    .groupBy(hackathonVotes.hackathonId)
-    .as("vote_totals");
+  /* Per-hackathon vote totals, carried only to order "Top voted" pages. They
+     come from hackathon_vote_totals, which a trigger on hackathon_votes keeps
+     up to date, so nothing is aggregated here. The displayed counts are NOT
+     read from here — the snapshot is cached, so cards get live totals from
+     applyUserCardState instead. */
 
   /* Tag names, alphabetical, as one array per hackathon. */
   const tagNames = sql<string[]>`coalesce((
@@ -127,14 +120,14 @@ export async function loadCatalogSnapshot(now = new Date()): Promise<CatalogSnap
       endsAt: hackathonDates.endsAt,
       tags: tagNames,
       discordPath,
-      upvotes: sql`coalesce(${voteTotals.upvotes}, 0)`.mapWith(Number),
-      downvotes: sql`coalesce(${voteTotals.downvotes}, 0)`.mapWith(Number),
+      upvotes: sql`coalesce(${hackathonVoteTotals.upvoteCount}, 0)`.mapWith(Number),
+      downvotes: sql`coalesce(${hackathonVoteTotals.downvoteCount}, 0)`.mapWith(Number),
     })
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
-    .leftJoin(voteTotals, eq(voteTotals.hackathonId, hackathons.id))
+    .leftJoin(hackathonVoteTotals, eq(hackathonVoteTotals.hackathonId, hackathons.id))
     .where(
       and(
         isNotNull(hackathons.publishedAt),
@@ -268,7 +261,7 @@ export async function getPublicHackathonCatalog(input: {
 
 /**
  * Live vote totals and the viewer's own vote for a set of hackathons. Vote counts change far more often than the catalog, so they are
- * read per request (one grouped query) instead of from the cached page. Like
+ * read per request (one query by primary key) instead of from the cached page. Like
  * the rest of the personalization, a failure degrades to empty votes rather
  * than breaking the page.
  */

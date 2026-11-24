@@ -1,8 +1,10 @@
+import { DiscordChannelRequests } from "@/components/admin/discord-channel-jobs";
 import { DiscordChannelManager } from "@/components/admin/discord-channel-manager";
 import { listAdminDiscordOverview } from "@/lib/discord/channel-admin";
+import { listOpenDiscordChannelJobs } from "@/lib/discord/channel-jobs";
 
 export default async function AdminDiscordPage() {
-  const overview = await listAdminDiscordOverview();
+  const [overview, openJobs] = await Promise.all([listAdminDiscordOverview(), listOpenDiscordChannelJobs()]);
 
   return (
     <div className="space-y-6">
@@ -25,6 +27,8 @@ export default async function AdminDiscordPage() {
           </div>
         </div>
       </section>
+
+      <DiscordChannelRequests initialJobs={openJobs} />
 
       <DiscordChannelManager overview={overview} />
     </div>

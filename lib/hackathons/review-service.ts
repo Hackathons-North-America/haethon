@@ -1,11 +1,18 @@
-import { and, desc, eq, inArray, isNull, like, lt, or } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+
+import { and, desc, eq, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { drainDiscordChannelJobsSafely, enqueueDiscordChannelJobQuery } from "@/lib/discord/channel-jobs";
+import { categoryForHackathon } from "@/lib/discord/channel-rules";
 import {
-  ensureHackathonDiscordChannel,
-  previewHackathonDiscordChannel,
+  type DiscordChannelPreview,
+  guildChannelListingForPreview,
+  previewDiscordChannel,
   syncHackathonDiscordChannelSafely,
+  type TrackedDiscordChannel,
+  trackedDiscordChannelsQuery,
 } from "@/lib/discord/sync";
 import {
   hackathonDates,
@@ -19,7 +26,13 @@ import {
   users,
 } from "@/lib/db/schema";
 import type { SelectUser } from "@/lib/db/schema";
-import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
+import {
+  cityCoordinatesQuery,
+  hackathonLocationValues,
+  locationValuesFrom,
+  needsCityLookup,
+  toResolvedCity,
+} from "@/lib/hackathons/city-lookup";
 import { DATE_FIELDS, externalIdsOf, feedChanges, LOCATION_FIELDS, type FeedField } from "@/lib/hackathons/external-ids";
 import { verifiedImageUrl } from "@/lib/hackathons/image-ingest";
 import { normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
@@ -31,7 +44,7 @@ import {
   slugify,
 } from "@/lib/hackathons/utils";
 import type { CommunitySubmissionInput, HackathonSubmissionInput, NormalizedHackathonPayload } from "@/lib/hackathons/utils";
-import { ensureHackathonSeries } from "@/lib/hackathons/series";
+import { ensureHackathonSeries, hackathonSeriesIdentity } from "@/lib/hackathons/series";
 import { compileSourceType } from "@/lib/hackathons/source-badges";
 import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 import { deleteHackathon } from "@/lib/hackathons/admin-service";
@@ -43,11 +56,17 @@ import {
   reviewActionSchema,
 } from "@/lib/validations/hackathon";
 
-type DiscordChannelPreview = Awaited<ReturnType<typeof previewHackathonDiscordChannel>>;
-type AutoDiscordResult = Awaited<ReturnType<typeof ensureHackathonDiscordChannel>>;
 export type ReviewAction = z.infer<typeof reviewActionSchema>;
 export type AdminHackathonImportPayload = z.infer<typeof adminHackathonImportPayloadSchema>;
 export type AdminHackathonFixImportItem = z.infer<typeof adminHackathonFixImportItemSchema>;
+
+/* A query that has not been sent yet. Several of them go to the database in one
+   round trip, and one transaction, through db.batch. */
+type BatchQuery = Parameters<typeof db.batch>[0][number];
+
+async function runBatch(queries: BatchQuery[]): Promise<unknown[]> {
+  return queries.length ? ((await db.batch(queries as [BatchQuery, ...BatchQuery[]])) as unknown[]) : [];
+}
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -108,23 +127,26 @@ async function ensureOrganization(payload: NormalizedHackathonPayload) {
   return fallback?.id ?? null;
 }
 
+function firstFreeSlug(base: string, taken: Set<string>) {
+  for (let index = 0; index < 25; index += 1) {
+    const candidate = index === 0 ? base : `${base}-${index + 1}`;
+
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return `${base}-${Date.now()}`;
+}
+
 async function uniqueHackathonSlug(name: string) {
   const base = slugify(name);
   const rows = await db
     .select({ slug: hackathons.slug })
     .from(hackathons)
     .where(or(eq(hackathons.slug, base), like(hackathons.slug, `${base}-%`)));
-  const existingSlugs = new Set(rows.map((row) => row.slug));
 
-  for (let index = 0; index < 25; index += 1) {
-    const candidate = index === 0 ? base : `${base}-${index + 1}`;
-
-    if (!existingSlugs.has(candidate)) {
-      return candidate;
-    }
-  }
-
-  return `${base}-${Date.now()}`;
+  return firstFreeSlug(base, new Set(rows.map((row) => row.slug)));
 }
 
 export async function getApprovedOrganizationIdsForUser(userId: string) {
@@ -156,21 +178,27 @@ async function isVerifiedOrganizerForOrganization(userId: string, role: string, 
   return Boolean(membership);
 }
 
-type DuplicateCandidate = { id: string; name: string; websiteUrl: string | null; startsAt: Date | null };
+type DuplicateCandidate = { id: string; name: string; slug: string; websiteUrl: string | null; startsAt: Date | null };
 
-async function listDuplicateCandidates(): Promise<DuplicateCandidate[]> {
+function duplicateCandidatesQuery() {
   // Deliberately unbounded: an import can duplicate a hackathon of any age, and the
   // in-memory scoring over one narrow left-joined projection stays cheap at this scale.
+  // The slugs double as the set a new hackathon's slug must not collide with.
   return db
     .select({
       id: hackathons.id,
       name: hackathons.name,
+      slug: hackathons.slug,
       websiteUrl: hackathons.websiteUrl,
       startsAt: hackathonDates.startsAt,
     })
     .from(hackathons)
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
     .orderBy(desc(hackathons.createdAt));
+}
+
+async function listDuplicateCandidates(): Promise<DuplicateCandidate[]> {
+  return duplicateCandidatesQuery();
 }
 
 function findBestDuplicateInCandidates(
@@ -210,37 +238,17 @@ async function findBestDuplicate(payload: { name: string; websiteUrl?: string | 
   return findBestDuplicateInCandidates(payload, await listDuplicateCandidates());
 }
 
-/* The hackathon a feed id was last imported into, with the payload imported
-   then. When an event's ids point at different rows (should not happen), the
-   most recently imported wins. */
-async function findLinkedHackathon(externalIds: string[]) {
+/* Records every feed id of an import against its hackathon, with the payload
+   as imported, so the next import of the event matches by feed id. Null when
+   the row carries no feed id. */
+function linkExternalIdsQuery(hackathonId: string, externalIds: string[], payload: Record<string, unknown>) {
   if (!externalIds.length) {
     return null;
   }
 
-  const [linked] = await db
-    .select({
-      hackathonId: hackathonExternalIds.hackathonId,
-      lastPayload: hackathonExternalIds.lastPayload,
-      name: hackathons.name,
-    })
-    .from(hackathonExternalIds)
-    .innerJoin(hackathons, eq(hackathons.id, hackathonExternalIds.hackathonId))
-    .where(inArray(hackathonExternalIds.externalId, externalIds))
-    .orderBy(desc(hackathonExternalIds.updatedAt))
-    .limit(1);
-
-  return linked ?? null;
-}
-
-async function linkExternalIds(hackathonId: string, externalIds: string[], payload: Record<string, unknown>) {
-  if (!externalIds.length) {
-    return;
-  }
-
   const now = new Date();
 
-  await db
+  return db
     .insert(hackathonExternalIds)
     .values(externalIds.map((externalId) => ({ externalId, hackathonId, lastPayload: payload, updatedAt: now })))
     .onConflictDoUpdate({
@@ -255,7 +263,13 @@ async function linkExternalIds(hackathonId: string, externalIds: string[], paylo
  * Returns the fields actually written (a date change that would end the event
  * before it starts is skipped).
  */
-async function applyFeedUpdate(hackathonId: string, payload: NormalizedHackathonPayload, changed: FeedField[]) {
+async function applyFeedUpdate(
+  hackathonId: string,
+  payload: NormalizedHackathonPayload,
+  changed: FeedField[],
+  // syncDiscord: false when the caller queues the Discord refresh itself.
+  options?: { syncDiscord?: boolean }
+) {
   const applied = new Set<FeedField>();
   const has = (field: FeedField) => changed.includes(field);
   const now = new Date();
@@ -348,7 +362,7 @@ async function applyFeedUpdate(hackathonId: string, payload: NormalizedHackathon
     .set({ ...hackathonValues, lastVerifiedAt: now, updatedAt: now })
     .where(eq(hackathons.id, hackathonId));
 
-  if (applied.size) {
+  if (applied.size && options?.syncDiscord !== false) {
     await syncHackathonDiscordChannelSafely(hackathonId);
   }
 
@@ -448,7 +462,12 @@ export async function createPublishedHackathon(
   return created.id;
 }
 
-async function mergeIntoHackathon(targetHackathonId: string, payload: NormalizedHackathonPayload) {
+async function mergeIntoHackathon(
+  targetHackathonId: string,
+  payload: NormalizedHackathonPayload,
+  // syncDiscord: false when the caller queues the Discord refresh itself.
+  options?: { syncDiscord?: boolean }
+) {
   payload = normalizeLocationPayload(payload);
   const [existing] = await db.select().from(hackathons).where(eq(hackathons.id, targetHackathonId)).limit(1);
 
@@ -537,7 +556,10 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
     });
   }
 
-  await syncHackathonDiscordChannelSafely(targetHackathonId);
+  if (options?.syncDiscord !== false) {
+    await syncHackathonDiscordChannelSafely(targetHackathonId);
+  }
+
   revalidateHackathonCaches();
 
   return targetHackathonId;
@@ -727,7 +749,11 @@ function deriveFixPayload(item: AdminHackathonFixImportItem, index: number) {
   };
 }
 
-export async function importAdminHackathonFixItems(input: { items: AdminHackathonFixImportItem[]; reviewerUserId: string }) {
+export async function importAdminHackathonFixItems(input: {
+  items: AdminHackathonFixImportItem[];
+  reviewerUserId: string;
+  defer?: Defer;
+}) {
   const results: Array<{
     duplicateScore: number;
     index: number;
@@ -741,6 +767,10 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
     submissionId: string;
   }> = [];
   const duplicateCandidates = await listDuplicateCandidates();
+  // Every item's submission row (and any Discord refresh) is written in one
+  // round trip after the loop; ids are made here so results can carry them.
+  const writes: BatchQuery[] = [];
+  let queuedJobs = 0;
 
   for (const [index, item] of input.items.entries()) {
     const { hasRealStartDate, payload } = deriveFixPayload(item, index);
@@ -763,13 +793,18 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
         payload.sourceUrl === importedFallbackUrl(index) ? null : normalizedHackathonPayloadSchema.safeParse(payload);
 
       if (mergeParse?.success) {
-        await mergeIntoHackathon(duplicate.id, mergeParse.data);
+        await mergeIntoHackathon(duplicate.id, mergeParse.data, { syncDiscord: false });
+        writes.push(
+          enqueueDiscordChannelJobQuery({ hackathonId: duplicate.id, kind: "refresh", requestedByUserId: input.reviewerUserId })
+        );
+        queuedJobs += 1;
       }
 
       const matchedName = duplicateCandidates.find((candidate) => candidate.id === duplicate.id)?.name ?? null;
-      const [submission] = await db
-        .insert(hackathonSubmissions)
-        .values({
+      const submissionId = randomUUID();
+      writes.push(
+        db.insert(hackathonSubmissions).values({
+          id: submissionId,
           submittedByUserId: input.reviewerUserId,
           submitterType: "community",
           matchedHackathonId: duplicate.id,
@@ -784,7 +819,7 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
           reviewedByUserId: input.reviewerUserId,
           reviewedAt: new Date(),
         })
-        .returning({ id: hackathonSubmissions.id });
+      );
 
       results.push({
         duplicateScore,
@@ -796,14 +831,15 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
         source: item.source ?? "unknown",
         sourceUrl: payload.sourceUrl,
         status: "auto_merged",
-        submissionId: submission.id,
+        submissionId,
       });
       continue;
     }
 
-    const [submission] = await db
-      .insert(hackathonSubmissions)
-      .values({
+    const submissionId = randomUUID();
+    writes.push(
+      db.insert(hackathonSubmissions).values({
+        id: submissionId,
         submittedByUserId: input.reviewerUserId,
         submitterType: "community",
         matchedHackathonId: duplicate?.id,
@@ -815,7 +851,7 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
         duplicateScore: duplicateScore.toFixed(2),
         reviewerNotes: `Imported for manual fix: ${item.reason}`,
       })
-      .returning({ id: hackathonSubmissions.id });
+    );
 
     results.push({
       duplicateScore,
@@ -826,8 +862,18 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
       source: item.source ?? "unknown",
       sourceUrl: payload.sourceUrl,
       status: "queued",
-      submissionId: submission.id,
+      submissionId,
     });
+  }
+
+  await runBatch(writes);
+
+  if (queuedJobs) {
+    if (input.defer) {
+      input.defer(drainDiscordChannelJobsSafely);
+    } else {
+      await drainDiscordChannelJobsSafely();
+    }
   }
 
   const queuedCount = results.filter((result) => result.status === "queued").length;
@@ -840,70 +886,335 @@ export async function importAdminHackathonFixItems(input: { items: AdminHackatho
   };
 }
 
+type ImportDiscordSync = { jobId: string; status: "queued" };
+
+type AdminImportResult = {
+  autoApprove?: boolean;
+  discord?: DiscordChannelPreview;
+  /* Set when the Discord step was queued (auto-approved rows): the job to
+     poll for the channel, see lib/discord/channel-jobs.ts. */
+  discordSync?: ImportDiscordSync;
+  duplicateScore: number;
+  externalId?: string;
+  hackathonId?: string;
+  index: number;
+  matchedHackathonId?: string;
+  matchedName?: string | null;
+  name: string;
+  status: "imported" | "duplicate_flagged" | "auto_merged" | "updated";
+  submissionId?: string;
+  updatedFields?: FeedField[];
+};
+
+/* Runs work that need not hold up the response. The import route passes
+   next/server after(); without it (scripts, tests) the work is awaited before
+   the import returns. */
+type Defer = (task: () => Promise<unknown>) => void;
+
+/* A write waiting for the next flush. Consecutive writes share one round trip
+   and one transaction (db.batch), so a new hackathon is never left half
+   created. */
+type QueuedWrite = { query: BatchQuery; onResult?: (result: unknown) => void };
+
+function isUniqueViolation(error: unknown) {
+  const code = (value: unknown) => (value && typeof value === "object" && "code" in value ? (value as { code?: unknown }).code : undefined);
+
+  return code(error) === "23505" || code((error as { cause?: unknown } | null)?.cause) === "23505";
+}
+
+/**
+ * Vets the images of freshly imported hackathons after the response. The URL
+ * is stored as sent so the card has its image straight away; one that turns
+ * out to be dead or not an image is cleared, which degrades the card to the
+ * initials tile (see lib/hackathons/image-ingest.ts). The guard on the stored
+ * URL keeps an admin's edit made in the meantime.
+ */
+async function dropUnreachableImages(images: Array<{ hackathonId: string; imageUrl: string }>) {
+  let cursor = 0;
+  let dropped = 0;
+
+  await Promise.all(
+    Array.from({ length: Math.min(4, images.length) }, async () => {
+      while (cursor < images.length) {
+        const image = images[cursor++];
+
+        if (!(await verifiedImageUrl(image.imageUrl))) {
+          await db
+            .update(hackathons)
+            .set({ imageUrl: null })
+            .where(and(eq(hackathons.id, image.hackathonId), eq(hackathons.imageUrl, image.imageUrl)));
+          dropped += 1;
+        }
+      }
+    })
+  );
+
+  if (dropped) {
+    revalidateHackathonCaches();
+  }
+}
+
 export async function importAdminHackathons(input: {
   payloads: AdminHackathonImportPayload[];
   reviewerUserId: string;
   ignoreDuplicates?: boolean;
+  defer?: Defer;
 }) {
-  const results: Array<{
-    autoApprove?: boolean;
-    discord?: DiscordChannelPreview;
-    discordSync?: AutoDiscordResult;
-    duplicateScore: number;
-    externalId?: string;
-    hackathonId?: string;
-    index: number;
-    matchedHackathonId?: string;
-    matchedName?: string | null;
-    name: string;
-    status: "imported" | "duplicate_flagged" | "auto_merged" | "updated";
-    submissionId?: string;
-    updatedFields?: FeedField[];
-  }> = [];
-  const duplicateCandidates = await listDuplicateCandidates();
-  let feedUpdates = 0;
+  try {
+    return await runAdminImport(input);
+  } catch (error) {
+    // Two imports wrote the same event at once (a double submit) and this one
+    // lost: its writes were one transaction, so nothing of it was saved. Run
+    // it again; it now sees the other import's rows and reports them as
+    // already imported instead of failing.
+    if (isUniqueViolation(error) && (error as { nothingCommitted?: boolean }).nothingCommitted) {
+      return runAdminImport(input);
+    }
 
-  for (const [index, rawPayload] of input.payloads.entries()) {
+    throw error;
+  }
+}
+
+/* How the import works, and why it is fast: everything every row needs to
+   know is read in ONE round trip, rows are then decided in memory in their
+   original order, and what they write is sent in ONE more round trip. Only
+   rows that change a hackathon already in the catalog (a feed update with
+   real changes, an auto-merge) take the slower read-modify-write path, and the
+   queued writes are flushed before each of those so order is preserved.
+   Discord work is queued as jobs and image vetting is deferred. */
+async function runAdminImport(input: {
+  payloads: AdminHackathonImportPayload[];
+  reviewerUserId: string;
+  ignoreDuplicates?: boolean;
+  defer?: Defer;
+}) {
+  const now = new Date();
+  const rows = input.payloads.map((rawPayload) => {
     const payload = payloadWithValidOrganizationId(rawPayload);
-    const externalIds = externalIdsOf(rawPayload);
-    const feedPayload = payloadForJson(payload);
-    const linked = await findLinkedHackathon(externalIds);
+
+    return {
+      rawPayload,
+      payload,
+      externalIds: externalIdsOf(rawPayload),
+      feedPayload: payloadForJson(payload),
+      series: hackathonSeriesIdentity(payload),
+      organizationSlug: !payload.organizationId && payload.organizationName ? slugify(payload.organizationName) : null,
+      cityKey: needsCityLookup(payload) && payload.city ? JSON.stringify([payload.city, payload.region ?? null, payload.country]) : null,
+      status: deriveHackathonStatus(payload.startDate, payload.endDate, now),
+    };
+  });
+
+  // The admin is only asked about a channel for rows that are not
+  // auto-approved, and only Canadian and US events get one.
+  const wantsPreview = rows.some(
+    (row) =>
+      row.rawPayload.autoApprove !== true &&
+      categoryForHackathon({ country: row.payload.country, endsAt: row.payload.endDate, startsAt: row.payload.startDate, status: row.status })
+  );
+  // Started now, awaited last: the call to Discord overlaps the database work.
+  const guildListing = wantsPreview ? guildChannelListingForPreview() : Promise.resolve(null);
+
+  /* ---- One round trip of reads ---- */
+  const reads: BatchQuery[] = [];
+  const read = (query: BatchQuery) => reads.push(query) - 1;
+  const allExternalIds = [...new Set(rows.flatMap((row) => row.externalIds))];
+  const organizationSlugs = [...new Set(rows.flatMap((row) => (row.organizationSlug ? [row.organizationSlug] : [])))];
+  const seriesSlugs = [...new Set(rows.map((row) => row.series.slug))];
+
+  const candidatesAt = read(duplicateCandidatesQuery());
+  const linkedAt = allExternalIds.length
+    ? read(
+        db
+          .select({
+            externalId: hackathonExternalIds.externalId,
+            hackathonId: hackathonExternalIds.hackathonId,
+            lastPayload: hackathonExternalIds.lastPayload,
+            name: hackathons.name,
+            updatedAt: hackathonExternalIds.updatedAt,
+          })
+          .from(hackathonExternalIds)
+          .innerJoin(hackathons, eq(hackathons.id, hackathonExternalIds.hackathonId))
+          .where(inArray(hackathonExternalIds.externalId, allExternalIds))
+      )
+    : -1;
+  const organizationsAt = organizationSlugs.length
+    ? read(db.select({ slug: organizations.slug }).from(organizations).where(inArray(organizations.slug, organizationSlugs)))
+    : -1;
+  const seriesAt = read(
+    db
+      .select({ id: hackathonSeries.id, slug: hackathonSeries.slug, websiteUrl: hackathonSeries.websiteUrl })
+      .from(hackathonSeries)
+      .where(inArray(hackathonSeries.slug, seriesSlugs))
+  );
+  const trackedAt = wantsPreview ? read(trackedDiscordChannelsQuery()) : -1;
+  const cityAt = new Map<string, number>();
+
+  for (const row of rows) {
+    const query = row.cityKey && !cityAt.has(row.cityKey) ? cityCoordinatesQuery(row.payload) : null;
+
+    if (row.cityKey && query) {
+      cityAt.set(row.cityKey, read(query));
+    }
+  }
+
+  const readResults = await runBatch(reads);
+  const duplicateCandidates = readResults[candidatesAt] as DuplicateCandidate[];
+  const takenSlugs = new Set(duplicateCandidates.map((candidate) => candidate.slug));
+  /* The hackathon each feed id was last imported into. Rows of this request
+     are added as they are decided, so a later row carrying the same id
+     updates the earlier one. `order` picks the most recent link when an
+     event's ids point at different hackathons. */
+  const linkByExternalId = new Map<string, { hackathonId: string; lastPayload: Record<string, unknown>; name: string; order: number }>();
+
+  for (const link of linkedAt < 0
+    ? []
+    : (readResults[linkedAt] as Array<{ externalId: string; hackathonId: string; lastPayload: Record<string, unknown>; name: string; updatedAt: Date }>)) {
+    linkByExternalId.set(link.externalId, { ...link, order: link.updatedAt.getTime() });
+  }
+
+  const knownOrganizationSlugs = new Set(
+    organizationsAt < 0 ? [] : (readResults[organizationsAt] as Array<{ slug: string }>).map((organization) => organization.slug)
+  );
+  const seriesBySlug = new Map(
+    (readResults[seriesAt] as Array<{ id: string; slug: string; websiteUrl: string | null }>).map((series) => [
+      series.slug,
+      // id is null for a series a row of this request is about to create.
+      { id: series.id as string | null, websiteUrl: series.websiteUrl },
+    ])
+  );
+  const trackedChannels = trackedAt < 0 ? [] : (readResults[trackedAt] as TrackedDiscordChannel[]);
+  const resolvedCity = (cityKey: string | null) => {
+    const at = cityKey ? cityAt.get(cityKey) : undefined;
+
+    return at === undefined ? null : toResolvedCity((readResults[at] as Array<{ latitude: string; longitude: string; countryCode: string }>)[0]);
+  };
+
+  /* ---- Decide every row in memory, queueing its writes ---- */
+  const results: AdminImportResult[] = [];
+  const writes: QueuedWrite[] = [];
+  const previews: Array<{ result: AdminImportResult; event: Parameters<typeof previewDiscordChannel>[0] }> = [];
+  const newImages: Array<{ hackathonId: string; imageUrl: string }> = [];
+  let committed = false;
+  let queuedJobs = 0;
+  let feedUpdates = 0;
+  let linkOrder = Date.now();
+
+  const flush = async () => {
+    if (!writes.length) {
+      return;
+    }
+
+    const batch = writes.splice(0);
+    let batchResults: unknown[];
+
+    try {
+      batchResults = await runBatch(batch.map((write) => write.query));
+    } catch (error) {
+      if (error && typeof error === "object") {
+        Object.assign(error, { nothingCommitted: !committed });
+      }
+
+      throw error;
+    }
+
+    committed = true;
+    batch.forEach((write, position) => write.onResult?.(batchResults[position]));
+  };
+
+  const queueJob = (
+    request: { hackathonId: string; keepExisting?: boolean; kind: "ensure" | "refresh" },
+    result?: AdminImportResult
+  ) => {
+    queuedJobs += 1;
+    writes.push({
+      query: enqueueDiscordChannelJobQuery({ ...request, requestedByUserId: input.reviewerUserId }),
+      onResult: result
+        ? (jobRows) => {
+            result.discordSync = { jobId: (jobRows as Array<{ id: string }>)[0].id, status: "queued" };
+          }
+        : undefined,
+    });
+  };
+
+  const queueLink = (hackathonId: string, name: string, row: (typeof rows)[number]) => {
+    const query = linkExternalIdsQuery(hackathonId, row.externalIds, row.feedPayload);
+
+    if (query) {
+      writes.push({ query });
+    }
+
+    linkOrder += 1;
+
+    for (const externalId of row.externalIds) {
+      linkByExternalId.set(externalId, { hackathonId, lastPayload: row.feedPayload, name, order: linkOrder });
+    }
+  };
+
+  const queueSubmission = (
+    row: (typeof rows)[number],
+    values: Pick<typeof hackathonSubmissions.$inferInsert, "approvedHackathonId" | "duplicateScore" | "matchedHackathonId" | "reviewerNotes" | "status">
+  ) => {
+    const id = randomUUID();
+
+    writes.push({
+      query: db.insert(hackathonSubmissions).values({
+        id,
+        submittedByUserId: input.reviewerUserId,
+        submitterType: "community",
+        organizationId: row.payload.organizationId ?? null,
+        // Tag admin-imported records so the submissions review page can keep them out —
+        // imports are handled entirely on /admin/import, not in the form review queue.
+        payload: payloadForJson({ ...row.payload, submitterType: "community", origin: "admin_import" }),
+        normalizedName: row.payload.name,
+        websiteUrl: row.payload.websiteUrl,
+        sourceUrl: row.payload.sourceUrl ?? row.payload.websiteUrl,
+        reviewedByUserId: input.reviewerUserId,
+        reviewedAt: new Date(),
+        ...values,
+      }),
+    });
+
+    return id;
+  };
+
+  for (const [index, row] of rows.entries()) {
+    const { rawPayload, payload, externalIds } = row;
+    const autoApprove = rawPayload.autoApprove === true;
+    const linked = externalIds
+      .flatMap((externalId) => linkByExternalId.get(externalId) ?? [])
+      .sort((left, right) => right.order - left.order)[0];
 
     if (linked) {
       // Sent by the scraper before: update that hackathon with what the feed
       // changed since, instead of name/date duplicate matching.
-      const changed = feedChanges(linked.lastPayload, feedPayload);
-      const updatedFields = changed.length ? await applyFeedUpdate(linked.hackathonId, payload, changed) : [];
-      await linkExternalIds(linked.hackathonId, externalIds, feedPayload);
+      const changed = feedChanges(linked.lastPayload, row.feedPayload);
+      let updatedFields: FeedField[] = [];
+
+      if (changed.length) {
+        await flush();
+        updatedFields = await applyFeedUpdate(linked.hackathonId, payload, changed, { syncDiscord: false });
+        committed = true;
+      }
+
+      queueLink(linked.hackathonId, linked.name, row);
       let submissionId: string | undefined;
 
       if (updatedFields.length) {
         feedUpdates += 1;
-        const [submission] = await db
-          .insert(hackathonSubmissions)
-          .values({
-            submittedByUserId: input.reviewerUserId,
-            submitterType: "community",
-            organizationId: payload.organizationId ?? null,
-            matchedHackathonId: linked.hackathonId,
-            approvedHackathonId: linked.hackathonId,
-            status: "merged",
-            payload: payloadForJson({ ...payload, submitterType: "community", origin: "admin_import" }),
-            normalizedName: payload.name,
-            websiteUrl: payload.websiteUrl,
-            sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
-            duplicateScore: "1.00",
-            reviewerNotes: `Updated from the feed (${externalIds.join(", ")}): ${updatedFields.join(", ")}.`,
-            reviewedByUserId: input.reviewerUserId,
-            reviewedAt: new Date(),
-          })
-          .returning({ id: hackathonSubmissions.id });
-        submissionId = submission.id;
+        submissionId = queueSubmission(row, {
+          matchedHackathonId: linked.hackathonId,
+          approvedHackathonId: linked.hackathonId,
+          status: "merged",
+          duplicateScore: "1.00",
+          reviewerNotes: `Updated from the feed (${externalIds.join(", ")}): ${updatedFields.join(", ")}.`,
+        });
+        // The channel's name, topic and category follow the event.
+        queueJob({ hackathonId: linked.hackathonId, kind: "refresh" });
       }
 
-      results.push({
+      const result: AdminImportResult = {
         duplicateScore: 1,
-        autoApprove: rawPayload.autoApprove === true,
+        autoApprove,
         externalId: rawPayload.externalId,
         hackathonId: linked.hackathonId,
         index,
@@ -913,7 +1224,14 @@ export async function importAdminHackathons(input: {
         status: "updated",
         submissionId,
         updatedFields,
-      });
+      };
+      results.push(result);
+
+      if (autoApprove) {
+        // A hackathon already in the catalog keeps its channel if it has one.
+        queueJob({ hackathonId: linked.hackathonId, keepExisting: true, kind: "ensure" }, result);
+      }
+
       continue;
     }
 
@@ -928,36 +1246,19 @@ export async function importAdminHackathons(input: {
       if (duplicate.score >= AUTO_MERGE_SCORE) {
         // A near-certain match needs no decision: merge the import into the existing
         // hackathon, using its data only to fill fields the existing record is missing.
-        await mergeIntoHackathon(duplicate.id, payload);
+        await flush();
+        await mergeIntoHackathon(duplicate.id, payload, { syncDiscord: false });
+        committed = true;
+        queueJob({ hackathonId: duplicate.id, kind: "refresh" });
         // Later imports of this event then match by feed id. The existing
         // hackathon was not created from this feed (earlier scraper imports
         // are linked by scripts/backfill-external-ids.ts and take the update
         // path above), so its values stay and only later feed changes apply.
-        await linkExternalIds(duplicate.id, externalIds, feedPayload);
+        queueLink(duplicate.id, matchedName ?? payload.name, row);
 
-        const [submission] = await db
-          .insert(hackathonSubmissions)
-          .values({
-            submittedByUserId: input.reviewerUserId,
-            submitterType: "community",
-            organizationId: payload.organizationId ?? null,
-            matchedHackathonId: duplicate.id,
-            approvedHackathonId: duplicate.id,
-            status: "merged",
-            payload: payloadForJson({ ...payload, submitterType: "community", origin: "admin_import" }),
-            normalizedName: payload.name,
-            websiteUrl: payload.websiteUrl,
-            sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
-            duplicateScore: duplicateScore.toFixed(2),
-            reviewerNotes: `Auto-merged into existing hackathon (match ${duplicateScore.toFixed(2)}).`,
-            reviewedByUserId: input.reviewerUserId,
-            reviewedAt: new Date(),
-          })
-          .returning({ id: hackathonSubmissions.id });
-
-        results.push({
+        const result: AdminImportResult = {
           duplicateScore,
-          autoApprove: rawPayload.autoApprove === true,
+          autoApprove,
           externalId: rawPayload.externalId,
           hackathonId: duplicate.id,
           index,
@@ -965,8 +1266,20 @@ export async function importAdminHackathons(input: {
           matchedName,
           name: payload.name,
           status: "auto_merged",
-          submissionId: submission.id,
-        });
+          submissionId: queueSubmission(row, {
+            matchedHackathonId: duplicate.id,
+            approvedHackathonId: duplicate.id,
+            status: "merged",
+            duplicateScore: duplicateScore.toFixed(2),
+            reviewerNotes: `Auto-merged into existing hackathon (match ${duplicateScore.toFixed(2)}).`,
+          }),
+        };
+        results.push(result);
+
+        if (autoApprove) {
+          queueJob({ hackathonId: duplicate.id, keepExisting: true, kind: "ensure" }, result);
+        }
+
         continue;
       }
 
@@ -974,7 +1287,7 @@ export async function importAdminHackathons(input: {
       // pending submission in the review queue — nothing is written until the admin decides.
       results.push({
         duplicateScore,
-        autoApprove: rawPayload.autoApprove === true,
+        autoApprove,
         externalId: rawPayload.externalId,
         index,
         matchedHackathonId: duplicate.id,
@@ -985,79 +1298,179 @@ export async function importAdminHackathons(input: {
       continue;
     }
 
-    // Do not create the Discord channel yet — the admin approves that separately.
-    const hackathonId = await createPublishedHackathon(payload, {
-      revalidateCaches: false,
-      source: rawPayload.source,
-      syncDiscord: false,
-    });
-    duplicateCandidates.unshift({ id: hackathonId, name: payload.name, websiteUrl: payload.websiteUrl, startsAt: payload.startDate });
-    await linkExternalIds(hackathonId, externalIds, feedPayload);
-    const [submission] = await db
-      .insert(hackathonSubmissions)
-      .values({
-        submittedByUserId: input.reviewerUserId,
-        submitterType: "community",
-        organizationId: payload.organizationId ?? null,
-        approvedHackathonId: hackathonId,
-        status: "approved",
-        // Tag admin-imported records so the submissions review page can keep them out —
-        // imports are handled entirely on /admin/import, not in the form review queue.
-        payload: payloadForJson({ ...payload, submitterType: "community", origin: "admin_import" }),
-        normalizedName: payload.name,
-        websiteUrl: payload.websiteUrl,
-        sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
-        duplicateScore: "0.00",
-        reviewedByUserId: input.reviewerUserId,
-        reviewedAt: new Date(),
-      })
-      .returning({ id: hackathonSubmissions.id });
+    /* A new hackathon. Its id is made here so every row that hangs off it can
+       be written in the same batch; the organization and series are referred
+       to by slug, which stays correct even if another import created them a
+       moment ago. */
+    const hackathonId = randomUUID();
+    const slug = firstFreeSlug(slugify(payload.name), takenSlugs);
+    takenSlugs.add(slug);
 
-    results.push({
+    if (row.organizationSlug && !knownOrganizationSlugs.has(row.organizationSlug)) {
+      knownOrganizationSlugs.add(row.organizationSlug);
+      writes.push({
+        query: db
+          .insert(organizations)
+          .values({ name: payload.organizationName!, slug: row.organizationSlug, websiteUrl: payload.websiteUrl, isVerified: false })
+          .onConflictDoNothing(),
+      });
+    }
+
+    const existingSeries = seriesBySlug.get(row.series.slug);
+
+    if (!existingSeries) {
+      seriesBySlug.set(row.series.slug, { id: null, websiteUrl: payload.websiteUrl ?? null });
+      writes.push({
+        query: db
+          .insert(hackathonSeries)
+          .values({
+            name: row.series.name,
+            slug: row.series.slug,
+            websiteUrl: payload.websiteUrl,
+            isRecurring: payload.recurring ?? false,
+            updatedAt: now,
+          })
+          .onConflictDoNothing(),
+      });
+    }
+
+    // Same rules as ensureHackathonSeries: fill a missing website, and
+    // `recurring` only ever turns the flag on.
+    const websiteUrlBackfill = existingSeries && !existingSeries.websiteUrl && payload.websiteUrl ? payload.websiteUrl : null;
+
+    if (websiteUrlBackfill || payload.recurring) {
+      if (existingSeries && websiteUrlBackfill) {
+        existingSeries.websiteUrl = websiteUrlBackfill;
+      }
+
+      writes.push({
+        query: db
+          .update(hackathonSeries)
+          .set({
+            ...(websiteUrlBackfill ? { websiteUrl: websiteUrlBackfill } : {}),
+            ...(payload.recurring ? { isRecurring: true } : {}),
+            updatedAt: now,
+          })
+          .where(eq(hackathonSeries.slug, row.series.slug)),
+      });
+    }
+
+    writes.push({
+      query: db.insert(hackathons).values({
+        id: hackathonId,
+        organizationId: payload.organizationId
+          ? payload.organizationId
+          : row.organizationSlug
+            ? sql`(select ${organizations.id} from ${organizations} where ${organizations.slug} = ${row.organizationSlug})`
+            : null,
+        seriesId: sql`(select ${hackathonSeries.id} from ${hackathonSeries} where ${hackathonSeries.slug} = ${row.series.slug})`,
+        name: payload.name,
+        slug,
+        shortDescription: payload.shortDescription,
+        websiteUrl: payload.websiteUrl,
+        // Stored as sent and vetted after the response (dropUnreachableImages).
+        imageUrl: payload.imageUrl,
+        applicationUrl: payload.applicationUrl,
+        venue: payload.venue,
+        format: payload.format,
+        status: row.status,
+        beginnerFriendly: payload.beginnerFriendly,
+        travelReimbursement: payload.travelReimbursement,
+        highSchoolersOnly: payload.highSchoolersOnly,
+        prizeAmountUsd: payload.prizeAmountUsd,
+        // Compiled once here. An explicit feed identity wins because the event
+        // URL may point somewhere else (for example MLH linking to Devpost).
+        source: compileSourceType(rawPayload.source, payload.sourceUrl, payload.websiteUrl),
+        lastVerifiedAt: now,
+        dataConfidenceScore: "0.85",
+        publishedAt: now,
+      }),
+    });
+    writes.push({
+      query: db.insert(hackathonDates).values({
+        hackathonId,
+        startsAt: payload.startDate,
+        endsAt: payload.endDate,
+        applicationOpensAt: payload.applicationOpensAt,
+        applicationClosesAt: payload.applicationClosesAt,
+        acceptanceAt: payload.acceptanceAt,
+      }),
+    });
+    writes.push({
+      query: db.insert(hackathonLocations).values({ hackathonId, ...locationValuesFrom(payload, resolvedCity(row.cityKey)) }),
+    });
+
+    duplicateCandidates.unshift({ id: hackathonId, name: payload.name, slug, websiteUrl: payload.websiteUrl, startsAt: payload.startDate });
+    queueLink(hackathonId, payload.name, row);
+
+    if (payload.imageUrl) {
+      newImages.push({ hackathonId, imageUrl: payload.imageUrl });
+    }
+
+    const result: AdminImportResult = {
       duplicateScore,
-      autoApprove: rawPayload.autoApprove === true,
+      autoApprove,
       externalId: rawPayload.externalId,
       hackathonId,
       index,
       name: payload.name,
       status: "imported",
-      submissionId: submission.id,
-    });
-  }
+      submissionId: queueSubmission(row, { approvedHackathonId: hackathonId, status: "approved", duplicateScore: "0.00" }),
+    };
+    results.push(result);
 
-  const importedResults = results.filter(
-    (result): result is typeof result & { hackathonId: string } => result.status === "imported" && Boolean(result.hackathonId)
-  );
-
-  if (importedResults.length > 0 || feedUpdates > 0) {
-    revalidateHackathonCaches();
-  }
-
-  // Auto-approved rows skip the admin's channel decision: the channel is made
-  // or reused right away. One at a time, so two rows of one series cannot both
-  // try to claim the same existing channel. A row that landed on a hackathon
-  // already in the catalog keeps that hackathon's channel if it has one.
-  for (const result of results) {
-    if (result.autoApprove && result.hackathonId && result.status !== "duplicate_flagged") {
-      result.discordSync = await ensureHackathonDiscordChannel(result.hackathonId, {
-        keepExisting: result.status !== "imported",
+    if (autoApprove) {
+      // Auto-approved rows skip the admin's channel decision: the channel is
+      // made or reused by the queue, right after the response.
+      queueJob({ hackathonId, kind: "ensure" }, result);
+    } else {
+      // Do not create the Discord channel yet — the admin approves that separately.
+      previews.push({
+        result,
+        event: {
+          country: payload.country,
+          endsAt: payload.endDate,
+          name: payload.name,
+          seriesId: existingSeries?.id ?? null,
+          startsAt: payload.startDate,
+          status: row.status,
+        },
       });
     }
   }
 
-  const previewResults = importedResults.filter((result) => !result.autoApprove);
+  /* ---- One round trip of writes ---- */
+  await flush();
 
-  // Discord previews are independent read operations. A small worker pool
-  // removes the serial network waterfall without creating an unbounded burst.
-  let nextPreviewIndex = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(4, previewResults.length) }, async () => {
-      while (nextPreviewIndex < previewResults.length) {
-        const result = previewResults[nextPreviewIndex++];
-        result.discord = await previewHackathonDiscordChannel(result.hackathonId);
-      }
-    })
-  );
+  if (results.some((result) => result.status === "imported") || feedUpdates > 0) {
+    revalidateHackathonCaches();
+  }
+
+  if (previews.length) {
+    const listing = await guildListing;
+
+    for (const preview of previews) {
+      preview.result.discord = previewDiscordChannel(preview.event, trackedChannels, listing);
+    }
+  }
+
+  const deferred: Array<() => Promise<unknown>> = [];
+
+  if (newImages.length) {
+    deferred.push(() => dropUnreachableImages(newImages));
+  }
+
+  if (queuedJobs) {
+    deferred.push(drainDiscordChannelJobsSafely);
+  }
+
+  for (const task of deferred) {
+    if (input.defer) {
+      input.defer(task);
+    } else {
+      await task();
+    }
+  }
 
   return {
     duplicateCount: results.filter((result) => result.status === "duplicate_flagged").length,
