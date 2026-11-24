@@ -29,14 +29,17 @@ const grainMask = blooms.map((bloom) => bloom.mask).join(", ");
 
 /* The page-wide brown wash: the same airbrushed bloom and grain as the
    hackathon cards' streak, in one coffee brown, fixed to the viewport so it stays
-   put while content scrolls over it. It sits at -z-10 in the root stacking
+   put while content scrolls over it. In dark mode it drops to 20% so the tan
+   blooms are only a faint warmth on the espresso ground. It sits at -z-10 in the root stacking
    context, above the canvas (html's bg-paper) and below all page content.
-   Pages with an opaque background of their own cover it. Decorative only. */
+   It is opt-in: hidden by default (leaving html's plain bg-paper), and shown
+   only while the page renders an element with `data-page-wash` (the :has()
+   flips it on). Today that is just the /hackathons list. Decorative only. */
 export function PageWash() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 bg-paper dark:opacity-75"
+      className="pointer-events-none fixed inset-0 -z-10 bg-paper hidden dark:opacity-20 [body:has([data-page-wash])_&]:block"
       style={{ backgroundImage: washImage }}
     >
       <div

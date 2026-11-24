@@ -6,7 +6,6 @@ import { CityCombobox } from "@/components/forms/city-combobox";
 import { COMMUNITY_FORM_SOURCE_URL } from "@/lib/hackathons/source-provenance";
 
 type SubmitterType = "organizer" | "community";
-type HackathonFormat = "in_person" | "online";
 
 // Sentinel source URL so reviewers can tell a submission came from this form
 // rather than a scraped or imported source.
@@ -58,9 +57,6 @@ export function HackathonSubmissionForm() {
   const [submitterType, setSubmitterType] = useState<SubmitterType>("community");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
-  // Controlled so the location fields can be hidden (and their values dropped)
-  // when the event is online.
-  const [format, setFormat] = useState<HackathonFormat>("in_person");
   // Controlled so picking a city from the autocomplete fills them in one step.
   const [region, setRegion] = useState("");
   const [country, setCountry] = useState("Canada");
@@ -74,10 +70,6 @@ export function HackathonSubmissionForm() {
     setMessage(null);
 
     const formData = new FormData(form);
-    // Online events carry no physical location: the fields are not rendered,
-    // and "Online" stands in for the required country (same convention as the
-    // Devpost importer), so cards show them as simply "Online".
-    const isOnline = format === "online";
     const payload =
       submitterType === "organizer"
         ? {
@@ -85,8 +77,9 @@ export function HackathonSubmissionForm() {
             name: fieldValue(formData, "name"),
             startDate: fieldValue(formData, "startDate"),
             endDate: fieldValue(formData, "endDate"),
-            format,
-            country: isOnline ? "Online" : fieldValue(formData, "country"),
+            // Only in-person hackathons are listed, so the format is fixed.
+            format: "in_person",
+            country: fieldValue(formData, "country"),
             city: fieldValue(formData, "city"),
             region: fieldValue(formData, "region"),
             countryCode: fieldValue(formData, "countryCode"),
@@ -131,7 +124,6 @@ export function HackathonSubmissionForm() {
         body.data?.publishedDirectly ? "Published directly for your verified organization." : "Submitted for review."
       );
       form.reset();
-      setFormat("in_person");
       setRegion("");
       setCountry("Canada");
       setFormVersion((version) => version + 1);
@@ -226,7 +218,7 @@ export function HackathonSubmissionForm() {
 
         {submitterType === "organizer" ? (
           <>
-            <div className="space-y-7 border-t border-ink/10 pt-8">
+            <div className="space-y-7 pt-8">
               <p className={sectionHeadingClassName}>Dates</p>
               <div className="grid gap-x-8 gap-y-7 md:grid-cols-4">
                 <div>
@@ -256,86 +248,61 @@ export function HackathonSubmissionForm() {
               </div>
             </div>
 
-            <div className="space-y-7 border-t border-ink/10 pt-8">
-              <p className={sectionHeadingClassName}>Format &amp; location</p>
-              <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="Format">
-                {[
-                  { value: "in_person" as const, label: "In person", note: "Held at a physical venue" },
-                  { value: "online" as const, label: "Online", note: "Fully remote, join from anywhere" },
-                ].map(({ value, label, note }) => (
-                  <button
-                    aria-checked={format === value}
-                    className={`flex min-w-52 flex-col gap-1 border px-5 py-4 text-left outline-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${
-                      format === value
-                        ? "border-pine bg-pine/5 text-ink"
-                        : "border-ink/15 text-ink/55 hover:border-pine/60 hover:text-ink"
-                    }`}
-                    key={value}
-                    onClick={() => setFormat(value)}
-                    role="radio"
-                    type="button"
-                  >
-                    <span className="font-mono text-xs font-medium uppercase tracking-[0.14em]">{label}</span>
-                    <span className="text-xs text-ink/55">{note}</span>
-                  </button>
-                ))}
-              </div>
-              {format === "in_person" ? (
-                <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
-                  <div>
-                    <label className={labelClassName} htmlFor="city">
-                      City
-                    </label>
-                    <CityCombobox
-                      id="city"
-                      inputClassName={inputClassName}
-                      key={formVersion}
-                      onCitySelect={(city) => {
-                        setRegion(city.region ?? "");
-                        setCountry(city.country);
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClassName} htmlFor="region">
-                      Province / state
-                    </label>
-                    <input
-                      id="region"
-                      name="region"
-                      className={inputClassName}
-                      onChange={(event) => setRegion(event.target.value)}
-                      value={region}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClassName} htmlFor="country">
-                      Country
-                    </label>
-                    <input
-                      id="country"
-                      name="country"
-                      required
-                      className={inputClassName}
-                      onChange={(event) => setCountry(event.target.value)}
-                      value={country}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClassName} htmlFor="venue">
-                      Venue
-                    </label>
-                    <input id="venue" name="venue" className={inputClassName} />
-                  </div>
+            <div className="space-y-7 pt-8">
+              <p className={sectionHeadingClassName}>Location</p>
+              <p className="text-sm leading-6 text-ink/55">
+                We only list in-person hackathons — online events aren&apos;t supported.
+              </p>
+              <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
+                <div>
+                  <label className={labelClassName} htmlFor="city">
+                    City
+                  </label>
+                  <CityCombobox
+                    id="city"
+                    inputClassName={inputClassName}
+                    key={formVersion}
+                    onCitySelect={(city) => {
+                      setRegion(city.region ?? "");
+                      setCountry(city.country);
+                    }}
+                  />
                 </div>
-              ) : (
-                <p className="text-sm leading-6 text-ink/55">
-                  No location needed — your hackathon will simply show as online.
-                </p>
-              )}
+                <div>
+                  <label className={labelClassName} htmlFor="region">
+                    Province / state
+                  </label>
+                  <input
+                    id="region"
+                    name="region"
+                    className={inputClassName}
+                    onChange={(event) => setRegion(event.target.value)}
+                    value={region}
+                  />
+                </div>
+                <div>
+                  <label className={labelClassName} htmlFor="country">
+                    Country
+                  </label>
+                  <input
+                    id="country"
+                    name="country"
+                    required
+                    className={inputClassName}
+                    onChange={(event) => setCountry(event.target.value)}
+                    value={country}
+                  />
+                </div>
+                <div>
+                  <label className={labelClassName} htmlFor="venue">
+                    Venue
+                  </label>
+                  <input id="venue" name="venue" className={inputClassName} />
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-7 border-t border-ink/10 pt-8">
+            <div className="space-y-7 pt-8">
               <p className={sectionHeadingClassName}>Details</p>
               <div className="grid gap-x-8 gap-y-7 md:grid-cols-2">
                 <div>
@@ -349,12 +316,10 @@ export function HackathonSubmissionForm() {
                     <input name="beginnerFriendly" type="checkbox" className="size-4 accent-pine" />
                     Beginner friendly
                   </label>
-                  {format === "in_person" ? (
-                    <label className="inline-flex items-center gap-2.5 text-sm text-ink">
-                      <input name="travelReimbursement" type="checkbox" className="size-4 accent-pine" />
-                      Travel reimbursement
-                    </label>
-                  ) : null}
+                  <label className="inline-flex items-center gap-2.5 text-sm text-ink">
+                    <input name="travelReimbursement" type="checkbox" className="size-4 accent-pine" />
+                    Travel reimbursement
+                  </label>
                   <label className="inline-flex items-center gap-2.5 text-sm text-ink">
                     <input name="highSchoolersOnly" type="checkbox" className="size-4 accent-pine" />
                     High school only
@@ -373,7 +338,7 @@ export function HackathonSubmissionForm() {
 
         <div
           className={`flex flex-wrap items-center gap-4 ${
-            submitterType === "organizer" ? "border-t border-ink/10 pt-8" : ""
+            submitterType === "organizer" ? "pt-8" : ""
           }`}
         >
           <button

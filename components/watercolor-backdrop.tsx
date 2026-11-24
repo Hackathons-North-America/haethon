@@ -3,15 +3,41 @@
    fractal noise on top: a pale cream wash and deeper tan blotches, each turned
    into a soft alpha mask by a color matrix.
 
-   With `dome`, a white "horizon" cuts into the bottom: a quadratic curve whose
+   With `dome`, a "horizon" cuts into the bottom: a quadratic curve whose
    height scales with the viewport (--dome, set by the caller) so the arc keeps
-   the same curvature at any width. In dark mode the whole wash is dimmed by
-   --watercolor-filter (app/globals.css) so its texture survives as a dark
-   ground, and the horizon is filled with the page's surface color. Decorative
-   throughout. */
+   the same curvature at any width. The cut is a mask, not a painted shape, so
+   whatever sits behind the backdrop (the landing page's surface, the app's
+   PageWash) shows through the arc unchanged. In dark mode the whole wash is
+   dimmed by --watercolor-filter (app/globals.css) so its texture survives as
+   a dark ground. Decorative throughout. */
+
+/* The mask's bottom layer: opaque above the curve, clear below it. Edges sit
+   on the bottom and the peak touches the top: a quadratic with its control
+   point at -100 peaks at exactly y=0. Stretched to the full width and
+   --dome tall by preserveAspectRatio="none". */
+const DOME_MASK_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100V100Q50 -100 0 100Z'/%3E%3C/svg%3E\")";
+
+/* A solid layer over everything above the dome strip (overlapping it by 1px
+   so no seam shows between the two layers), then the curve below. */
+const domeMask = {
+  maskImage: `linear-gradient(#000, #000), ${DOME_MASK_URI}`,
+  maskSize: "100% calc(100% - var(--dome) + 1px), 100% var(--dome)",
+  maskPosition: "top, bottom",
+  maskRepeat: "no-repeat",
+  WebkitMaskImage: `linear-gradient(#000, #000), ${DOME_MASK_URI}`,
+  WebkitMaskSize: "100% calc(100% - var(--dome) + 1px), 100% var(--dome)",
+  WebkitMaskPosition: "top, bottom",
+  WebkitMaskRepeat: "no-repeat",
+};
+
 export function WatercolorBackdrop({ className = "", dome = false }: { className?: string; dome?: boolean }) {
   return (
-    <div aria-hidden="true" className={`pointer-events-none overflow-hidden ${className}`}>
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none overflow-hidden ${className}`}
+      style={dome ? domeMask : undefined}
+    >
       <svg
         className="absolute inset-0 size-full [filter:var(--watercolor-filter)]"
         preserveAspectRatio="xMidYMid slice" viewBox="0 0 1600 480">
@@ -39,19 +65,6 @@ export function WatercolorBackdrop({ className = "", dome = false }: { className
         <rect filter="url(#watercolor-blotch)" height="480" width="1600" />
         <rect filter="url(#watercolor-wash)" height="480" opacity="0.55" width="1600" />
       </svg>
-
-      {dome ? (
-        <svg
-          className="absolute inset-x-0 bottom-0 h-[var(--dome)] w-full"
-          preserveAspectRatio="none"
-          viewBox="0 0 100 100"
-        >
-          {/* Edges sit on the bottom, the peak touches the top: a quadratic
-              with its control point at -100 peaks at exactly y=0. The extra 1
-              unit below hides any sub-pixel seam against the white page. */}
-          <path d="M0 100 Q50 -100 100 100 V101 H0 Z" className="fill-surface" />
-        </svg>
-      ) : null}
     </div>
   );
 }
