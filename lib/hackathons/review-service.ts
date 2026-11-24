@@ -411,6 +411,7 @@ export async function createPublishedHackathon(
       travelReimbursement: payload.travelReimbursement,
       highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd,
+      discordTag: payload.discordTag,
       // Compiled once here. An explicit feed identity wins because the event
       // URL may point somewhere else (for example MLH linking to Devpost).
       source: compileSourceType(options?.source, payload.sourceUrl, payload.websiteUrl),
@@ -479,6 +480,7 @@ async function mergeIntoHackathon(targetHackathonId: string, payload: Normalized
       travelReimbursement: existing.travelReimbursement || payload.travelReimbursement,
       highSchoolersOnly: existing.highSchoolersOnly || payload.highSchoolersOnly,
       prizeAmountUsd: existing.prizeAmountUsd ?? payload.prizeAmountUsd,
+      discordTag: existing.discordTag ?? payload.discordTag,
       // Source is creation-time provenance. In particular, preserve null when
       // an admin deliberately selected "None" instead of deriving it again.
       source: existing.source,

@@ -1,0 +1,1 @@
+ALTER TABLE "hackathons" ADD COLUMN "discord_tag" varchar(32);

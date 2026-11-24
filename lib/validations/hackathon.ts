@@ -30,6 +30,24 @@ const optionalDiscordChannelId = z.preprocess(
     .optional()
 );
 
+// Discord's current username rules: 2–32 characters of lowercase letters,
+// digits, "_" and ".", with no consecutive periods. A leading "@" and capitals
+// are forgiven since people paste their tag the way they'd ping it.
+const DISCORD_USERNAME_PATTERN = /^(?!.*\.\.)[a-z0-9_.]{2,32}$/;
+const normalizeDiscordTag = (value: unknown) =>
+  typeof value === "string" ? value.trim().replace(/^@+/, "").toLowerCase() : value;
+const discordTag = z
+  .string()
+  .regex(
+    DISCORD_USERNAME_PATTERN,
+    "Enter a Discord username: 2 to 32 lowercase letters, numbers, underscores, or periods."
+  );
+const optionalDiscordTag = z.preprocess(
+  (value) => emptyToUndefined(normalizeDiscordTag(value)),
+  discordTag.optional()
+);
+const requiredDiscordTag = z.preprocess(normalizeDiscordTag, discordTag);
+
 // Scraped sources often carry a full event description that exceeds our short
 // description cap. For imports we truncate to fit rather than reject the card.
 const truncatedOptionalString = (max: number) =>
@@ -214,6 +232,10 @@ const normalizedHackathonPayloadBaseSchema = z.object({
        false/absent leaves the series flag untouched. */
     recurring: z.coerce.boolean().optional().default(false),
     prizeAmountUsd: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).optional()),
+    /* Organizer contact for hackers. Optional here because scraped, imported,
+       and community listings have none; organizerSubmissionSchema requires it.
+       On edits an empty value clears the stored tag. */
+    discordTag: optionalDiscordTag,
     timeNote: optionalString(160),
 });
 
@@ -319,6 +341,7 @@ export const organizerSubmissionSchema = normalizedHackathonPayloadBaseSchema
     submitterType: z.literal("organizer"),
     organizationName: z.string().trim().min(2).max(160),
     shortDescription: z.string().trim().min(20).max(500),
+    discordTag: requiredDiscordTag,
   })
   .superRefine(dateRangeRefinement);
 

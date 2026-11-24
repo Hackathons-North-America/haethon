@@ -128,6 +128,7 @@ describe("hackathon submission schemas", () => {
         submitterType: "organizer",
         name: "Waterloo Build Weekend",
         organizationName: "Waterloo Builders",
+        discordTag: "waterloo.builders",
         websiteUrl: unsafeUrl,
         country: "Canada",
         startDate: "2026-09-12",
@@ -164,6 +165,7 @@ describe("hackathon submission schemas", () => {
       submitterType: "organizer",
       name: "Waterloo Build Weekend",
       organizationName: "Waterloo Builders",
+      discordTag: "waterloo.builders",
       websiteUrl: "https://example.com",
       city: "toronto",
       region: "ON",
@@ -184,6 +186,7 @@ describe("hackathon submission schemas", () => {
       submitterType: "organizer",
       name: "Waterloo Build Weekend",
       organizationName: "Waterloo Builders",
+      discordTag: "waterloo.builders",
       websiteUrl: "https://example.com",
       imageUrl: "https://example.com/event-image.jpg",
       country: "Canada",
@@ -205,6 +208,7 @@ describe("hackathon submission schemas", () => {
       submitterType: "organizer",
       name: "Waterloo Build Weekend",
       organizationName: "Waterloo Builders",
+      discordTag: "waterloo.builders",
       websiteUrl: "https://example.com",
       country: "Canada",
       startDate: "2026-09-12",
@@ -232,6 +236,7 @@ describe("hackathon submission schemas", () => {
       submitterType: "organizer",
       name: "Backwards Hack",
       organizationName: "Waterloo Builders",
+      discordTag: "waterloo.builders",
       websiteUrl: "https://example.com",
       country: "Canada",
       startDate: "2026-09-14",
@@ -248,6 +253,7 @@ describe("hackathon submission schemas", () => {
       submitterType: "organizer",
       name: "Waterloo Build Weekend",
       organizationName: "Waterloo Builders",
+      discordTag: "waterloo.builders",
       websiteUrl: "https://example.com",
       country: "Canada",
       startDate: "2026-09-12",
@@ -257,6 +263,54 @@ describe("hackathon submission schemas", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  describe("organizer Discord tag", () => {
+    const organizerBase = {
+      submitterType: "organizer" as const,
+      name: "Waterloo Build Weekend",
+      organizationName: "Waterloo Builders",
+      websiteUrl: "https://example.com",
+      country: "Canada",
+      startDate: "2026-09-12",
+      endDate: "2026-09-14",
+      format: "in_person" as const,
+      shortDescription: "A weekend hackathon for students building useful software.",
+    };
+
+    it("requires a Discord tag on organizer submissions", () => {
+      expect(organizerSubmissionSchema.safeParse(organizerBase).success).toBe(false);
+      expect(organizerSubmissionSchema.safeParse({ ...organizerBase, discordTag: "  " }).success).toBe(false);
+    });
+
+    it("normalizes a pasted @handle with capitals to the stored username", () => {
+      const result = organizerSubmissionSchema.parse({ ...organizerBase, discordTag: "  @Jamie_Lee.dev " });
+
+      expect(result.discordTag).toBe("jamie_lee.dev");
+    });
+
+    it.each(["a", "x".repeat(33), "bad tag", "name#1234", "two..dots", "emoji🙂"])(
+      "rejects %j as a Discord username",
+      (discordTag) => {
+        expect(organizerSubmissionSchema.safeParse({ ...organizerBase, discordTag }).success).toBe(false);
+      }
+    );
+
+    it("keeps the tag optional on edits, where an empty value clears it", () => {
+      const editBase = {
+        name: organizerBase.name,
+        websiteUrl: organizerBase.websiteUrl,
+        country: organizerBase.country,
+        startDate: organizerBase.startDate,
+        endDate: organizerBase.endDate,
+        format: organizerBase.format,
+      };
+
+      expect(adminHackathonUpdateSchema.parse(editBase).discordTag).toBeUndefined();
+      expect(adminHackathonUpdateSchema.parse({ ...editBase, discordTag: "" }).discordTag).toBeUndefined();
+      expect(adminHackathonEditSchema.parse({ ...editBase, discordTag: "@Organizer" }).discordTag).toBe("organizer");
+      expect(adminHackathonUpdateSchema.safeParse({ ...editBase, discordTag: "no spaces" }).success).toBe(false);
+    });
   });
 });
 

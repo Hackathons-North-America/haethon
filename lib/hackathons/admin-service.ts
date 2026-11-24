@@ -44,6 +44,7 @@ const adminHackathonSelection = {
   travelReimbursement: hackathons.travelReimbursement,
   highSchoolersOnly: hackathons.highSchoolersOnly,
   prizeAmountUsd: hackathons.prizeAmountUsd,
+  discordTag: hackathons.discordTag,
   source: hackathons.source,
   city: hackathonLocations.city,
   region: hackathonLocations.region,
@@ -156,6 +157,7 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
       travelReimbursement: payload.travelReimbursement,
       highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd ?? null,
+      discordTag: payload.discordTag ?? null,
       lastVerifiedAt: now,
       updatedAt: now,
     })

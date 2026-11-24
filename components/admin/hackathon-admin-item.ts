@@ -25,6 +25,8 @@ export type AdminHackathonListItem = {
   travelReimbursement: boolean;
   highSchoolersOnly: boolean;
   prizeAmountUsd: number | null;
+  /** Discord username of an organizer hackers can ping; null when none was given. */
+  discordTag: string | null;
   city: string | null;
   region: string | null;
   country: string | null;

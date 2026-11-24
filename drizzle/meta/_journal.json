@@ -274,6 +274,13 @@
       "when": 1795414381951,
       "tag": "0038_import_feed_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795497105363,
+      "tag": "0039_add_hackathon_discord_tag",
+      "breakpoints": true
     }
   ]
 }
