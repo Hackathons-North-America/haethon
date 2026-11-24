@@ -19,17 +19,6 @@ import { motion, useReducedMotion } from "motion/react";
    viewport in place, reusing the already-loaded contents, so there is no page
    load; reloading the URL still gives the real full page. */
 
-const detailPathPattern = /^\/hackathons\/[^/]+$/;
-
-/* True while a hackathon is open in the side panel. Card links use it to
-   `replace` rather than push when swapping hackathons, so closing (history
-   back) always returns straight to the list instead of the previous peek. */
-export function useHackathonPanelOpen() {
-  const pathname = usePathname();
-
-  return detailPathPattern.test(pathname ?? "");
-}
-
 /* Clicks on these never close the panel: they are controls with their own job
    (another card's link swaps the panel; a status button tracks a hackathon),
    or belong to another dialog layered on top, like the login prompt. */

@@ -25,7 +25,6 @@ function runsProxy(pathname: string) {
 describe("proxy matcher", () => {
   it.each([
     "/",
-    "/hackathons",
     "/hackathons/some-hackathon",
     "/my",
     "/account",
@@ -50,6 +49,8 @@ describe("proxy matcher", () => {
   });
 
   it.each([
+    "/hackathons",
+    "/hackathons/",
     "/about",
     "/corporate",
     "/discord",
@@ -83,6 +84,7 @@ describe("proxy matcher", () => {
     "/api/cities/search-admin",
     "/api/cronjobs",
     "/api/cron",
+    "/hackathons-archive",
   ])("still runs Clerk on the look-alike %s", (pathname) => {
     expect(runsProxy(pathname)).toBe(true);
   });

@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { requireAdminUserId } from "@/lib/auth";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
 import { adminHackathonImportSchema } from "@/lib/validations/hackathon";
 
@@ -38,6 +39,11 @@ export async function POST(request: Request) {
       // response; image vetting and Discord run after it.
       defer: after,
     });
+
+    // Belt and braces for the prerendered catalog: drop it once the import's
+    // writes are committed. Channel jobs queued for auto-approved rows
+    // invalidate again when they finish in the background.
+    revalidateHackathonCaches();
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

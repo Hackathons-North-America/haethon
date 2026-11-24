@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import { HackathonResultActions, type ResultSave } from "@/components/hackathon-result-actions";
-import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
+import { useHackathonPanelOpen } from "@/components/hackathon-panel-open";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
 import { reportBackgroundFailure } from "@/lib/client/background-actions";

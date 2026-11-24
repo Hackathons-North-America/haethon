@@ -3,46 +3,26 @@ import * as Sentry from "@sentry/nextjs";
 import { eq } from "drizzle-orm";
 import { cache } from "react";
 
+import { isAdminRole, roleFromSessionClaims, type SessionMetadata } from "@/lib/auth-role";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import type { SelectUser } from "@/lib/db/schema";
 import { syncedProfileChanged, type SyncedProfile } from "@/lib/profile/clerk-sync";
 import { createPermanentProfileUsername } from "@/lib/profile/username";
 
-type SessionMetadata = {
-  role?: "user" | "admin" | "organizer" | "sponsor";
-  /* The app's own users.id, mirrored into Clerk publicMetadata so read paths
-     can resolve it from the session token without a database query. */
-  appUserId?: string;
-};
+/* The pure role helpers live in lib/auth-role.ts so client components can use
+   them too; server callers keep importing them from here. */
+export { isAdminRole, isOrganizerRole, roleFromSessionClaims } from "@/lib/auth-role";
 
 export type AppRole = NonNullable<SessionMetadata["role"]>;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/**
- * Derives the app role from already-fetched session claims so callers that
- * hold an auth() result don't need a second auth() call for the role.
- */
-export function roleFromSessionClaims(sessionClaims: unknown) {
-  const metadata = (sessionClaims as { metadata?: SessionMetadata } | null | undefined)?.metadata;
-
-  return (metadata?.role ?? "user") as AppRole;
-}
 
 const getCurrentRole = cache(async () => {
   const { sessionClaims } = await auth();
 
   return roleFromSessionClaims(sessionClaims);
 });
-
-export function isAdminRole(role: AppRole) {
-  return role === "admin";
-}
-
-export function isOrganizerRole(role: AppRole) {
-  return role === "admin" || role === "organizer";
-}
 
 /* Mirrors the app user id into Clerk publicMetadata. updateUserMetadata
    shallow-merges top-level keys, so the dashboard-managed `role` survives.

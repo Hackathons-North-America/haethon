@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { reportBackgroundFailure } from "@/lib/client/background-actions";
 import { sendRequest } from "@/lib/client/request";
@@ -23,6 +23,21 @@ export function useTrackStatus(
 ) {
   const [status, setStatus] = useState<string | null>(initialStatus ?? null);
   const confirmedRef = useRef<string | null>(initialStatus ?? null);
+
+  /* The static catalog renders cards without a viewer and fills the stage in
+     a moment later (from /api/hackathons/card-state), so the prop can change
+     after mount. Follow it by adjusting state during render rather than
+     remounting on a key, which would drop keyboard focus from the buttons. */
+  const [seenInitialStatus, setSeenInitialStatus] = useState<string | null>(initialStatus ?? null);
+
+  if ((initialStatus ?? null) !== seenInitialStatus) {
+    setSeenInitialStatus(initialStatus ?? null);
+    setStatus(initialStatus ?? null);
+  }
+
+  useEffect(() => {
+    confirmedRef.current = initialStatus ?? null;
+  }, [initialStatus]);
 
   const { save, isSaving } = useLatestSave<TrackableStatus | null, unknown>(
     (next) =>

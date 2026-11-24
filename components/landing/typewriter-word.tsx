@@ -1,7 +1,8 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useEffect, useState } from "react";
+
+import { usePrefersReducedMotion } from "@/components/use-prefers-reduced-motion";
 
 const TYPE_MS = 80;
 const DELETE_MS = 45;
@@ -18,7 +19,7 @@ type Cursor = { index: number; length: number; deleting: boolean };
    The letters are decorative: it is aria-hidden, and the caller supplies the
    screen-reader text. */
 export function TypewriterWord({ words }: { words: readonly string[] }) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
   const [cursor, setCursor] = useState<Cursor>({ index: 0, length: words[0].length, deleting: false });
   const word = words[cursor.index];
   const holding = !cursor.deleting && cursor.length === word.length;
