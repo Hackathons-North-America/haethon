@@ -4,6 +4,7 @@ import posthog from "posthog-js";
 
 import { PostHogIdentify } from "@/components/providers/posthog-identify";
 import { PostHogPageView } from "@/components/providers/posthog-pageview";
+import { registerAnalyticsClient } from "@/lib/analytics/client";
 import { posthogConfig } from "@/lib/analytics/posthog";
 
 // Initialize PostHog at module load (client only), not inside an effect. Because
@@ -29,6 +30,10 @@ if (typeof window !== "undefined" && !posthog.__loaded) {
       // explicit events instead.
       autocapture: false,
     });
+
+    // Hands the live client to lib/analytics/client and flushes any events
+    // components tracked while this chunk was still loading.
+    registerAnalyticsClient(posthog);
   }
 }
 

@@ -1,6 +1,20 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+import { discordGuildUrl } from "./lib/discord/guild-url";
+
+/* Baked in at build time (Vercel exposes project env vars to the build), so
+   /discord is answered by the routing layer instead of invoking a function.
+   Without the variable the app/discord route handler still answers. */
+const discordGuildId = process.env.DISCORD_GUILD_ID?.trim();
+
+/* Files in public/ are not content-hashed, so they cannot be immutable, but
+   Vercel's default (max-age=0, must-revalidate) makes every page view
+   re-request the logo. A day in the browser, served stale for a week while it
+   revalidates, removes that request for returning visitors and still lets a
+   replaced asset roll out within a day. */
+const publicAssetCacheControl = "public, max-age=86400, stale-while-revalidate=604800";
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   /* Tags every client bundle with the deploy it came from so the router
@@ -15,6 +29,9 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      ...(discordGuildId
+        ? [{ source: "/discord", destination: discordGuildUrl(discordGuildId), permanent: false }]
+        : []),
       { source: "/saved", destination: "/my", permanent: false },
       { source: "/reminders", destination: "/my", permanent: false },
       { source: "/friends", destination: "/hackathons", permanent: false },
@@ -39,6 +56,8 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      { source: "/logo-beaver.svg", headers: [{ key: "Cache-Control", value: publicAssetCacheControl }] },
+      { source: "/photos/:path*", headers: [{ key: "Cache-Control", value: publicAssetCacheControl }] },
     ];
   },
 };

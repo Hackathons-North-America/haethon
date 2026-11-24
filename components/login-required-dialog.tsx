@@ -64,7 +64,10 @@ export function LoginRequiredLink({
     showLoginRequiredDialog(typeof href === "string" ? href : href.pathname ?? undefined);
   }
 
-  return <Link {...props} href={href} onClick={handleClick} />;
+  // Every destination behind this link is a protected route. Unless the
+  // visitor is known to be signed in, a prefetch would only be redirected to
+  // the sign-in page (and fail there), so it waits until Clerk says they are.
+  return <Link {...props} href={href} onClick={handleClick} prefetch={isSignedIn ? props.prefetch : false} />;
 }
 
 export function LoginRequiredDialog() {

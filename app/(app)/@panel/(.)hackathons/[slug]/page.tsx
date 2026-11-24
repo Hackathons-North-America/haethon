@@ -7,7 +7,12 @@ import { getHackathonPageData, getHackathonViewerData } from "@/lib/hackathons/d
    visits and reloads skip this and render app/(app)/hackathons/[slug]. */
 export default async function HackathonPanelPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [pageData, userId] = await Promise.all([getHackathonPageData(slug), getCurrentUserId()]);
+  // Public data (cached per slug) and the viewer's own state load together:
+  // the user id comes from the session token, so neither waits on the other.
+  const [pageData, viewer] = await Promise.all([
+    getHackathonPageData(slug),
+    getCurrentUserId().then((userId) => getHackathonViewerData(userId, slug)),
+  ]);
 
   // notFound() here would replace the page underneath too; keep the list and
   // say so inside the panel instead.
@@ -21,8 +26,6 @@ export default async function HackathonPanelPage({ params }: { params: Promise<{
       </div>
     );
   }
-
-  const viewer = await getHackathonViewerData(userId, pageData.hackathon.id);
 
   return <HackathonDetailView data={pageData} variant="panel" viewer={viewer} />;
 }

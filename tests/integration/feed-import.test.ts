@@ -2,11 +2,17 @@ import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /* External side effects of an import are stubbed: Discord, Next's cache tags
-   (no request context here) and image fetching (no network in tests). */
-vi.mock("@/lib/discord/sync", () => ({
-  ensureHackathonDiscordChannel: vi.fn(async () => ({ status: "skipped" })),
-  previewHackathonDiscordChannel: vi.fn(async () => ({ eligible: false })),
+   (no request context here) and image fetching (no network in tests). The
+   parts of the Discord module that only read the database stay real. */
+process.env.DISCORD_GUILD_ID = "900000000000000000";
+
+vi.mock("@/lib/discord/sync", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/discord/sync")>()),
+  ensureHackathonDiscordChannelOrThrow: vi.fn(async () => ({ status: "skipped" })),
+  guildChannelListingForPreview: vi.fn(async () => null),
+  reportHackathonSyncFailure: vi.fn(),
   retireHackathonDiscordChannel: vi.fn(async () => undefined),
+  syncHackathonDiscordChannel: vi.fn(async () => ({ status: "skipped" })),
   syncHackathonDiscordChannelSafely: vi.fn(async () => ({ status: "skipped" })),
 }));
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches: vi.fn() }));
@@ -16,11 +22,22 @@ vi.mock("@/lib/hackathons/image-ingest", () => ({
 }));
 
 const { db } = await import("@/lib/db");
-const { hackathonDates, hackathonExternalIds, hackathonLocations, hackathons, hackathonSubmissions, users } = await import(
-  "@/lib/db/schema"
-);
+const {
+  discordChannelJobs,
+  discordChannels,
+  discordGuilds,
+  hackathonDates,
+  hackathonExternalIds,
+  hackathonLocations,
+  hackathons,
+  hackathonSeries,
+  hackathonSubmissions,
+  organizations,
+  users,
+} = await import("@/lib/db/schema");
 const { importAdminHackathons } = await import("@/lib/hackathons/review-service");
-const { ensureHackathonDiscordChannel, previewHackathonDiscordChannel } = await import("@/lib/discord/sync");
+const { ensureHackathonDiscordChannelOrThrow, syncHackathonDiscordChannel } = await import("@/lib/discord/sync");
+const { verifiedImageUrl } = await import("@/lib/hackathons/image-ingest");
 const { backfillExternalIds } = await import("@/lib/hackathons/external-ids-backfill");
 const { adminHackathonImportSchema } = await import("@/lib/validations/hackathon");
 
@@ -76,15 +93,23 @@ const BASE = {
 };
 
 beforeEach(async () => {
-  await db.execute(sql`TRUNCATE hackathon_external_ids, hackathon_submissions, hackathons, hackathon_series, organizations, users CASCADE`);
+  await db.execute(
+    sql`TRUNCATE hackathon_external_ids, hackathon_submissions, hackathons, hackathon_series, organizations, discord_guilds, users CASCADE`
+  );
   const [user] = await db
     .insert(users)
     .values({ clerkUserId: "user_admin", email: "admin@example.test", username: "admin", role: "admin" })
     .returning({ id: users.id });
   reviewerUserId = user.id;
-  vi.mocked(ensureHackathonDiscordChannel).mockClear();
-  vi.mocked(previewHackathonDiscordChannel).mockClear();
+  vi.mocked(ensureHackathonDiscordChannelOrThrow).mockClear();
+  vi.mocked(syncHackathonDiscordChannel).mockClear();
 });
+
+async function jobFor(jobId: string) {
+  const [job] = await db.select().from(discordChannelJobs).where(eq(discordChannelJobs.id, jobId));
+
+  return job;
+}
 
 describe("feed-id imports", () => {
   it("links every feed id of a new import", async () => {
@@ -177,8 +202,8 @@ describe("feed-id imports", () => {
 });
 
 describe("auto-approved imports", () => {
-  it("sets up the channel of a new auto-approved import without a preview", async () => {
-    vi.mocked(ensureHackathonDiscordChannel).mockResolvedValueOnce({
+  it("queues the channel of a new auto-approved import and runs it without a preview", async () => {
+    vi.mocked(ensureHackathonDiscordChannelOrThrow).mockResolvedValueOnce({
       action: "created",
       category: "us",
       categoryName: "US Hackathons",
@@ -190,9 +215,14 @@ describe("auto-approved imports", () => {
     const result = await importRows([{ ...BASE, autoApprove: true }]);
 
     expect(result.results[0]).toMatchObject({ autoApprove: true, status: "imported" });
-    expect(result.results[0].discordSync).toMatchObject({ action: "created", status: "synced" });
-    expect(ensureHackathonDiscordChannel).toHaveBeenCalledWith(result.results[0].hackathonId, { keepExisting: false });
-    expect(previewHackathonDiscordChannel).not.toHaveBeenCalled();
+    expect(result.results[0].discordSync).toMatchObject({ status: "queued" });
+    expect(result.results[0].discord).toBeUndefined();
+    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledWith(result.results[0].hackathonId, { keepExisting: false });
+    // Without a `defer` the queue is drained before the import returns.
+    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({
+      status: "done",
+      result: { action: "created", channelSnowflake: "123", status: "synced" },
+    });
   });
 
   it("keeps asking about the channel when the flag is missing", async () => {
@@ -200,8 +230,28 @@ describe("auto-approved imports", () => {
 
     expect(result.results[0]).toMatchObject({ autoApprove: false, status: "imported" });
     expect(result.results[0].discordSync).toBeUndefined();
-    expect(ensureHackathonDiscordChannel).not.toHaveBeenCalled();
-    expect(previewHackathonDiscordChannel).toHaveBeenCalledWith(result.results[0].hackathonId);
+    expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+    expect(result.results[0].discord).toMatchObject({ action: "create", eligible: true, existingChannelName: null });
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
+  });
+
+  it("previews recycling the series' existing channel", async () => {
+    const [guild] = await db.insert(discordGuilds).values({ guildSnowflake: "900000000000000000", name: "Guild" }).returning();
+    const [series] = await db
+      .insert(hackathonSeries)
+      .values({ name: "Embodied Metal Hackathon", slug: "embodied-metal-hackathon" })
+      .returning();
+    await db.insert(discordChannels).values({ channelSnowflake: "555", guildId: guild.id, name: "embodied-metal", seriesId: series.id });
+
+    const result = await importRows([BASE]);
+
+    expect(result.results[0].discord).toMatchObject({ action: "recycle", eligible: true, existingChannelName: "embodied-metal" });
+  });
+
+  it("offers no channel outside Canada and the US", async () => {
+    const result = await importRows([{ ...BASE, city: "Berlin", region: undefined, country: "Germany" }]);
+
+    expect(result.results[0].discord).toEqual({ eligible: false });
   });
 
   it("keeps an existing hackathon's channel when the feed sends it again", async () => {
@@ -210,7 +260,7 @@ describe("auto-approved imports", () => {
     const result = await importRows([{ ...BASE, autoApprove: true }]);
 
     expect(result.results[0]).toMatchObject({ status: "updated", hackathonId });
-    expect(ensureHackathonDiscordChannel).toHaveBeenCalledWith(hackathonId, { keepExisting: true });
+    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledWith(hackathonId, { keepExisting: true });
   });
 
   it("leaves a likely duplicate to the admin", async () => {
@@ -231,7 +281,144 @@ describe("auto-approved imports", () => {
 
     expect(result.results[0].status).toBe("duplicate_flagged");
     expect(result.results[0].discordSync).toBeUndefined();
-    expect(ensureHackathonDiscordChannel).not.toHaveBeenCalled();
+    expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the channel through the queue when the feed changed the event", async () => {
+    const hackathonId = (await importRows([BASE])).results[0].hackathonId!;
+
+    await importRows([{ ...BASE, venue: "Frontier Tower" }]);
+
+    expect(syncHackathonDiscordChannel).toHaveBeenCalledWith(hackathonId);
+    expect(await db.select({ kind: discordChannelJobs.kind, status: discordChannelJobs.status }).from(discordChannelJobs)).toEqual([
+      { kind: "refresh", status: "done" },
+    ]);
+  });
+
+  it("records why a channel could not be set up", async () => {
+    vi.mocked(ensureHackathonDiscordChannelOrThrow).mockRejectedValueOnce(new Error("Missing Permissions"));
+
+    const result = await importRows([{ ...BASE, autoApprove: true }]);
+
+    expect(result.results[0].status).toBe("imported");
+    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({ status: "failed", error: "Missing Permissions" });
+  });
+});
+
+describe("one request, many rows", () => {
+  const second = {
+    ...BASE,
+    name: "Quantum Garden Buildathon",
+    websiteUrl: "https://luma.com/quantum",
+    sourceUrl: "https://luma.com/quantum",
+    startDate: "2026-08-02",
+    endDate: "2026-08-03",
+    externalId: "luma:evt-quantum",
+    externalIds: ["luma:evt-quantum"],
+  };
+
+  it("writes every new row with its dates, location, links, organization and series", async () => {
+    const result = await importRows([
+      { ...BASE, organizationName: "Shared Org", city: undefined, region: undefined },
+      { ...second, organizationName: "Shared Org" },
+    ]);
+
+    expect(result.results.map((row) => row.status)).toEqual(["imported", "imported"]);
+    expect(await db.select({ slug: organizations.slug }).from(organizations)).toEqual([{ slug: "shared-org" }]);
+
+    const rows = await db
+      .select({
+        name: hackathons.name,
+        slug: hackathons.slug,
+        organization: organizations.slug,
+        series: hackathonSeries.slug,
+        startsAt: hackathonDates.startsAt,
+        country: hackathonLocations.country,
+      })
+      .from(hackathons)
+      .innerJoin(organizations, eq(organizations.id, hackathons.organizationId))
+      .innerJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId))
+      .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+      .innerJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
+      .orderBy(hackathons.name);
+
+    expect(rows).toMatchObject([
+      { slug: "embodied-metal-hackathon", organization: "shared-org", series: "embodied-metal-hackathon", country: "United States" },
+      { slug: "quantum-garden-buildathon", organization: "shared-org", series: "quantum-garden-buildathon" },
+    ]);
+    expect(await linkedIds(result.results[1].hackathonId!)).toEqual(["luma:evt-quantum"]);
+    expect(await db.select({ id: hackathonSubmissions.id }).from(hackathonSubmissions)).toHaveLength(2);
+  });
+
+  it("treats a feed id repeated in the request as the same event", async () => {
+    const result = await importRows([BASE, { ...BASE, venue: "Frontier Tower" }]);
+
+    expect(result.results.map((row) => row.status)).toEqual(["imported", "updated"]);
+    expect(result.results[1]).toMatchObject({ hackathonId: result.results[0].hackathonId, updatedFields: ["venue"] });
+    expect(await db.select({ id: hackathons.id }).from(hackathons)).toHaveLength(1);
+    expect((await hackathonState(result.results[0].hackathonId!)).venue).toBe("Frontier Tower");
+  });
+
+  it("flags a row that duplicates an earlier row of the request", async () => {
+    const result = await importRows([
+      { ...BASE, externalId: undefined, externalIds: undefined },
+      {
+        ...BASE,
+        name: "Embodied Metal Robotics Hackathon",
+        websiteUrl: "https://embodied.example.com",
+        sourceUrl: "https://embodied.example.com",
+        externalId: "mlh:embodied",
+        externalIds: ["mlh:embodied"],
+      },
+    ]);
+
+    expect(result.results.map((row) => row.status)).toEqual(["imported", "duplicate_flagged"]);
+    expect(await db.select({ id: hackathons.id }).from(hackathons)).toHaveLength(1);
+  });
+
+  it("gives same-named rows distinct slugs", async () => {
+    const result = await importRows([
+      { ...BASE, externalId: "luma:a", externalIds: undefined },
+      { ...BASE, startDate: "2026-09-01", endDate: "2026-09-02", externalId: "luma:b", externalIds: undefined },
+    ]);
+
+    expect(result.results.map((row) => row.status)).toEqual(["imported", "imported"]);
+    const slugs = await db.select({ slug: hackathons.slug }).from(hackathons).orderBy(hackathons.slug);
+    expect(slugs).toEqual([{ slug: "embodied-metal-hackathon" }, { slug: "embodied-metal-hackathon-2" }]);
+  });
+
+  it("clears an image that turns out to be unreachable, after publishing", async () => {
+    vi.mocked(verifiedImageUrl).mockResolvedValueOnce(undefined);
+
+    const result = await importRows([
+      { ...BASE, imageUrl: "https://images.example.com/dead.png" },
+      { ...second, imageUrl: "https://images.example.com/fine.png" },
+    ]);
+    const images = await db.select({ name: hackathons.name, imageUrl: hackathons.imageUrl }).from(hackathons).orderBy(hackathons.name);
+
+    expect(result.results.map((row) => row.status)).toEqual(["imported", "imported"]);
+    expect(images).toEqual([
+      { name: "Embodied Metal Hackathon", imageUrl: null },
+      { name: "Quantum Garden Buildathon", imageUrl: "https://images.example.com/fine.png" },
+    ]);
+  });
+
+  it("hands deferred work to the caller instead of waiting for it", async () => {
+    const deferred: Array<() => Promise<unknown>> = [];
+    const parsed = adminHackathonImportSchema.parse({ hackathons: [{ ...BASE, autoApprove: true, imageUrl: "https://images.example.com/a.png" }] });
+
+    const result = await importAdminHackathons({
+      payloads: parsed.hackathons,
+      reviewerUserId,
+      defer: (task) => deferred.push(task),
+    });
+
+    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({ status: "pending" });
+    expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+
+    await Promise.all(deferred.map((task) => task()));
+
+    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({ status: "done" });
   });
 });
 

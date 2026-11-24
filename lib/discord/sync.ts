@@ -41,7 +41,7 @@ type DiscordGuild = {
   name: string;
 };
 
-type DiscordChannel = {
+export type DiscordChannel = {
   guild_id?: string;
   id: string;
   name: string;
@@ -141,7 +141,7 @@ function channelTopic(input: {
   return parts.join(" | ").slice(0, 1024);
 }
 
-function reportHackathonSyncFailure(hackathonId: string, error: unknown) {
+export function reportHackathonSyncFailure(hackathonId: string, error: unknown) {
   console.error("Unable to sync Discord channel for hackathon.", { error, hackathonId });
   Sentry.captureException(error, { extra: { hackathonId } });
 }
@@ -994,115 +994,148 @@ export async function retireHackathonDiscordChannel(hackathonId: string) {
   return { channelSnowflake: mapped.channelSnowflake, status: "retired" as const };
 }
 
-/**
- * Works out what syncing this hackathon *would* do. Used to show an admin,
- * before they confirm, whether approving will create a new channel or recycle
- * the series' existing one, and which category it lands in. Database checks
- * come first; a best-effort guild listing then covers untracked channels
- * parked in the archive categories, so the preview matches what the sync's
- * adoption would actually do.
- */
-export async function previewHackathonDiscordChannel(hackathonId: string) {
-  const [row] = await db
-    .select({
-      country: hackathonLocations.country,
-      endsAt: hackathonDates.endsAt,
-      name: hackathons.name,
-      seriesId: hackathons.seriesId,
-      startsAt: hackathonDates.startsAt,
-      status: hackathons.status,
-    })
-    .from(hackathons)
-    .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
-    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
-    .where(eq(hackathons.id, hackathonId))
-    .limit(1);
+export type DiscordChannelPreview =
+  | { eligible: false }
+  | {
+      action: "create" | "recycle";
+      category: DiscordCategoryKey;
+      categoryName: string;
+      eligible: true;
+      existingChannelName: string | null;
+      name: string;
+    };
 
-  if (!row) {
-    throw new Error("Hackathon not found.");
+/* A channel the sync tracks, as the preview needs it. */
+export type TrackedDiscordChannel = {
+  channelSnowflake: string;
+  name: string;
+  nameOverride: string | null;
+  seriesId: string | null;
+};
+
+/**
+ * Every channel the sync tracks in the configured guild. Returned unawaited so
+ * a caller can send it in the same round trip as its other reads (db.batch).
+ */
+export function trackedDiscordChannelsQuery() {
+  return db
+    .select({
+      channelSnowflake: discordChannels.channelSnowflake,
+      name: discordChannels.name,
+      nameOverride: discordChannels.nameOverride,
+      seriesId: discordChannels.seriesId,
+    })
+    .from(discordChannels)
+    .innerJoin(discordGuilds, eq(discordGuilds.id, discordChannels.guildId))
+    .where(eq(discordGuilds.guildSnowflake, env.DISCORD_GUILD_ID ?? ""));
+}
+
+/* The preview only reads the guild listing to spot hand-made channels it could
+   reuse, so a listing a few seconds old is fine. Sharing one for a short while
+   means a run of imports lists the guild once instead of once per card. The
+   sync itself always lists the guild afresh. */
+const PREVIEW_LISTING_TTL_MS = 30_000;
+/* Discord can hold a rate-limited request for a long time. The preview is
+   best-effort, so it stops waiting and says "create". */
+const PREVIEW_LISTING_WAIT_MS = 1_500;
+let previewListing: { channels: Promise<DiscordChannel[]>; fetchedAt: number } | null = null;
+
+/**
+ * The guild's channels for previewDiscordChannel, or null when Discord is not
+ * configured, fails, or takes too long. Call it early and await it late: the
+ * request to Discord then overlaps the caller's database work.
+ */
+export async function guildChannelListingForPreview(): Promise<DiscordChannel[] | null> {
+  const rest = discordRest();
+  const guildSnowflake = env.DISCORD_GUILD_ID;
+
+  if (!rest || !guildSnowflake) {
+    return null;
   }
 
+  if (!previewListing || Date.now() - previewListing.fetchedAt > PREVIEW_LISTING_TTL_MS) {
+    const entry = { channels: listGuildChannels(rest, guildSnowflake), fetchedAt: Date.now() };
+    previewListing = entry;
+    entry.channels.catch((error) => {
+      if (previewListing === entry) {
+        previewListing = null;
+      }
+
+      console.error("Unable to list Discord channels for the channel preview.", { error });
+    });
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const gaveUp = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), PREVIEW_LISTING_WAIT_MS);
+  });
+
+  try {
+    return await Promise.race([previewListing.channels.catch(() => null), gaveUp]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Works out what syncing an event *would* do, from data the caller already
+ * holds. Used to show an admin, before they confirm, whether approving will
+ * create a new channel or recycle an existing one, and which category it lands
+ * in. Mirrors the sync's own order: the series' channel, then a parked channel
+ * with a matching name, then an untracked channel in the hackathon categories
+ * (`listing`; null when the guild could not be listed, in which case the
+ * preview says "create" and the sync sorts it out).
+ */
+export function previewDiscordChannel(
+  event: {
+    country: string | null;
+    endsAt: Date | null;
+    name: string;
+    seriesId: string | null;
+    startsAt: Date | null;
+    status: string;
+  },
+  tracked: TrackedDiscordChannel[],
+  listing: DiscordChannel[] | null
+): DiscordChannelPreview {
   const category = categoryForHackathon({
-    country: row.country,
-    endsAt: row.endsAt,
-    startsAt: row.startsAt,
-    status: row.status,
+    country: event.country,
+    endsAt: event.endsAt,
+    startsAt: event.startsAt,
+    status: event.status,
   });
 
   if (!category) {
-    return { eligible: false as const };
+    return { eligible: false };
   }
 
-  let name = channelNameForHackathon({ name: row.name, startsAt: row.startsAt });
-
+  let name = channelNameForHackathon({ name: event.name, startsAt: event.startsAt });
   let action: "create" | "recycle" = "create";
   let existingChannelName: string | null = null;
 
   if (env.DISCORD_GUILD_ID) {
-    if (row.seriesId) {
-      const [existing] = await db
-        .select({ name: discordChannels.name, nameOverride: discordChannels.nameOverride })
-        .from(discordChannels)
-        .innerJoin(discordGuilds, eq(discordGuilds.id, discordChannels.guildId))
-        .where(
-          and(
-            eq(discordGuilds.guildSnowflake, env.DISCORD_GUILD_ID),
-            eq(discordChannels.seriesId, row.seriesId)
-          )
-        )
-        .limit(1);
+    const key = hackathonChannelMatchKey(event.name);
+    const existing =
+      (event.seriesId ? tracked.find((channel) => channel.seriesId === event.seriesId) : undefined) ??
+      // A retired channel that matches this event year-insensitively would be
+      // recycled, not recreated.
+      (key ? tracked.find((channel) => channel.seriesId === null && channelMatchKey(channel.name) === key) : undefined);
 
-      if (existing) {
+    if (existing) {
+      action = "recycle";
+      existingChannelName = existing.name;
+      name = existing.nameOverride ?? name;
+    } else if (listing && key) {
+      const trackedSnowflakes = new Set(tracked.map((channel) => channel.channelSnowflake));
+      const candidate = adoptionCandidates(
+        listing,
+        hackathonCategoryIds(listing, configuredActiveCategoryIds()),
+        key
+      ).find((channel) => !trackedSnowflakes.has(channel.id));
+
+      if (candidate) {
         action = "recycle";
-        existingChannelName = existing.name;
-        name = existing.nameOverride ?? name;
-      }
-    }
-
-    // Mirror the sync's adoption of parked channels: a retired channel that
-    // matches this event year-insensitively would be recycled, not recreated.
-    if (action === "create") {
-      const key = hackathonChannelMatchKey(row.name);
-      const orphans = key
-        ? await db
-            .select({ name: discordChannels.name, nameOverride: discordChannels.nameOverride })
-            .from(discordChannels)
-            .innerJoin(discordGuilds, eq(discordGuilds.id, discordChannels.guildId))
-            .where(
-              and(
-                eq(discordGuilds.guildSnowflake, env.DISCORD_GUILD_ID),
-                isNull(discordChannels.seriesId)
-              )
-            )
-        : [];
-      const match = orphans.find((orphan) => channelMatchKey(orphan.name) === key);
-
-      if (match) {
-        action = "recycle";
-        existingChannelName = match.name;
-        name = match.nameOverride ?? name;
-      }
-    }
-
-    // Also mirror adoption of untracked channels from the hackathon categories.
-    // Listing the guild can fail (bot offline, missing permissions) — the
-    // preview then just says "create" and the sync sorts it out.
-    if (action === "create") {
-      const rest = discordRest();
-      const key = hackathonChannelMatchKey(row.name);
-
-      if (rest && key) {
-        try {
-          const directory = createGuildChannelDirectory(rest, env.DISCORD_GUILD_ID);
-          const candidate = await findAdoptableUntrackedChannel(directory, key);
-
-          if (candidate) {
-            action = "recycle";
-            existingChannelName = candidate.name;
-          }
-        } catch (error) {
-          console.error("Unable to scan Discord hackathon categories for the channel preview.", { error, hackathonId });
-        }
+        existingChannelName = candidate.name;
       }
     }
   }
@@ -1111,7 +1144,7 @@ export async function previewHackathonDiscordChannel(hackathonId: string) {
     action,
     category,
     categoryName: categoryDisplayName(category),
-    eligible: true as const,
+    eligible: true,
     existingChannelName,
     name,
   };
@@ -1137,38 +1170,44 @@ export async function syncHackathonDiscordChannelSafely(hackathonId: string) {
  * `keepExisting` is for imports that landed on a hackathon that was already in
  * the catalog: when that hackathon already has a channel, nothing is touched.
  */
-export async function ensureHackathonDiscordChannel(hackathonId: string, options?: { keepExisting?: boolean }) {
-  try {
-    const [row] = await db
-      .select({
-        country: hackathonLocations.country,
-        endsAt: hackathonDates.endsAt,
-        startsAt: hackathonDates.startsAt,
-        status: hackathons.status,
-      })
-      .from(hackathons)
-      .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
-      .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
-      .where(eq(hackathons.id, hackathonId))
+export async function ensureHackathonDiscordChannelOrThrow(hackathonId: string, options?: { keepExisting?: boolean }) {
+  const [row] = await db
+    .select({
+      country: hackathonLocations.country,
+      endsAt: hackathonDates.endsAt,
+      startsAt: hackathonDates.startsAt,
+      status: hackathons.status,
+    })
+    .from(hackathons)
+    .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
+    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .where(eq(hackathons.id, hackathonId))
+    .limit(1);
+
+  if (!row || !categoryForHackathon(row)) {
+    return { status: "skipped" as const, reason: INELIGIBLE_REASON };
+  }
+
+  if (options?.keepExisting) {
+    const [existing] = await db
+      .select({ channelSnowflake: discordChannels.channelSnowflake })
+      .from(discordChannels)
+      .where(eq(discordChannels.hackathonId, hackathonId))
       .limit(1);
 
-    if (!row || !categoryForHackathon(row)) {
-      return { status: "skipped" as const, reason: INELIGIBLE_REASON };
+    if (existing) {
+      return { status: "unchanged" as const, channelSnowflake: existing.channelSnowflake };
     }
+  }
 
-    if (options?.keepExisting) {
-      const [existing] = await db
-        .select({ channelSnowflake: discordChannels.channelSnowflake })
-        .from(discordChannels)
-        .where(eq(discordChannels.hackathonId, hackathonId))
-        .limit(1);
+  return syncHackathonDiscordChannel(hackathonId);
+}
 
-      if (existing) {
-        return { status: "unchanged" as const, channelSnowflake: existing.channelSnowflake };
-      }
-    }
-
-    return await syncHackathonDiscordChannel(hackathonId);
+/* The same step for callers that must not fail on a Discord error: it is
+   reported and comes back as "failed". */
+export async function ensureHackathonDiscordChannel(hackathonId: string, options?: { keepExisting?: boolean }) {
+  try {
+    return await ensureHackathonDiscordChannelOrThrow(hackathonId, options);
   } catch (error) {
     reportHackathonSyncFailure(hackathonId, error);
     return { status: "failed" as const };

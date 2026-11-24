@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathons, userHackathons } from "@/lib/db/schema";
 import { revalidatePublicProfiles } from "@/lib/profile/public-profile-cache";
@@ -12,7 +12,7 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const userContext = await getCurrentUserContext();
+  const userContext = await getCurrentIdentity();
 
   if (!userContext) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -34,7 +34,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const [tracked] = await db
     .insert(userHackathons)
     .values({
-      userId: userContext.user.id,
+      userId: userContext.userId,
       hackathonId: id,
       applicationStatus: parsed.data.applicationStatus,
       isSaved: true,
@@ -59,7 +59,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const userContext = await getCurrentUserContext();
+  const userContext = await getCurrentIdentity();
 
   if (!userContext) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -71,7 +71,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   // undoes the interested/applied/attending tag in one go.
   await db
     .delete(userHackathons)
-    .where(and(eq(userHackathons.userId, userContext.user.id), eq(userHackathons.hackathonId, id)));
+    .where(and(eq(userHackathons.userId, userContext.userId), eq(userHackathons.hackathonId, id)));
 
   revalidatePublicProfiles();
 

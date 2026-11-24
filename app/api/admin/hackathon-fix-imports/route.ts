@@ -1,11 +1,13 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
-import { requireAdminUser } from "@/lib/auth";
+import { requireAdminUserId } from "@/lib/auth";
 import { importAdminHackathonFixItems, listHackathonSubmissions } from "@/lib/hackathons/review-service";
 import { adminHackathonFixImportSchema } from "@/lib/validations/hackathon";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
-  const gate = await requireAdminUser();
+  const gate = await requireAdminUserId();
 
   if (!gate.ok) {
     return NextResponse.json({ error: gate.reason }, { status: gate.reason === "unauthenticated" ? 401 : 403 });
@@ -28,7 +30,8 @@ export async function POST(request: Request) {
   try {
     const result = await importAdminHackathonFixItems({
       items: parsed.data.items,
-      reviewerUserId: gate.user.id,
+      reviewerUserId: gate.userId,
+      defer: after,
     });
     // Auto-merged items are already resolved; only queued ones belong in the review workspace.
     const submissionIds = result.results.filter((item) => item.status === "queued").map((item) => item.submissionId);

@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Archive,
@@ -12,13 +13,12 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import type { Variants } from "motion/react";
 
 import { AppNavCenter } from "@/components/app-nav-slot";
 import { NavUnderline } from "@/components/nav-underline";
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
+import type { ViewerCardHydration } from "@/components/use-viewer-card-hydration";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 import type { GeoPoint } from "@/lib/geo";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
@@ -27,6 +27,8 @@ import { sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
+import { subscribeToHackathonStatusChanges } from "@/lib/hackathons/status-events";
+import { mergeViewerCardState } from "@/lib/hackathons/viewer-card-state";
 import type {
   CatalogSort,
   DatePeriod,
@@ -155,107 +157,42 @@ const sortOptions: { label: string; value: CatalogSort; detail: string }[] = [
   { label: "Votes", value: "top", detail: "Most upvoted by hackers first" },
 ];
 
-/* Airbnb-style field switching. Every field's dropdown (and the pill that
-   highlights the open field in the bar) shares one layoutId, so moving from
-   one field to another reads as a single panel: the old contents vanish, the
-   panel glides and resizes to the new field, then the new contents fade in.
-   Opening from nothing or closing is a quick fade instead.
+/* The dropdown panels and the open-field pill animate with the motion
+   library. Nothing they render is visible until a field is opened, so they
+   load after the page is interactive instead of with it. A field opened in
+   the brief gap before the chunk lands simply shows its panel a beat later. */
+const SearchPopover = dynamic(
+  () => import("@/components/hackathon-search-popover").then((module) => module.SearchPopover),
+  { ssr: false }
+);
+const SegmentPill = dynamic(
+  () => import("@/components/hackathon-search-popover").then((module) => module.SegmentPill),
+  { ssr: false }
+);
 
-   `switched` is true when the open field changed from one field straight to
-   another; it picks the morph over the fade. layoutCrossfade={false} hides
-   the outgoing panel the instant the new one takes over, and
-   layoutDependency limits layout animation to that hand-off, so content
-   changing inside an open panel (filtering countries, toggling a feature)
-   never animates its size. */
-const morphEase = [0.22, 1, 0.36, 1] as const;
-const morphTransition = { duration: 0.3, ease: morphEase };
-
-const searchPanelVariants: Variants = {
-  hidden: { opacity: 0, y: -6 },
-  shown: { opacity: 1, y: 0, transition: { duration: 0.16, ease: morphEase } },
-  exit: (switched: boolean) =>
-    switched ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -4, transition: { duration: 0.12, ease: "easeIn" } },
-};
-
-const segmentPillVariants: Variants = {
-  hidden: { opacity: 0 },
-  shown: { opacity: 1, transition: { duration: 0.16 } },
-  exit: (switched: boolean) => ({ opacity: 0, transition: { duration: switched ? 0 : 0.12 } }),
-};
-
-function SearchPopover({
-  children,
-  className,
-  id,
-  show,
-  switched,
-}: {
-  children: ReactNode;
-  className: string;
-  id: string;
-  show: boolean;
-  switched: boolean;
-}) {
+/* Stand-ins for the grid while the first page is on its way (a filtered URL
+   opened directly). Sized like a cover card so the page doesn't jump. */
+function CatalogSkeleton() {
   return (
-    <AnimatePresence custom={switched} initial={false}>
-      {show ? (
-        <motion.div
-          animate="shown"
-          className={className}
-          custom={switched}
-          exit="exit"
-          id={id}
-          initial={switched ? false : "hidden"}
-          layoutCrossfade={false}
-          layoutDependency={id}
-          layoutId="hackathon-search-popover"
-          // Set here rather than as classes so motion can undo the stretch
-          // its scale-based resize would otherwise put on the corners.
-          style={{ borderRadius: 28, boxShadow: "0 22px 55px rgba(0,0,0,0.2)" }}
-          transition={{ layout: morphTransition }}
-          variants={searchPanelVariants}
-        >
-          {/* Hidden while the panel is still moving, since its contents
-              would be squashed by the resize. */}
-          <motion.div
-            animate={{ opacity: 1 }}
-            initial={switched ? { opacity: 0 } : false}
-            transition={{ delay: 0.18, duration: 0.16 }}
-          >
-            {children}
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
-  );
-}
-
-function SegmentPill({ show, switched }: { show: boolean; switched: boolean }) {
-  const dependency = useId();
-
-  return (
-    <AnimatePresence custom={switched} initial={false}>
-      {show ? (
-        <motion.span
-          animate="shown"
+    <div
+      aria-busy="true"
+      aria-label="Loading hackathons"
+      className="grid grid-cols-1 gap-x-8 gap-y-14 sm:grid-cols-2 min-[90rem]:grid-cols-3"
+      role="status"
+    >
+      {Array.from({ length: 6 }, (_, index) => (
+        <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-paper"
-          custom={switched}
-          exit="exit"
-          initial={switched ? false : "hidden"}
-          layoutCrossfade={false}
-          layoutDependency={dependency}
-          layoutId="hackathon-search-segment-pill"
-          style={{ borderRadius: 9999, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.08)" }}
-          transition={{ layout: morphTransition }}
-          variants={segmentPillVariants}
+          className="h-[21rem] rounded-[7px] border border-ink/10 bg-ink/[0.04] motion-safe:animate-pulse"
+          key={index}
         />
-      ) : null}
-    </AnimatePresence>
+      ))}
+    </div>
   );
 }
 
 export function HackathonSearch({
+  fetchOnMount = false,
   initialFilters,
   initialHasMore = false,
   initialHasSearched = false,
@@ -263,7 +200,13 @@ export function HackathonSearch({
   basePath = "/hackathons",
   initialSort = "soonest",
   renderCard,
+  viewerCards,
 }: {
+  /* Load the first page from the API on mount instead of from
+     initialHackathons. Used when the page was opened on a filtered URL: the
+     server-rendered page is the same static one for every URL, so the
+     filtered results have to be fetched here. */
+  fetchOnMount?: boolean;
   initialFilters: HackathonSearchFilters;
   initialHasMore?: boolean;
   initialHasSearched?: boolean;
@@ -276,6 +219,11 @@ export function HackathonSearch({
   /* Overrides how each grid card renders. Defaults to a plain HackathonCard; the
      admin view wraps it with edit/delete controls. */
   renderCard?: (hackathon: HackathonCardData, helpers: HackathonCardHelpers) => ReactNode;
+  /* Where the viewer's own card state (pipeline stage, votes) comes from when
+     cards were rendered without it: the static page's cards, or a response
+     the API answered before it could see the session. Omitted, cards keep
+     whatever state they arrived with. */
+  viewerCards?: ViewerCardHydration;
 }) {
   const [name, setName] = useState(initialFilters.name);
   const [countries, setCountries] = useState(initialFilters.countries);
@@ -293,7 +241,7 @@ export function HackathonSearch({
   const [sort, setSort] = useState<CatalogSort>(initialSort);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [hasSearched, setHasSearched] = useState(initialHasSearched);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearching, setIsSearching] = useState(fetchOnMount);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
   /* Whether the last change went straight from one field to another (morph)
@@ -326,6 +274,9 @@ export function HackathonSearch({
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const autoLoadedOffsetRef = useRef(-1);
   const searchGenerationRef = useRef(0);
+  /* The request currently in flight. A newer search aborts it, so a
+     superseded response is neither downloaded nor left running on the server. */
+  const searchAbortRef = useRef<AbortController | null>(null);
   const [loadMoreVisible, setLoadMoreVisible] = useState(false);
 
   useEffect(() => {
@@ -349,6 +300,9 @@ export function HackathonSearch({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  // Leaving the page drops whatever search is still on the wire.
+  useEffect(() => () => searchAbortRef.current?.abort(), []);
 
   useEffect(() => {
     if (openPopover === "location" && locationMode === "country") {
@@ -494,8 +448,48 @@ export function HackathonSearch({
      URL but left the panel on screen. Once patched, replaceState(null, ...)
      keeps Next's state and syncs useSearchParams. */
   useEffect(() => {
-    queueMicrotask(() => replaceSearchUrl(appliedFilters, basePath, hasSearched, sort));
+    // Skipped if this instance was replaced before the microtask ran (the
+    // catalog page swaps in a URL-filtered instance right after hydration);
+    // otherwise the outgoing instance would overwrite the URL's filters.
+    let cancelled = false;
+
+    queueMicrotask(() => {
+      if (!cancelled) {
+        replaceSearchUrl(appliedFilters, basePath, hasSearched, sort);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [appliedFilters, basePath, hasSearched, sort]);
+
+  /* Run once on mount; the filters and sort it uses are this instance's
+     initial ones, which never change. */
+  useEffect(() => {
+    if (fetchOnMount) {
+      void searchHackathons(initialFilters, 0, false, initialSort);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* The viewer's own state for cards that were rendered without it arrives
+     here, after the cards are already on screen. A stage the viewer changed
+     in the meantime is newer than that answer, so it is left alone. */
+  const statusChangedIdsRef = useRef(new Set<string>());
+
+  useEffect(
+    () => subscribeToHackathonStatusChanges((hackathonId) => statusChangedIdsRef.current.add(hackathonId)),
+    []
+  );
+
+  useEffect(
+    () =>
+      viewerCards?.subscribe((states) => {
+        setCatalog((current) => mergeViewerCardState(current, states, statusChangedIdsRef.current));
+      }),
+    [viewerCards]
+  );
 
   /* Watch the sentinel rather than the scroll position so nested scroll
      containers and the page itself both work. The margin starts the fetch a
@@ -641,7 +635,12 @@ export function HackathonSearch({
     if (!append) {
       // New result set, so the auto-load guard starts over.
       autoLoadedOffsetRef.current = -1;
+      // Whatever was loading belongs to the previous result set.
+      searchAbortRef.current?.abort();
     }
+
+    const abortController = new AbortController();
+    searchAbortRef.current = abortController;
 
     if (filters.distanceKm !== "any" && !origin && locationState !== "locating") {
       void locate();
@@ -673,7 +672,7 @@ export function HackathonSearch({
     }
 
     try {
-      const response = await fetch(`/api/hackathons?${params.toString()}`);
+      const response = await fetch(`/api/hackathons?${params.toString()}`, { signal: abortController.signal });
 
       if (!response.ok) {
         throw new Error("Search request failed.");
@@ -682,10 +681,18 @@ export function HackathonSearch({
       const body = (await response.json()) as {
         data: HackathonCardData[];
         hasMore: boolean;
+        signedIn?: boolean;
       };
 
       if (searchGeneration !== searchGenerationRef.current) {
         return;
+      }
+
+      // Answered without a session. If the visitor turns out to be signed in
+      // (the request beat Clerk refreshing its session cookie after a hard
+      // load), their state for these cards is fetched once that is known.
+      if (body.signedIn === false) {
+        viewerCards?.request(body.data.map((card) => card.id));
       }
 
       setCatalog((current) => (append ? [...current, ...body.data] : body.data));
@@ -693,7 +700,8 @@ export function HackathonSearch({
       setAppliedFilters(filters);
       setHasSearched(true);
     } catch {
-      if (searchGeneration !== searchGenerationRef.current) {
+      // Aborted by a newer search (or by leaving the page): not an error.
+      if (abortController.signal.aborted || searchGeneration !== searchGenerationRef.current) {
         return;
       }
 
@@ -1387,7 +1395,7 @@ export function HackathonSearch({
         </div>
       </section>
 
-      <section className="px-5 pb-16 pt-30 sm:px-8 sm:pb-20 lg:px-12">
+      <section className="px-5 pb-16 pt-30 sm:px-8 sm:pb-20 lg:px-12" data-catalog-results>
         {/* The inset is the space the cards gave up when the column gap went from 64px
             to 32px: one 32px gap per column boundary, split across both sides
             (2 cols → 16px a side, 3 cols → 32px a side). Card widths stay the
@@ -1410,6 +1418,22 @@ export function HackathonSearch({
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink/55">
                 Results are loaded only after you press Search, keeping the full catalog out of the initial page payload.
               </p>
+            </div>
+          ) : isSearching && !catalog.length ? (
+            <CatalogSkeleton />
+          ) : searchError && !catalog.length ? (
+            <div className="rounded-xl border border-ink/10 bg-paper p-8 text-center">
+              <h2 className="text-xl font-semibold text-ink">Couldn’t load hackathons</h2>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink/55">
+                Something went wrong on the way. Your filters are still set.
+              </p>
+              <button
+                className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full border border-ink/15 px-6 text-sm font-semibold text-ink transition-colors hover:border-ink"
+                onClick={() => void searchHackathons(appliedFilters)}
+                type="button"
+              >
+                Try again
+              </button>
             </div>
           ) : filteredHackathons.length ? (
             <>

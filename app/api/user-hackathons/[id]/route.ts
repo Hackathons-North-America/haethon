@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { userHackathons } from "@/lib/db/schema";
 import {
@@ -23,7 +23,7 @@ function stripUndefined<T extends Record<string, unknown>>(value: T) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const userContext = await getCurrentUserContext();
+  const userContext = await getCurrentIdentity();
 
   if (!userContext) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const [existing] = await db
     .select({ hackathonId: userHackathons.hackathonId })
     .from(userHackathons)
-    .where(and(eq(userHackathons.id, id), eq(userHackathons.userId, userContext.user.id)))
+    .where(and(eq(userHackathons.id, id), eq(userHackathons.userId, userContext.userId)))
     .limit(1);
 
   if (!existing) {
@@ -58,7 +58,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const plausibility = await evaluateAttendancePlausibilityForClaim({
-    userId: userContext.user.id,
+    userId: userContext.userId,
     hackathonId: existing.hackathonId,
     applicationStatus: parsed.data.applicationStatus,
   });
@@ -73,7 +73,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       ...values,
       updatedAt: new Date(),
     })
-    .where(and(eq(userHackathons.id, id), eq(userHackathons.userId, userContext.user.id)))
+    .where(and(eq(userHackathons.id, id), eq(userHackathons.userId, userContext.userId)))
     .returning();
 
   if (!updated) {
@@ -82,7 +82,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (parsed.data.applicationStatus) {
     await syncInferredAttendanceDays({
-      userId: userContext.user.id,
+      userId: userContext.userId,
       hackathonId: updated.hackathonId,
       applicationStatus: parsed.data.applicationStatus,
       source: claim.source,
@@ -92,7 +92,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     // (submitted project, recorded win) upgrade them to system_verified.
     if (statusShouldInferAttendance(parsed.data.applicationStatus)) {
       await applyPassiveAttendanceVerification({
-        userId: userContext.user.id,
+        userId: userContext.userId,
         hackathonId: updated.hackathonId,
       });
     }

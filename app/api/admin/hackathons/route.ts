@@ -8,6 +8,7 @@ import {
   validateExistingDiscordChannel,
 } from "@/lib/discord/sync";
 import { getAdminHackathon } from "@/lib/hackathons/admin-service";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { createPublishedHackathon } from "@/lib/hackathons/review-service";
 import { adminHackathonCreateSchema } from "@/lib/validations/hackathon";
 
@@ -46,6 +47,9 @@ export async function POST(request: Request) {
     if (discordChannelId) {
       await assignExistingDiscordChannel(hackathonId, discordChannelId);
       await syncHackathonDiscordChannelSafely(hackathonId);
+      // The catalog was already invalidated when the hackathon was created,
+      // before it had this channel; cards carry the channel link.
+      revalidateHackathonCaches();
     }
 
     const created = await getAdminHackathon(hackathonId);

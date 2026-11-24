@@ -56,19 +56,36 @@ export async function searchCities(query: string): Promise<CitySuggestion[]> {
   }));
 }
 
-/**
- * Resolves a free-text city/region/country to coordinates using the cities
- * table. This is the fallback for write paths that never went through the
- * city combobox (JSON imports, the review queue, admin edits), so every
- * published hackathon can carry coordinates without a geocoding call. A
- * region match is preferred (Waterloo, Ontario vs Waterloo, Iowa); ties go
- * to the biggest city.
- */
-export async function resolveCityCoordinates(location: {
+type CityLocation = {
   city?: string | null;
   region?: string | null;
   country?: string | null;
-}): Promise<{ latitude: number; longitude: number; countryCode: string } | null> {
+};
+
+export type ResolvedCity = { latitude: number; longitude: number; countryCode: string };
+
+type LocationPayload = {
+  city?: string | null;
+  region?: string | null;
+  country: string;
+  countryCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+/** True when a payload carries no coordinates of its own, so its city has to be looked up. */
+export function needsCityLookup(payload: LocationPayload) {
+  return (payload.latitude ?? null) === null || (payload.longitude ?? null) === null;
+}
+
+/**
+ * The lookup behind resolveCityCoordinates, unawaited so a bulk import can send
+ * every city it needs in one round trip (db.batch). Null when there is no city
+ * to look up. The exact, case-insensitive match uses the lower() indexes on
+ * cities; a region match is preferred (Waterloo, Ontario vs Waterloo, Iowa)
+ * and ties go to the biggest city.
+ */
+export function cityCoordinatesQuery(location: CityLocation) {
   const city = location.city?.trim();
 
   if (!city) {
@@ -78,7 +95,7 @@ export async function resolveCityCoordinates(location: {
   const region = location.region?.trim();
   const country = location.country?.trim();
 
-  const [row] = await db
+  return db
     .select({
       latitude: cities.latitude,
       longitude: cities.longitude,
@@ -96,44 +113,48 @@ export async function resolveCityCoordinates(location: {
         : sql`${cities.population} desc`
     )
     .limit(1);
+}
 
-  if (!row) {
-    return null;
-  }
-
-  return {
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
-    countryCode: row.countryCode,
-  };
+export function toResolvedCity(
+  row: { latitude: string; longitude: string; countryCode: string } | undefined
+): ResolvedCity | null {
+  return row ? { latitude: Number(row.latitude), longitude: Number(row.longitude), countryCode: row.countryCode } : null;
 }
 
 /**
- * Builds the hackathon_locations column values for a normalized payload.
- * Coordinates from the payload (city combobox) win; otherwise the city is
- * resolved against the local cities table. Both stay null only when the city
- * is unknown — the catalog treats those as "no distance filter match".
+ * Resolves a free-text city/region/country to coordinates using the cities
+ * table. This is the fallback for write paths that never went through the
+ * city combobox (JSON imports, the review queue, admin edits), so every
+ * published hackathon can carry coordinates without a geocoding call.
  */
-export async function hackathonLocationValues(payload: {
-  city?: string | null;
-  region?: string | null;
-  country: string;
-  countryCode?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-}) {
+export async function resolveCityCoordinates(location: CityLocation): Promise<ResolvedCity | null> {
+  const query = cityCoordinatesQuery(location);
+
+  if (!query) {
+    return null;
+  }
+
+  const [row] = await query;
+
+  return toResolvedCity(row);
+}
+
+/**
+ * The hackathon_locations column values for a payload, given the city lookup
+ * result (pass null when the payload had coordinates or the city is unknown).
+ * Coordinates from the payload (city combobox, scraper) win. Both stay null
+ * only when the city is unknown — the catalog treats those as "no distance
+ * filter match".
+ */
+export function locationValuesFrom(payload: LocationPayload, resolved: ResolvedCity | null) {
   let latitude = payload.latitude ?? null;
   let longitude = payload.longitude ?? null;
   let countryCode = payload.countryCode ?? null;
 
-  if (latitude === null || longitude === null) {
-    const resolved = await resolveCityCoordinates(payload);
-
-    if (resolved) {
-      latitude = resolved.latitude;
-      longitude = resolved.longitude;
-      countryCode ??= resolved.countryCode;
-    }
+  if ((latitude === null || longitude === null) && resolved) {
+    latitude = resolved.latitude;
+    longitude = resolved.longitude;
+    countryCode ??= resolved.countryCode;
   }
 
   const hasCoordinates = latitude !== null && longitude !== null;
@@ -147,4 +168,13 @@ export async function hackathonLocationValues(payload: {
     longitude: hasCoordinates ? longitude!.toFixed(6) : null,
     coordinates: hasCoordinates ? { lat: latitude!, lng: longitude! } : null,
   };
+}
+
+/**
+ * Builds the hackathon_locations column values for a normalized payload,
+ * resolving the city against the local cities table when the payload has no
+ * coordinates.
+ */
+export async function hackathonLocationValues(payload: LocationPayload) {
+  return locationValuesFrom(payload, needsCityLookup(payload) ? await resolveCityCoordinates(payload) : null);
 }

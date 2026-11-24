@@ -18,6 +18,11 @@ function deriveSeriesSlug(input: { name: string; seriesName?: string | null; ser
   return slugify(input.seriesSlug || deriveSeriesName(input.seriesName || input.name));
 }
 
+/** The series an event belongs to, as ensureHackathonSeries would name and key it. */
+export function hackathonSeriesIdentity(payload: { name: string; seriesName?: string | null; seriesSlug?: string | null }) {
+  return { name: deriveSeriesName(payload.seriesName || payload.name), slug: deriveSeriesSlug(payload) };
+}
+
 export async function ensureHackathonSeries(payload: Pick<NormalizedHackathonPayload, "name"> & {
   seriesName?: string | null;
   seriesSlug?: string | null;

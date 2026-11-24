@@ -11,10 +11,9 @@ import { getCurrentUserId } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonDates, hackathonLocations, hackathons, userHackathons } from "@/lib/db/schema";
 import { formatDateRange, formatLocation, formatLocationParts } from "@/lib/hackathons/card-format";
-import { cardVoteFields, loadCardVotes } from "@/lib/hackathons/catalog";
-import { getDiscordLinksByHackathon } from "@/lib/hackathons/discord-cards";
-import { getPrimarySourceByHackathon } from "@/lib/hackathons/source-badges";
-import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
+import { discordLinkSql, voteFieldsSql, voteStateFromRow } from "@/lib/hackathons/row-extras";
+import { sourceBadge } from "@/lib/hackathons/source-provenance";
+import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 
 export const metadata: Metadata = {
   title: "My Hackathons | Hackathons North America",
@@ -28,7 +27,6 @@ type PipelineRow = {
   awardName: string | null;
   devpostUrl: string | null;
   hackathonId: string;
-  seriesId: string | null;
   hackathonName: string;
   slug: string;
   imageUrl: string | null;
@@ -41,6 +39,11 @@ type PipelineRow = {
   description: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
+  source: HackathonSource | null;
+  discordUrl: string | null;
+  upvotes: number;
+  downvotes: number;
+  viewerVote: number | null;
 };
 
 const stageOrder = ["interested", "applied", "attending"] as const;
@@ -51,27 +54,23 @@ const stageTitles: Record<(typeof stageOrder)[number], string> = {
   attending: "Attending",
 };
 
-function toCardData(
-  row: PipelineRow,
-  discordUrl: string | null,
-  source: HackathonSourceBadge | null
-): HackathonCardData {
+function toCardData(row: PipelineRow): HackathonCardData {
   const location = formatLocationParts(row);
 
   return {
     country: location.country,
     date: formatDateRange(row.startsAt, row.endsAt),
     description: row.description,
-    discordUrl,
+    discordUrl: row.discordUrl,
     endsAt: row.endsAt?.toISOString() ?? null,
     format: row.format,
-    hasDiscord: Boolean(discordUrl),
+    hasDiscord: Boolean(row.discordUrl),
     id: row.hackathonId,
     image: row.imageUrl,
     location: location.locality ?? "Location TBA",
     name: row.hackathonName,
     slug: row.slug,
-    source,
+    source: row.source ? sourceBadge(row.source) : null,
     startsAt: row.startsAt?.toISOString() ?? null,
     websiteUrl: row.websiteUrl,
   };
@@ -84,7 +83,13 @@ export default async function MyHackathonsPage() {
     redirect("/sign-in");
   }
 
-  const rows = await db
+  /* The whole page in one statement. The board also needs each hackathon's
+     source badge, Discord link and vote state; those used to be three more
+     queries in a second round trip, issued once this one had returned the ids.
+     The source is a column on the row already joined here, and the other two
+     are index probes per row over a list that is only ever one person's
+     pipeline. */
+  const rows: PipelineRow[] = await db
     .select({
       id: userHackathons.id,
       applicationStatus: userHackathons.applicationStatus,
@@ -92,7 +97,6 @@ export default async function MyHackathonsPage() {
       awardName: userHackathons.awardName,
       devpostUrl: userHackathons.devpostUrl,
       hackathonId: hackathons.id,
-      seriesId: hackathons.seriesId,
       hackathonName: hackathons.name,
       slug: hackathons.slug,
       imageUrl: hackathons.imageUrl,
@@ -105,6 +109,9 @@ export default async function MyHackathonsPage() {
       description: hackathons.shortDescription,
       startsAt: hackathonDates.startsAt,
       endsAt: hackathonDates.endsAt,
+      source: hackathons.source,
+      discordUrl: discordLinkSql,
+      ...voteFieldsSql(userId),
     })
     .from(userHackathons)
     .innerJoin(hackathons, eq(hackathons.id, userHackathons.hackathonId))
@@ -139,23 +146,13 @@ export default async function MyHackathonsPage() {
   pastRows.sort((a, b) => (b.endsAt?.getTime() ?? 0) - (a.endsAt?.getTime() ?? 0));
 
   const activeCount = stageOrder.reduce((total, stage) => total + (byStage.get(stage)?.length ?? 0), 0);
-  const boardHackathonIds = stageOrder.flatMap((stage) => (byStage.get(stage) ?? []).map((row) => row.hackathonId));
-  const [discordLinks, sourceByHackathon, votes] = await Promise.all([
-    getDiscordLinksByHackathon(rows.map((row) => ({ id: row.hackathonId, seriesId: row.seriesId }))),
-    getPrimarySourceByHackathon(rows.map((row) => row.hackathonId)),
-    loadCardVotes(boardHackathonIds, userId),
-  ]);
-
   const pipelineColumns: PipelineColumn[] = stageOrder.map((stage) => ({
     stage,
     title: stageTitles[stage],
     cards: (byStage.get(stage) ?? []).map((row) => ({
       userHackathonId: row.id,
       hackathonId: row.hackathonId,
-      card: {
-        ...toCardData(row, discordLinks.get(row.hackathonId) ?? null, sourceByHackathon.get(row.hackathonId) ?? null),
-        ...cardVoteFields(row.hackathonId, votes),
-      },
+      card: { ...toCardData(row), ...voteStateFromRow(row) },
     })),
   }));
 

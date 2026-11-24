@@ -265,6 +265,11 @@ export const cities = pgTable(
     index("cities_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
     index("cities_ascii_name_trgm_idx").using("gin", sql`${table.asciiName} gin_trgm_ops`),
     index("cities_country_code_idx").on(table.countryCode),
+    /* Exact, case-insensitive city match for imports that arrive without
+       coordinates (resolveCityCoordinates). The trigram indexes above only
+       serve the ILIKE autocomplete. */
+    index("cities_lower_name_idx").on(sql`lower(${table.name})`),
+    index("cities_lower_ascii_name_idx").on(sql`lower(${table.asciiName})`),
   ]
 );
 
@@ -334,8 +339,9 @@ export const userHackathons = pgTable(
 );
 
 /* One up (+1) or down (-1) vote per user per hackathon edition. Clearing a vote
-   deletes the row. Totals are aggregated on read; the (hackathon_id, value)
-   index serves both per-card counts and the catalog's "Top voted" sort. */
+   deletes the row. Totals are not aggregated on read: a trigger on this table
+   maintains hackathon_vote_totals on every insert, update and delete (cascades
+   included), and reads take the totals from there. */
 export const hackathonVotes = pgTable(
   "hackathon_votes",
   {
@@ -355,6 +361,21 @@ export const hackathonVotes = pgTable(
     check("hackathon_votes_value_check", sql`${table.value} in (-1, 1)`),
   ]
 );
+
+/* Up and down vote totals per hackathon, written only by the
+   hackathon_votes_sync_totals trigger on hackathon_votes (plain SQL in the
+   migration: Drizzle cannot declare triggers) and never by application code.
+   A hackathon nobody has voted on has no row here, which reads as 0 / 0.
+
+   The totals deliberately do not live on the hackathons row: every vote would
+   then rewrite that wide, heavily indexed row. */
+export const hackathonVoteTotals = pgTable("hackathon_vote_totals", {
+  hackathonId: uuid("hackathon_id")
+    .primaryKey()
+    .references(() => hackathons.id, { onDelete: "cascade" }),
+  upvoteCount: integer("upvote_count").notNull().default(0),
+  downvoteCount: integer("downvote_count").notNull().default(0),
+});
 
 export const userHackathonAttendanceDays = pgTable(
   "user_hackathon_attendance_days",
@@ -601,6 +622,44 @@ export const discordChannels = pgTable("discord_channels", {
   index("discord_channels_hackathon_idx").on(table.hackathonId),
   index("discord_channels_series_idx").on(table.seriesId),
 ]);
+
+/* Discord work an admin action asked for, done after the response is sent
+   (see lib/discord/channel-jobs.ts). Jobs run one at a time across the whole
+   deployment, so two of them can never create a channel for the same series or
+   reorder the same category at once. The partial unique index keeps a
+   double-click from queueing a hackathon twice. */
+export const discordChannelJobs = pgTable(
+  "discord_channel_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    hackathonId: uuid("hackathon_id")
+      .notNull()
+      .references(() => hackathons.id, { onDelete: "cascade" }),
+    /* "ensure": make or reuse the channel of a Canadian or US event, leave
+       other events alone. "refresh": the full sync after an import changed an
+       existing hackathon. */
+    kind: varchar("kind", { length: 16 }).notNull(),
+    /* "ensure" only: leave a hackathon that already has a channel untouched. */
+    keepExisting: boolean("keep_existing").notNull().default(false),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    /* What the sync returned, once done. */
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    requestedByUserId: uuid("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("discord_channel_jobs_pending_hackathon_idx")
+      .on(table.hackathonId)
+      .where(sql`${table.status} = 'pending'`),
+    index("discord_channel_jobs_status_created_idx").on(table.status, table.createdAt),
+    check("discord_channel_jobs_status_check", sql`${table.status} in ('pending', 'running', 'done', 'failed')`),
+    check("discord_channel_jobs_kind_check", sql`${table.kind} in ('ensure', 'refresh')`),
+  ]
+);
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   profile: one(userProfiles, {

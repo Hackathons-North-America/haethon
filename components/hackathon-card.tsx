@@ -2,13 +2,13 @@
 
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
 
 import { DiscordGlyph } from "@/components/discord-glyph";
 import { HackathonVoteControl } from "@/components/hackathon-vote-control";
+import { IntentPrefetchLink } from "@/components/intent-prefetch-link";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
-import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
+import { useHackathonPanelOpen } from "@/components/hackathon-panel-open";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { useTrackStatus } from "@/lib/hackathons/use-track-status";
@@ -497,7 +497,7 @@ function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData
       {label}
     </span>
   ) : (
-    <Link
+    <IntentPrefetchLink
       className={cardFooterLinkClassName}
       href={`/hackathons/${hackathon.slug}`}
       // Swapping hackathons replaces the open panel's history entry, so
@@ -507,7 +507,7 @@ function CardMoreInfoLink({ hackathon, preview }: { hackathon: HackathonCardData
       title={`View ${hackathon.name} details`}
     >
       {label}
-    </Link>
+    </IntentPrefetchLink>
   );
 }
 
@@ -544,7 +544,7 @@ function CardStretchedLink({ hackathon, preview }: { hackathon: HackathonCardDat
   }
 
   return (
-    <Link
+    <IntentPrefetchLink
       aria-label={`View ${hackathon.name} details`}
       className={className}
       draggable={false}
@@ -566,6 +566,11 @@ function CardVotes({ hackathon, preview }: { hackathon: HackathonCardData; previ
   return (
     <HackathonVoteControl
       closed={Boolean(hackathon.isPast) || isVotingClosed(hackathon.endsAt)}
+      /* The control seeds its own state from these once. On the catalog page
+         they change after mount, when the viewer's vote and live totals
+         replace the static snapshot's, so a new set gets a fresh control; it
+         still prefers any vote the viewer has confirmed since. */
+      key={`${hackathon.upvotes}:${hackathon.downvotes ?? 0}:${hackathon.viewerVote ?? 0}`}
       hackathonId={hackathon.id}
       hackathonName={hackathon.name}
       initialState={{
@@ -599,12 +604,12 @@ function BookmarkPageCard({
       style={getAccentStyle(hackathon.name)}
     >
       {hackathon.slug && !preview ? (
-        <Link
+        <IntentPrefetchLink
           aria-label={`View ${hackathon.name} details`}
           className="absolute inset-0 z-[1]"
           draggable={false}
           href={`/hackathons/${hackathon.slug}`}
-          replace={panelOpen}
+              replace={panelOpen}
           scroll={false}
         />
       ) : null}

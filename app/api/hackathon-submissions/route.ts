@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserContext } from "@/lib/auth";
+import { getCurrentIdentity, getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonSubmissions } from "@/lib/db/schema";
 import { createHackathonSubmission } from "@/lib/hackathons/review-service";
@@ -9,9 +9,9 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { hackathonSubmissionSchema } from "@/lib/validations/hackathon";
 
 export async function GET(request: Request) {
-  const context = await getCurrentUserContext();
+  const identity = await getCurrentIdentity();
 
-  if (!context) {
+  if (!identity) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const rows = await db
     .select()
     .from(hackathonSubmissions)
-    .where(eq(hackathonSubmissions.submittedByUserId, context.user.id))
+    .where(eq(hackathonSubmissions.submittedByUserId, identity.userId))
     .orderBy(desc(hackathonSubmissions.createdAt))
     .limit(50);
 
@@ -32,6 +32,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // The one mutation that needs the whole users row: the submission records
+  // the submitter's email and name alongside the id.
   const context = await getCurrentUserContext();
 
   if (!context) {

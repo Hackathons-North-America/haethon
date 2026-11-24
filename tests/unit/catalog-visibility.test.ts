@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isPastCatalogRow,
-  pastRecurringSeriesIds,
   selectVisibleCatalogRows,
+  seriesWithCurrentEdition,
 } from "@/lib/hackathons/catalog-visibility";
 
 const now = new Date("2026-07-14T12:00:00.000Z");
@@ -36,16 +36,17 @@ describe("isPastCatalogRow", () => {
   });
 });
 
-describe("pastRecurringSeriesIds", () => {
-  it("collects only past rows that belong to a recurring series", () => {
+describe("seriesWithCurrentEdition", () => {
+  it("collects series that have an edition whose end date is still ahead", () => {
     const rows = [
       row({ seriesId: "htn", isRecurring: true, startsAt: "2025-09-25T00:00:00.000Z", endsAt: "2025-09-27T00:00:00.000Z" }),
-      row({ seriesId: "other", isRecurring: false, startsAt: "2025-05-01T00:00:00.000Z", endsAt: "2025-05-02T00:00:00.000Z" }),
-      row({ seriesId: "upcoming", isRecurring: true }),
-      row({ seriesId: null, isRecurring: true, startsAt: "2025-05-01T00:00:00.000Z", endsAt: "2025-05-02T00:00:00.000Z" }),
+      row({ seriesId: "htn", isRecurring: true }),
+      row({ seriesId: "past-only", isRecurring: true, startsAt: "2025-05-01T00:00:00.000Z", endsAt: "2025-05-02T00:00:00.000Z" }),
+      row({ seriesId: "dates-tba", isRecurring: true, startsAt: null, endsAt: null }),
+      row({ seriesId: null }),
     ];
 
-    expect(pastRecurringSeriesIds(rows, now)).toEqual(["htn"]);
+    expect([...seriesWithCurrentEdition(rows, now)]).toEqual(["htn"]);
   });
 });
 

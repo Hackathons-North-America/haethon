@@ -120,6 +120,14 @@
   }
 }
 
+/* /hackathons is one static page for every URL. When it is opened on a
+   filtered URL the HTML still contains the unfiltered cards, so an inline
+   script marks <html> and this keeps them from being shown until the browser
+   has replaced them with the filtered view (lib/hackathons/catalog-url.ts). */
+html[data-catalog-url="filtered"] [data-catalog-results] {
+  visibility: hidden;
+}
+
 /* Hackathon cover cards (HackathonCard). The 1px outline is painted as
    background layers under a transparent border, and the inner divider lines
    (under the cover, between the columns, above the footer) are their own

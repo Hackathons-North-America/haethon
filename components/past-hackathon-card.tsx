@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, ExternalLink, MapPin, Pin, Trophy } from "lucide-react";
 
 import { HackathonResultActions, type ResultSave } from "@/components/hackathon-result-actions";
-import { useHackathonPanelOpen } from "@/components/hackathon-side-panel";
+import { useHackathonPanelOpen } from "@/components/hackathon-panel-open";
 import { MarkAttendedButton } from "@/components/mark-attended-button";
 import { RemoveHackathonControl } from "@/components/remove-hackathon-control";
 import { reportBackgroundFailure } from "@/lib/client/background-actions";
 import { sendRequest } from "@/lib/client/request";
 import { useKeyedLatestSave } from "@/lib/client/use-latest-save";
+import { DETAIL_LINK_PREFETCH } from "@/lib/hackathons/detail-link";
 
 export type PastResultFields = {
   status: "attended" | "won" | "ended";
@@ -128,6 +129,7 @@ export function PastHackathonCard({
           <Link
             className="text-lg font-semibold text-ink underline-offset-4 hover:text-pine hover:underline"
             href={`/hackathons/${slug}`}
+            prefetch={DETAIL_LINK_PREFETCH}
             replace={panelOpen}
             scroll={false}
           >

@@ -6,6 +6,7 @@ import {
   deleteDiscordChannel,
   setDiscordChannelName,
 } from "@/lib/discord/channel-admin";
+import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { discordChannelNameSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -63,6 +64,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   try {
     const data = await deleteDiscordChannel(id);
+
+    // Catalog cards link to this channel; drop the cached catalog so the dead
+    // link goes with it.
+    revalidateHackathonCaches();
 
     return NextResponse.json({ data });
   } catch (error) {

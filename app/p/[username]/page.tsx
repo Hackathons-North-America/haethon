@@ -19,7 +19,20 @@ import { PUBLIC_PROFILE_CACHE_TAG } from "@/lib/profile/public-profile-cache";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { isProfileUsername } from "@/lib/profile/username";
 
-export const dynamic = "force-dynamic";
+/* Rendered once per username and then served as a static file (ISR): a shared
+   profile link no longer invokes a function per view. Nothing here reads the
+   visitor's session, so one rendering is correct for everyone.
+
+   Freshness is unchanged from the previous per-request rendering, which read
+   the same data through unstable_cache: every profile-affecting write calls
+   revalidatePublicProfiles(), whose tag is recorded on these pages too, and
+   the ten-minute window is the backstop. */
+export const revalidate = 600;
+
+/* No profiles are built at deploy time; each is generated on its first visit. */
+export function generateStaticParams() {
+  return [];
+}
 
 type PageProps = { params: Promise<{ username: string }> };
 
