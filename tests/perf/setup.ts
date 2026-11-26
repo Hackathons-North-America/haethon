@@ -96,6 +96,15 @@ vi.mock("@/lib/discord/rest", async () => {
 vi.mock("@/lib/hackathons/image-ingest", () => ({
   assertReachableImageUrl: async () => {
     await sleep(perfState.imageLatencyMs);
+    return undefined;
+  },
+  fetchVerifiedImage: async (imageUrl: string | null | undefined) => {
+    if (!imageUrl) {
+      return undefined;
+    }
+
+    await sleep(perfState.imageLatencyMs);
+    return { bytes: new Uint8Array([1]), contentType: "image/png" };
   },
   verifiedImageUrl: async (imageUrl: string | null | undefined) => {
     if (!imageUrl) {
@@ -105,4 +114,13 @@ vi.mock("@/lib/hackathons/image-ingest", () => ({
     await sleep(perfState.imageLatencyMs);
     return imageUrl;
   },
+}));
+
+/* Cover thumbnails are made after the response and are not what these
+   benches time; keep them out (no sharp work, no UploadThing). */
+vi.mock("@/lib/hackathons/cover-thumbnails", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/hackathons/cover-thumbnails")>()),
+  generateCoverThumbnails: async () => ({ status: "skipped", reason: "unreachable" }),
+  replaceCoverThumbnails: async () => undefined,
+  deleteCoverThumbnailsSafely: async () => undefined,
 }));

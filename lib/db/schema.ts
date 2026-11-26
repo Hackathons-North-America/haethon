@@ -168,6 +168,13 @@ export const hackathons = pgTable(
     shortDescription: text("short_description"),
     websiteUrl: text("website_url"),
     imageUrl: text("image_url"),
+    /* Resized 2:1 WebP copies of imageUrl (640x320 and 1280x640) hosted on
+       UploadThing, made in the background whenever the image is set or
+       changed (lib/hackathons/cover-thumbnails.ts). Both are set together or
+       both null; null means "show the original". Cleared in the same write
+       that changes imageUrl, so they never describe a different image. */
+    imageThumbSmallUrl: text("image_thumb_small_url"),
+    imageThumbLargeUrl: text("image_thumb_large_url"),
     applicationUrl: text("application_url"),
     venue: varchar("venue", { length: 160 }),
     format: hackathonFormatEnum("format").notNull().default("in_person"),

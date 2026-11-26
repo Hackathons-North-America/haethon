@@ -6,26 +6,35 @@ import { fetchSafeRemoteImage } from "@/lib/security/remote-image";
    the /logo proxy fallback and the UploadThing router. */
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
-/** Admin/organizer edits: reject the save with an actionable message. */
-export async function assertReachableImageUrl(url: string) {
+export type VerifiedImage = Awaited<ReturnType<typeof fetchSafeRemoteImage>>;
+
+/** Admin/organizer edits: reject the save with an actionable message. Returns
+    the downloaded image so the cover thumbnails can be cut from the same bytes
+    instead of fetching it a second time. */
+export async function assertReachableImageUrl(url: string): Promise<VerifiedImage> {
   try {
-    await fetchSafeRemoteImage(url, MAX_IMAGE_BYTES);
+    return await fetchSafeRemoteImage(url, MAX_IMAGE_BYTES);
   } catch {
     throw new Error("Image URL must point at a publicly reachable image (PNG, JPEG, GIF, WebP, AVIF, or ICO) under 4MB.");
+  }
+}
+
+/** The vetted image's bytes, or undefined when the URL is missing, dead, too
+    large or not a supported raster image. */
+export async function fetchVerifiedImage(url: string | null | undefined): Promise<VerifiedImage | undefined> {
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    return await fetchSafeRemoteImage(url, MAX_IMAGE_BYTES);
+  } catch {
+    return undefined;
   }
 }
 
 /** Automated imports (Luma sync, bulk JSON): drop a broken image rather than
     fail the whole import. */
 export async function verifiedImageUrl(url: string | null | undefined) {
-  if (!url) {
-    return undefined;
-  }
-
-  try {
-    await fetchSafeRemoteImage(url, MAX_IMAGE_BYTES);
-    return url;
-  } catch {
-    return undefined;
-  }
+  return (await fetchVerifiedImage(url)) ? url! : undefined;
 }

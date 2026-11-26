@@ -37,6 +37,10 @@ export type PublicHackathonCard = {
   highSchoolersOnly: boolean;
   id: string;
   image: string | null;
+  /* 640w and 1280w WebP copies of `image`, both or neither; null until they
+     have been made (see lib/hackathons/cover-image.ts). */
+  imageThumbSmall: string | null;
+  imageThumbLarge: string | null;
   /* City-centroid coordinates (from the GeoNames-backed cities table); null
      for online events and unresolved cities. Shipped with the snapshot so the
      "within N km" filter runs entirely in the browser. */

@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { afterResponse } from "@/lib/after-response";
 import { db } from "@/lib/db";
 import { retireHackathonDiscordChannel, syncHackathonDiscordChannelSafely } from "@/lib/discord/sync";
 import {
@@ -13,7 +14,12 @@ import {
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
-import { assertReachableImageUrl } from "@/lib/hackathons/image-ingest";
+import {
+  CLEARED_COVER_THUMBNAILS,
+  deleteCoverThumbnailsSafely,
+  replaceCoverThumbnails,
+} from "@/lib/hackathons/cover-thumbnails";
+import { assertReachableImageUrl, type VerifiedImage } from "@/lib/hackathons/image-ingest";
 import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
 import { orderAdminHackathonRows } from "@/lib/hackathons/admin-ordering";
@@ -142,7 +148,12 @@ export async function setHackathonSource(hackathonId: string, source: HackathonS
 
 export async function updatePublishedHackathon(hackathonId: string, payload: AdminHackathonUpdatePayload) {
   const [existing] = await db
-    .select({ id: hackathons.id, imageUrl: hackathons.imageUrl })
+    .select({
+      id: hackathons.id,
+      imageUrl: hackathons.imageUrl,
+      imageThumbSmallUrl: hackathons.imageThumbSmallUrl,
+      imageThumbLargeUrl: hackathons.imageThumbLargeUrl,
+    })
     .from(hackathons)
     .where(eq(hackathons.id, hackathonId))
     .limit(1);
@@ -154,9 +165,11 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
   // Image URLs are vetted once, on change, instead of on every read — cards
   // hand allowlisted hosts straight to the image optimizer.
   const imageUrl = payload.imageUrl ?? null;
+  const imageChanged = imageUrl !== existing.imageUrl;
+  let verifiedImage: VerifiedImage | undefined;
 
-  if (imageUrl && imageUrl !== existing.imageUrl) {
-    await assertReachableImageUrl(imageUrl);
+  if (imageUrl && imageChanged) {
+    verifiedImage = await assertReachableImageUrl(imageUrl);
   }
 
   const now = new Date();
@@ -168,6 +181,9 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
       shortDescription: payload.shortDescription ?? null,
       websiteUrl: payload.websiteUrl,
       imageUrl,
+      // The old image's thumbnails stop applying with this write; the new
+      // image's are made after the response (see below).
+      ...(imageChanged ? CLEARED_COVER_THUMBNAILS : {}),
       applicationUrl: payload.applicationUrl ?? null,
       venue: payload.venue ?? null,
       format: payload.format,
@@ -223,6 +239,18 @@ export async function updatePublishedHackathon(hackathonId: string, payload: Adm
   await syncHackathonDiscordChannelSafely(hackathonId);
   revalidateHackathonCaches();
 
+  if (imageChanged) {
+    await afterResponse(() =>
+      replaceCoverThumbnails({
+        hackathonId,
+        previous: [existing.imageThumbSmallUrl, existing.imageThumbLargeUrl],
+        sourceUrl: imageUrl,
+        // Already downloaded by the check above: resized from these bytes.
+        image: verifiedImage,
+      })
+    );
+  }
+
   return updated;
 }
 
@@ -275,7 +303,11 @@ export async function setHackathonSeriesRecurring(hackathonId: string, isRecurri
 
 export async function deleteHackathon(hackathonId: string) {
   const [existing] = await db
-    .select({ id: hackathons.id })
+    .select({
+      id: hackathons.id,
+      imageThumbSmallUrl: hackathons.imageThumbSmallUrl,
+      imageThumbLargeUrl: hackathons.imageThumbLargeUrl,
+    })
     .from(hackathons)
     .where(eq(hackathons.id, hackathonId))
     .limit(1);
@@ -296,6 +328,7 @@ export async function deleteHackathon(hackathonId: string) {
   }
 
   revalidateHackathonCaches();
+  await afterResponse(() => deleteCoverThumbnailsSafely([existing.imageThumbSmallUrl, existing.imageThumbLargeUrl]));
 
   return deleted.id;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, PointerEvent, ReactNode } from "react";
+import { useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import Image from "next/image";
 import { ArrowUpRight, Check } from "lucide-react";
 
@@ -9,6 +9,7 @@ import { HackathonVoteControl } from "@/components/hackathon-vote-control";
 import { IntentPrefetchLink } from "@/components/intent-prefetch-link";
 import type { TrackableStatus } from "@/components/hackathon-status-tracker";
 import { useHackathonPanelOpen } from "@/components/hackathon-panel-open";
+import { coverImageAttributes } from "@/lib/hackathons/cover-image";
 import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
 import type { HackathonSourceBadge } from "@/lib/hackathons/source-badges";
 import { useTrackStatus } from "@/lib/hackathons/use-track-status";
@@ -32,6 +33,10 @@ export type HackathonCardData = {
   highSchoolersOnly?: boolean;
   id: string;
   image?: string | null;
+  /** Resized WebP copies of `image` (640w, 1280w). Covers use them when both
+      are present and fall back to `image` otherwise. */
+  imageThumbSmall?: string | null;
+  imageThumbLarge?: string | null;
   /** The event's dates have passed; shown only for recurring (annual) series
       until the next edition is published. */
   isPast?: boolean;
@@ -466,6 +471,39 @@ function BookmarkCardLogo({ hackathon, preview }: { hackathon: HackathonCardData
   );
 }
 
+/* The 2:1 cover photo. A plain <img> rather than next/image: covers are never
+   sent through the image optimizer, and next/image's `unoptimized` mode cannot
+   emit a srcset. With thumbnails the browser picks the 640w or 1280w WebP for
+   the slot; without them, or if a thumbnail fails to load, it shows the
+   organizer's original. The attributes match what next/image rendered before
+   (lazy, async decode, absolutely filling the cover), so the look is the same.
+   The page's preload hint is built from the same coverImageAttributes(). */
+function CardCoverImage({ hackathon }: { hackathon: HackathonCardData }) {
+  const [useOriginal, setUseOriginal] = useState(false);
+  const cover = coverImageAttributes(hackathon, useOriginal);
+
+  if (!cover) {
+    return null;
+  }
+
+  /* Prop order matters on the client: React sets attributes in order, and a
+     browser starts fetching as soon as `src` is set, so `loading`, `sizes`
+     and `srcSet` must come before it (next/image orders them the same way). */
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- see the comment above.
+    <img
+      alt={`${hackathon.name} cover`}
+      className="absolute inset-0 size-full object-cover"
+      decoding="async"
+      loading="lazy"
+      onError={cover.srcSet ? () => setUseOriginal(true) : undefined}
+      sizes={cover.sizes}
+      srcSet={cover.srcSet}
+      src={cover.src}
+    />
+  );
+}
+
 /* The underline animates on hover and stays visible for the selected stage. */
 function CardActionUnderline() {
   return (
@@ -771,14 +809,7 @@ export function HackathonCard({
         }`}
       >
         {hackathon.image ? (
-          <Image
-            alt={`${hackathon.name} cover`}
-            className="object-cover"
-            fill
-            sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
-            src={hackathonLogoSrc(hackathon.id, hackathon.image)}
-            unoptimized
-          />
+          <CardCoverImage hackathon={hackathon} />
         ) : coverStreak ? (
           /* No image: a brown-to-color gradient and its grain fill the
              cover, with the full name set as a title in the top-left corner.
