@@ -13,6 +13,8 @@ export type AdminHackathonListItem = {
   discordChannelId?: string | null;
   /** Stored source badge, compiled at import time and admin-editable; null shows no badge. */
   source?: HackathonSource | null;
+  /** "HNA approved": the cover is kept after the event. Admin views only; absent for organizers. */
+  hnaApproved?: boolean;
   name: string;
   shortDescription: string | null;
   websiteUrl: string | null;

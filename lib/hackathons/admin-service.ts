@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { afterResponse } from "@/lib/after-response";
@@ -17,6 +17,7 @@ import { hackathonLocationValues } from "@/lib/hackathons/city-lookup";
 import {
   CLEARED_COVER_THUMBNAILS,
   deleteCoverThumbnailsSafely,
+  generateCoverThumbnails,
   replaceCoverThumbnails,
 } from "@/lib/hackathons/cover-thumbnails";
 import { assertReachableImageUrl, type VerifiedImage } from "@/lib/hackathons/image-ingest";
@@ -62,9 +63,21 @@ const adminHackathonSelection = {
   acceptanceAt: hackathonDates.acceptanceAt,
 };
 
+/* Also shared with the organizer dashboard (lib/hackathons/organizer-service.ts),
+   which is why admin-only fields such as hnaApproved are not in it. */
 export function adminHackathonQuery() {
   return db
     .select(adminHackathonSelection)
+    .from(hackathons)
+    .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
+    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .leftJoin(hackathonSeries, eq(hackathonSeries.id, hackathons.seriesId));
+}
+
+/* The admin pages' rows: the shared fields plus the admin-only ones. */
+function adminOnlyHackathonQuery() {
+  return db
+    .select({ ...adminHackathonSelection, hnaApproved: hackathons.hnaApproved })
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
@@ -121,7 +134,7 @@ export async function listPublishedHackathons() {
   // Both halves of the admin list in one round trip: the channel mapping is
   // read for the whole guild rather than waiting on the rows for series ids.
   const [rows, channelIdBySeries] = await Promise.all([
-    adminHackathonQuery()
+    adminOnlyHackathonQuery()
       .where(and(isNotNull(hackathons.publishedAt), inArray(hackathons.status, publicStatuses)))
       .orderBy(asc(hackathonDates.startsAt)),
     loadDiscordChannelIdsBySeries(),
@@ -132,7 +145,7 @@ export async function listPublishedHackathons() {
 }
 
 export async function getAdminHackathon(hackathonId: string) {
-  const [row] = await adminHackathonQuery().where(eq(hackathons.id, hackathonId)).limit(1);
+  const [row] = await adminOnlyHackathonQuery().where(eq(hackathons.id, hackathonId)).limit(1);
 
   if (!row) {
     return null;
@@ -144,6 +157,31 @@ export async function getAdminHackathon(hackathonId: string) {
 /** Sets or clears (null = no badge) the hackathon's stored source. */
 export async function setHackathonSource(hackathonId: string, source: HackathonSource | null) {
   await db.update(hackathons).set({ source, updatedAt: new Date() }).where(eq(hackathons.id, hackathonId));
+}
+
+/**
+ * Sets or clears "HNA approved". Approved hackathons keep their cover image
+ * for good; the rest lose it 30 days after they end
+ * (lib/hackathons/cover-retention.ts). hnaApprovedAt records the approval and
+ * is cleared with it. Writing the current value again is a no-op, so the
+ * timestamp keeps the original approval.
+ *
+ * Approving an ended hackathon whose thumbnails were held back by retention
+ * makes them now (after the response). A cover the cleanup already deleted is
+ * gone; the admin re-enters an image URL to restore one.
+ */
+export async function setHackathonHnaApproved(hackathonId: string, approved: boolean) {
+  const now = new Date();
+  const [changed] = await db
+    .update(hackathons)
+    .set({ hnaApproved: approved, hnaApprovedAt: approved ? now : null, updatedAt: now })
+    .where(and(eq(hackathons.id, hackathonId), ne(hackathons.hnaApproved, approved)))
+    .returning({ imageUrl: hackathons.imageUrl, imageThumbSmallUrl: hackathons.imageThumbSmallUrl });
+
+  if (approved && changed?.imageUrl && !changed.imageThumbSmallUrl) {
+    const sourceUrl = changed.imageUrl;
+    await afterResponse(() => generateCoverThumbnails({ hackathonId, sourceUrl }));
+  }
 }
 
 export async function updatePublishedHackathon(hackathonId: string, payload: AdminHackathonUpdatePayload) {

@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 import { hackathons } from "@/lib/db/schema";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { COVER_THUMBNAIL_SIZES } from "@/lib/hackathons/cover-image";
+import { isCoverRetentionExpired } from "@/lib/hackathons/cover-retention";
 import { deleteCoverThumbnailFiles, uploadCoverThumbnailFiles } from "@/lib/hackathons/cover-thumbnail-store";
 import { fetchVerifiedImage, type VerifiedImage } from "@/lib/hackathons/image-ingest";
 
@@ -64,7 +65,9 @@ export async function renderCoverThumbnails(bytes: Uint8Array): Promise<Rendered
 
 export type CoverThumbnailResult =
   | { status: "stored"; small: string; large: string }
-  | { status: "skipped"; reason: "animated" | "not-smaller" | "unreachable" }
+  /* "expired": a non-approved hackathon that ended over 30 days ago, whose
+     cover the retention cleanup deletes (lib/hackathons/cover-retention.ts). */
+  | { status: "skipped"; reason: "animated" | "not-smaller" | "unreachable" | "expired" }
   /* The hackathon's image changed (or it was deleted, or it already has
      thumbnails) while these were being made; they were thrown away. */
   | { status: "stale" }
@@ -83,7 +86,9 @@ function reportFailure(error: unknown, extra: Record<string, unknown>) {
  *
  * The row is only written while its imageUrl is still `sourceUrl` and it has
  * no thumbnails yet, so a slow run never overwrites a newer image's
- * thumbnails or attaches thumbnails to the wrong image. Never throws.
+ * thumbnails or attaches thumbnails to the wrong image. Nothing is made for a
+ * hackathon past cover retention, which would only be deleted again by the
+ * next cleanup. Never throws.
  */
 export async function generateCoverThumbnails(input: {
   hackathonId: string;
@@ -95,6 +100,10 @@ export async function generateCoverThumbnails(input: {
   let uploaded: string[] = [];
 
   try {
+    if (await isCoverRetentionExpired(input.hackathonId)) {
+      return { status: "skipped", reason: "expired" };
+    }
+
     const image = input.image ?? (await fetchVerifiedImage(input.sourceUrl));
 
     if (!image) {

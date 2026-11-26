@@ -11,6 +11,7 @@ const dbState = vi.hoisted(() => ({ updatedRows: [{ id: "h1" }] as Array<{ id: s
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches: vi.fn() }));
 vi.mock("@/lib/hackathons/image-ingest", () => ({ fetchVerifiedImage: vi.fn() }));
+vi.mock("@/lib/hackathons/cover-retention", () => ({ isCoverRetentionExpired: vi.fn(async () => false) }));
 vi.mock("@/lib/hackathons/cover-thumbnail-store", () => ({
   deleteCoverThumbnailFiles: vi.fn(async () => undefined),
   uploadCoverThumbnailFiles: vi.fn(async () => ["https://app.ufs.sh/f/small", "https://app.ufs.sh/f/large"]),
@@ -32,6 +33,7 @@ const { generateCoverThumbnails, renderCoverThumbnails, replaceCoverThumbnails }
 const { deleteCoverThumbnailFiles, uploadCoverThumbnailFiles } = await import("@/lib/hackathons/cover-thumbnail-store");
 const { fetchVerifiedImage } = await import("@/lib/hackathons/image-ingest");
 const { revalidateHackathonCaches } = await import("@/lib/hackathons/catalog");
+const { isCoverRetentionExpired } = await import("@/lib/hackathons/cover-retention");
 
 /* Random noise compresses badly, so these stand in for a heavy photo. */
 async function noiseImage(width: number, height: number, format: "png" | "jpeg" = "png") {
@@ -177,6 +179,22 @@ describe("generateCoverThumbnails", () => {
 
     expect(result.status).toBe("failed");
     expect(uploadCoverThumbnailFiles).not.toHaveBeenCalled();
+  });
+
+  it("makes nothing for a hackathon past cover retention, which cleanup would only delete again", async () => {
+    vi.mocked(isCoverRetentionExpired).mockResolvedValueOnce(true);
+
+    const result = await generateCoverThumbnails({
+      hackathonId: "h1",
+      sourceUrl: "https://cdn.example.com/cover.png",
+      image: { bytes: await noiseImage(1600, 800), contentType: "image/png" },
+    });
+
+    expect(result).toEqual({ status: "skipped", reason: "expired" });
+    expect(isCoverRetentionExpired).toHaveBeenCalledWith("h1");
+    expect(fetchVerifiedImage).not.toHaveBeenCalled();
+    expect(uploadCoverThumbnailFiles).not.toHaveBeenCalled();
+    expect(dbState.sets).toEqual([]);
   });
 
   it("does not revalidate when the caller batches that itself", async () => {

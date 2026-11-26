@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Pencil, Repeat, Trash2 } from "lucide-react";
+import { BadgeCheck, Pencil, Repeat, Trash2 } from "lucide-react";
 
 import type { AdminHackathonListItem } from "@/components/admin/hackathon-admin-item";
 import { HackathonEditDialog } from "@/components/admin/hackathon-edit-dialog";
@@ -88,6 +88,12 @@ function AdminHackathonCard({
         }}
         preview
       />
+      {item.hnaApproved ? (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-pine">
+          <BadgeCheck aria-hidden="true" className="size-4" />
+          HNA approved
+        </p>
+      ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"

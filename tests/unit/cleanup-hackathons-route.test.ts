@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { testEnv, backfillCoverThumbnails, deleteExpiredHackathonDiscordChannels, revalidateHackathonCaches, captureException } =
-  vi.hoisted(() => ({
-    testEnv: { CRON_SECRET: "cron-secret", UPLOADTHING_TOKEN: "ut-token" as string | undefined },
-    backfillCoverThumbnails: vi.fn(),
-    deleteExpiredHackathonDiscordChannels: vi.fn(),
-    revalidateHackathonCaches: vi.fn(),
-    captureException: vi.fn(),
-  }));
+const {
+  testEnv,
+  backfillCoverThumbnails,
+  clearExpiredCovers,
+  deleteExpiredHackathonDiscordChannels,
+  revalidateHackathonCaches,
+  captureException,
+} = vi.hoisted(() => ({
+  testEnv: { CRON_SECRET: "cron-secret", UPLOADTHING_TOKEN: "ut-token" as string | undefined },
+  backfillCoverThumbnails: vi.fn(),
+  clearExpiredCovers: vi.fn(),
+  deleteExpiredHackathonDiscordChannels: vi.fn(),
+  revalidateHackathonCaches: vi.fn(),
+  captureException: vi.fn(),
+}));
 
 vi.mock("@/lib/env", () => ({ env: testEnv }));
 vi.mock("@sentry/nextjs", () => ({ captureException }));
@@ -15,6 +22,7 @@ vi.mock("@/lib/discord/sync", () => ({ deleteExpiredHackathonDiscordChannels }))
 vi.mock("@/lib/security/rate-limit", () => ({ cleanupExpiredRateLimits: vi.fn(async () => 2) }));
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches }));
 vi.mock("@/lib/hackathons/cover-thumbnails-backfill", () => ({ backfillCoverThumbnails }));
+vi.mock("@/lib/hackathons/cover-retention", () => ({ clearExpiredCovers }));
 
 const { GET } = await import("@/app/api/cron/cleanup-hackathons/route");
 
@@ -25,6 +33,7 @@ function cronRequest(secret = "cron-secret") {
 }
 
 const backfillTotals = { pending: 4, stored: 2, skipped: 1, stale: 0, failed: 0, deferred: 1 };
+const coverTotals = { expired: 3, selected: 3, cleared: 3, changed: 0, failed: 0, deferred: 0, deletedFiles: 6 };
 
 describe("GET /api/cron/cleanup-hackathons", () => {
   beforeEach(() => {
@@ -32,6 +41,7 @@ describe("GET /api/cron/cleanup-hackathons", () => {
     testEnv.UPLOADTHING_TOKEN = "ut-token";
     deleteExpiredHackathonDiscordChannels.mockResolvedValue({ deleted: [], failed: [] });
     backfillCoverThumbnails.mockResolvedValue(backfillTotals);
+    clearExpiredCovers.mockResolvedValue(coverTotals);
   });
 
   it("refuses a request without the cron secret", async () => {
@@ -39,6 +49,7 @@ describe("GET /api/cron/cleanup-hackathons", () => {
 
     expect(response.status).toBe(401);
     expect(backfillCoverThumbnails).not.toHaveBeenCalled();
+    expect(clearExpiredCovers).not.toHaveBeenCalled();
   });
 
   it("catches up on missing cover thumbnails within the time budget, then refreshes the catalog", async () => {
@@ -52,6 +63,18 @@ describe("GET /api/cron/cleanup-hackathons", () => {
     expect(deadline).toBeLessThanOrEqual(Date.now() + 40_000);
     expect(body.data.coverThumbnails).toEqual({ status: "ran", ...backfillTotals });
     expect(body.data.expiredRateLimitBuckets).toBe(2);
+    expect(revalidateHackathonCaches).toHaveBeenCalledOnce();
+  });
+
+  it("clears expired covers under the same deadline and reports the counts", async () => {
+    const body = await (await GET(cronRequest())).json();
+
+    expect(body.data.covers).toEqual(coverTotals);
+    expect(clearExpiredCovers).toHaveBeenCalledWith({
+      deadline: backfillCoverThumbnails.mock.calls[0][0].deadline,
+      revalidate: false,
+    });
+    // Once for the whole run, covering the Discord, thumbnail and cover changes.
     expect(revalidateHackathonCaches).toHaveBeenCalledOnce();
   });
 
@@ -73,5 +96,21 @@ describe("GET /api/cron/cleanup-hackathons", () => {
     expect((await response.json()).data.coverThumbnails).toEqual({ status: "error" });
     expect(captureException).toHaveBeenCalledOnce();
     expect(revalidateHackathonCaches).toHaveBeenCalledOnce();
+  });
+
+  it("fails the run when a cover could not be deleted", async () => {
+    clearExpiredCovers.mockResolvedValueOnce({ ...coverTotals, cleared: 2, failed: 1 });
+
+    expect((await GET(cronRequest())).status).toBe(500);
+  });
+
+  it("still runs the Discord cleanup when the cover query throws", async () => {
+    clearExpiredCovers.mockRejectedValueOnce(new Error("db down"));
+
+    const response = await GET(cronRequest());
+
+    expect(response.status).toBe(500);
+    expect(deleteExpiredHackathonDiscordChannels).toHaveBeenCalledOnce();
+    expect((await response.json()).data.covers).toEqual({ error: "db down" });
   });
 });

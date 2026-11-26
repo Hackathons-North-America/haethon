@@ -506,6 +506,17 @@ describe("adminHackathonEditSchema", () => {
   it("rejects malformed Discord channel IDs", () => {
     expect(adminHackathonEditSchema.safeParse({ ...payload, discordChannelId: "not-an-id" }).success).toBe(false);
   });
+
+  it("carries the HNA approved flag, and leaves it out when absent", () => {
+    expect(adminHackathonEditSchema.parse({ ...payload, hnaApproved: true }).hnaApproved).toBe(true);
+    expect(adminHackathonEditSchema.parse({ ...payload, hnaApproved: false }).hnaApproved).toBe(false);
+    expect(adminHackathonEditSchema.parse(payload).hnaApproved).toBeUndefined();
+    expect(adminHackathonEditSchema.safeParse({ ...payload, hnaApproved: "yes" }).success).toBe(false);
+  });
+
+  it("is not something organizers can set", () => {
+    expect(adminHackathonUpdateSchema.parse({ ...payload, hnaApproved: true })).not.toHaveProperty("hnaApproved");
+  });
 });
 
 describe("adminHackathonCreateSchema", () => {

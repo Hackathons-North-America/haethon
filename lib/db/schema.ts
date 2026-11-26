@@ -186,6 +186,13 @@ export const hackathons = pgTable(
     /* Discord username of one organizer hackers can ping. Required on the
        organizer submission form; null for scraped/community listings. */
     discordTag: varchar("discord_tag", { length: 32 }),
+    /* "HNA approved" (Hackathons North America): an admin marked this
+       hackathon as worth keeping in full. Hackathons without it lose their
+       cover image 30 days after they end (lib/hackathons/cover-retention.ts);
+       every other field is kept either way. Admin-only, never shown publicly.
+       hnaApprovedAt is when it was first approved, null while unapproved. */
+    hnaApproved: boolean("hna_approved").notNull().default(false),
+    hnaApprovedAt: timestamp("hna_approved_at", { withTimezone: true }),
     /* Where the listing came from, compiled once when the hackathon is
        created (derived from the import's source URL) and admin-editable
        afterwards. Later sightings of the same event never overwrite it.

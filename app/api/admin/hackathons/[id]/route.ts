@@ -6,6 +6,7 @@ import { assignExistingDiscordChannel } from "@/lib/discord/sync";
 import {
   deleteHackathon,
   getAdminHackathon,
+  setHackathonHnaApproved,
   setHackathonSource,
   updatePublishedHackathon,
 } from "@/lib/hackathons/admin-service";
@@ -48,7 +49,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
 
   try {
-    const { discordChannelId, source, ...payload } = parsed.data;
+    const { discordChannelId, source, hnaApproved, ...payload } = parsed.data;
 
     if (discordChannelId) {
       await assignExistingDiscordChannel(id, discordChannelId);
@@ -56,6 +57,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (source !== undefined) {
       await setHackathonSource(id, source);
+    }
+
+    if (hnaApproved !== undefined) {
+      await setHackathonHnaApproved(id, hnaApproved);
     }
 
     const data = await updatePublishedHackathon(id, payload);
