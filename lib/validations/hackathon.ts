@@ -292,7 +292,12 @@ const optionalSource = z
 /* Admin-only edit payload. Organizers continue to use the schema above and
    cannot change which Discord channel the automation manages. */
 export const adminHackathonEditSchema = adminHackathonUpdatePayloadSchema
-  .extend({ discordChannelId: optionalDiscordChannelId, source: optionalSource })
+  .extend({
+    discordChannelId: optionalDiscordChannelId,
+    source: optionalSource,
+    // "HNA approved": keeps the cover after the event. Absent leaves it as is.
+    hnaApproved: z.boolean().optional(),
+  })
   .strip()
   .superRefine(dateRangeRefinement)
   .transform((payload) => normalizeLocationPayload(payload));
