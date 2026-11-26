@@ -49,6 +49,9 @@ export const config = {
      - /api/cities/search: CDN-cached for a day; the proxy would otherwise run
        on every autocomplete keystroke, cache hit or not.
      - /api/geo: only echoes Vercel's IP-geo request headers.
+     - /api/hackathons/catalog: the static catalog file /hackathons searches
+       in the browser. Fetched on every catalog visit, so the proxy would add
+       an invocation to each one.
      - /api/cron/*: authenticated by CRON_SECRET, not by a session.
      - /hackathons (exactly, not the pages under it): prerendered; per-viewer
        state loads in the browser, so Clerk would only add an invocation (and,
@@ -58,7 +61,7 @@ export const config = {
      that starts reading the session must be removed from the exclusions here
      (and stay in isPublicRoute above if signed-out visitors may see it). */
   matcher: [
-    "/((?!(?:about|corporate|discord)(?:/|$)|hackathons/?$|p/|api/(?:health|geo|cities/search)(?:/|$)|api/cron/|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api(?!/(?:health|geo|cities/search)(?:/|$)|/cron/)|trpc)(.*)",
+    "/((?!(?:about|corporate|discord)(?:/|$)|hackathons/?$|p/|api/(?:health|geo|cities/search|hackathons/catalog)(?:/|$)|api/cron/|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api(?!/(?:health|geo|cities/search|hackathons/catalog)(?:/|$)|/cron/)|trpc)(.*)",
   ],
 };

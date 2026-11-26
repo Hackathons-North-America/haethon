@@ -201,6 +201,15 @@ const getCachedCatalogSnapshot = unstable_cache(() => loadCatalogSnapshot(), [CA
   tags: [CATALOG_CACHE_TAG],
 });
 
+/**
+ * The whole cached snapshot, unfiltered. Served to the browser as a static
+ * file by app/api/hackathons/catalog/route.ts, which lets /hackathons answer
+ * every search in the browser (lib/hackathons/catalog-client.ts).
+ */
+export function getPublicCatalogSnapshot(): Promise<CatalogSnapshotEntry[]> {
+  return getCachedCatalogSnapshot();
+}
+
 export function revalidateHackathonCaches() {
   revalidateTag(CATALOG_CACHE_TAG, "max");
   revalidateTag(DETAIL_CACHE_TAG, "max");

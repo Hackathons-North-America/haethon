@@ -21,6 +21,8 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import type { ViewerCardHydration } from "@/components/use-viewer-card-hydration";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 import type { GeoPoint } from "@/lib/geo";
+import { loadCatalogSnapshot, peekCatalogSnapshot, searchCatalogSnapshot } from "@/lib/hackathons/catalog-client";
+import type { LoadedCatalogSnapshot } from "@/lib/hackathons/catalog-client";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
 import { sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
@@ -29,6 +31,7 @@ import type { RegionPresetId } from "@/lib/hackathons/region-presets";
 import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
 import { subscribeToHackathonStatusChanges } from "@/lib/hackathons/status-events";
 import { mergeViewerCardState } from "@/lib/hackathons/viewer-card-state";
+import type { ViewerCardState } from "@/lib/hackathons/viewer-card-state";
 import type {
   CatalogSort,
   DatePeriod,
@@ -200,6 +203,7 @@ export function HackathonSearch({
   basePath = "/hackathons",
   initialSort = "soonest",
   renderCard,
+  searchLocally = false,
   viewerCards,
 }: {
   /* Load the first page from the API on mount instead of from
@@ -219,6 +223,10 @@ export function HackathonSearch({
   /* Overrides how each grid card renders. Defaults to a plain HackathonCard; the
      admin view wraps it with edit/delete controls. */
   renderCard?: (hackathon: HackathonCardData, helpers: HackathonCardHelpers) => ReactNode;
+  /* Answer searches from the browser's copy of the public catalog
+     (lib/hackathons/catalog-client.ts) instead of a request per search. The
+     API stays the fallback while that copy can't be had. */
+  searchLocally?: boolean;
   /* Where the viewer's own card state (pipeline stage, votes) comes from when
      cards were rendered without it: the static page's cards, or a response
      the API answered before it could see the session. Omitted, cards keep
@@ -477,15 +485,31 @@ export function HackathonSearch({
      here, after the cards are already on screen. A stage the viewer changed
      in the meantime is newer than that answer, so it is left alone. */
   const statusChangedIdsRef = useRef(new Set<string>());
+  /* What this page has learned about the viewer, kept for cards that a local
+     search rebuilds from the catalog snapshot: the server's answers by card,
+     and the stages changed here since (which are newer than any answer).
+     Votes need nothing here; the vote control remembers confirmed votes
+     across remounts itself. */
+  const viewerStatesRef = useRef(new Map<string, ViewerCardState>());
+  const localStatusesRef = useRef(new Map<string, string | null>());
+  const requestedViewerIdsRef = useRef(new Set<string>());
 
   useEffect(
-    () => subscribeToHackathonStatusChanges((hackathonId) => statusChangedIdsRef.current.add(hackathonId)),
+    () =>
+      subscribeToHackathonStatusChanges((hackathonId, status) => {
+        statusChangedIdsRef.current.add(hackathonId);
+        localStatusesRef.current.set(hackathonId, status);
+      }),
     []
   );
 
   useEffect(
     () =>
       viewerCards?.subscribe((states) => {
+        for (const [id, state] of Object.entries(states)) {
+          viewerStatesRef.current.set(id, state);
+        }
+
         setCatalog((current) => mergeViewerCardState(current, states, statusChangedIdsRef.current));
       }),
     [viewerCards]
@@ -628,7 +652,6 @@ export function HackathonSearch({
        generation may update the catalog and URL. */
     const searchGeneration = append ? searchGenerationRef.current : ++searchGenerationRef.current;
 
-    setIsSearching(true);
     setSearchError(null);
     setOpenPopover(null);
 
@@ -639,11 +662,43 @@ export function HackathonSearch({
       searchAbortRef.current?.abort();
     }
 
+    if (filters.distanceKm !== "any" && !origin && locationState !== "locating") {
+      void locate();
+    }
+
+    /* With the catalog already in the browser the page is answered in this
+       same event, so the grid changes in the frame after the click with no
+       loading state in between. */
+    const ready = searchLocally ? peekCatalogSnapshot() : null;
+
+    if (ready) {
+      showLocalPage(ready, filters, offset, append, sortOrder);
+      // Re-downloads the copy in the background once it's past its age.
+      void loadCatalogSnapshot();
+      return;
+    }
+
+    setIsSearching(true);
+
     const abortController = new AbortController();
     searchAbortRef.current = abortController;
 
-    if (filters.distanceKm !== "any" && !origin && locationState !== "locating") {
-      void locate();
+    if (searchLocally) {
+      // Not here yet (a search in the first moment after the page opened):
+      // waiting for it is about as fast as the API, which it replaces.
+      const snapshot = await loadCatalogSnapshot();
+
+      if (searchGeneration !== searchGenerationRef.current || abortController.signal.aborted) {
+        return;
+      }
+
+      if (snapshot) {
+        showLocalPage(snapshot, filters, offset, append, sortOrder);
+        return;
+      }
+
+      // No copy to be had (offline, or a file built without a database):
+      // search through the API below.
     }
 
     const params = new URLSearchParams({
@@ -716,6 +771,46 @@ export function HackathonSearch({
         setIsSearching(false);
       }
     }
+  }
+
+  /* Puts one page of local results on screen, the way a successful API
+     response would. */
+  function showLocalPage(
+    snapshot: LoadedCatalogSnapshot,
+    filters: HackathonSearchFilters,
+    offset: number,
+    append: boolean,
+    sortOrder: CatalogSort
+  ) {
+    const page = searchCatalogSnapshot(snapshot, {
+      filters,
+      offset,
+      limit: SEARCH_PAGE_SIZE,
+      sort: sortOrder,
+      viewerStates: viewerStatesRef.current,
+    });
+    const cards = page.cards.map((card) =>
+      localStatusesRef.current.has(card.id)
+        ? { ...card, trackedStatus: localStatusesRef.current.get(card.id) ?? null }
+        : card
+    );
+    // The viewer's state for cards this page hasn't asked about yet. Sent
+    // only for signed-in visitors; the cards don't wait for it.
+    const unrequested = cards
+      .map((card) => card.id)
+      .filter((id) => !viewerStatesRef.current.has(id) && !requestedViewerIdsRef.current.has(id));
+
+    if (unrequested.length) {
+      unrequested.forEach((id) => requestedViewerIdsRef.current.add(id));
+      viewerCards?.request(unrequested);
+    }
+
+    setCatalog((current) => (append ? [...current, ...cards] : cards));
+    setHasMore(page.hasMore);
+    setAppliedFilters(filters);
+    setHasSearched(true);
+    // Also ends the loading state of a slower search this one replaced.
+    setIsSearching(false);
   }
 
   function clearSearch() {
