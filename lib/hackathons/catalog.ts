@@ -214,6 +214,33 @@ export function getPublicCatalogSnapshot(): Promise<CatalogSnapshotEntry[]> {
   return getCachedCatalogSnapshot();
 }
 
+/**
+ * Live vote totals for every listed hackathon that has any votes, as
+ * [upvotes, downvotes] by id. Served as its own static file
+ * (app/api/hackathons/catalog/votes), which is regenerated every minute: the
+ * snapshot's totals are up to ten minutes old, and a regeneration of that
+ * file costs one small query by primary key instead of the whole catalog.
+ */
+export async function getPublicCatalogVoteTotals(): Promise<Record<string, [number, number]>> {
+  const [snapshot, rows] = await Promise.all([
+    getCachedCatalogSnapshot(),
+    db
+      .select({
+        id: hackathonVoteTotals.hackathonId,
+        upvotes: hackathonVoteTotals.upvoteCount,
+        downvotes: hackathonVoteTotals.downvoteCount,
+      })
+      .from(hackathonVoteTotals)
+      .where(or(sql`${hackathonVoteTotals.upvoteCount} > 0`, sql`${hackathonVoteTotals.downvoteCount} > 0`)),
+  ]);
+  // Only hackathons the catalog lists; a draft's totals aren't public.
+  const listed = new Set(snapshot.map((entry) => entry.card.id));
+
+  return Object.fromEntries(
+    rows.filter((row) => listed.has(row.id)).map((row) => [row.id, [row.upvotes, row.downvotes]])
+  );
+}
+
 export function revalidateHackathonCaches() {
   revalidateTag(CATALOG_CACHE_TAG, "max");
   revalidateTag(DETAIL_CACHE_TAG, "max");

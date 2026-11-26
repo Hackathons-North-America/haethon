@@ -5,7 +5,7 @@ import {
   DEFAULT_SEARCH_FILTERS,
   catalogRequestFromSearch,
 } from "@/lib/hackathons/catalog-url";
-import { CATALOG_SNAPSHOT_URL, EARLY_CATALOG_GLOBAL } from "@/lib/hackathons/catalog-client";
+import { CATALOG_FILE_URLS, EARLY_CATALOG_GLOBAL } from "@/lib/hackathons/catalog-client";
 
 /* The boot script is a string that runs before React; evaluate it against a
    stand-in location and document the way the browser would. */
@@ -21,7 +21,7 @@ function runBootScript(search: string) {
     fakeWindow,
     (url: string) => {
       fetched.push(url);
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ entries: [] }) });
+      return Promise.resolve({ ok: true, text: () => Promise.resolve(`body of ${url}`) });
     }
   );
 
@@ -86,11 +86,14 @@ describe("CATALOG_URL_BOOT_SCRIPT", () => {
     expect(bootScriptMarks("?q=hack")).toBe(true);
   });
 
-  it("starts downloading the catalog file on a filtered URL, and only there", async () => {
+  it("starts downloading the three catalog files on a filtered URL, and only there", async () => {
     const filtered = runBootScript("?countries=Canada&search=1");
+    const early = filtered.early as Record<string, Promise<string | null>>;
 
-    expect(filtered.fetched).toEqual([CATALOG_SNAPSHOT_URL]);
-    await expect(filtered.early).resolves.toEqual({ entries: [] });
+    expect(filtered.fetched).toEqual([...CATALOG_FILE_URLS]);
+    for (const url of CATALOG_FILE_URLS) {
+      await expect(early[url]).resolves.toBe(`body of ${url}`);
+    }
 
     const plain = runBootScript("?search=1");
 

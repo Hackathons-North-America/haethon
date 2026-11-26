@@ -7,8 +7,13 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import { HackathonSearch } from "@/components/hackathon-search";
 import type { ViewerCardHydration } from "@/components/use-viewer-card-hydration";
 import {
+  CATALOG_DESCRIPTIONS_URL,
   CATALOG_SNAPSHOT_URL,
+  CATALOG_VOTES_URL,
+  catalogFileEntry,
+  loadCatalogDescriptions,
   loadCatalogSnapshot,
+  peekCatalogSnapshot,
   resetCatalogSnapshotForTests,
 } from "@/lib/hackathons/catalog-client";
 import type { CatalogSnapshotEntry } from "@/lib/hackathons/catalog-snapshot";
@@ -25,7 +30,9 @@ vi.mock("@/components/hackathon-card", async () => {
       ReactModule.createElement(
         "article",
         { "data-id": hackathon.id },
-        `${hackathon.name} stage=${hackathon.trackedStatus ?? "none"} up=${hackathon.upvotes ?? 0}`
+        `${hackathon.name} stage=${hackathon.trackedStatus ?? "none"} up=${hackathon.upvotes ?? "?"} blurb=${
+          hackathon.descriptionPending ? "pending" : hackathon.description ?? "none"
+        }`
       ),
   };
 });
@@ -88,7 +95,7 @@ function entry(id: string, card: Partial<CatalogSnapshotEntry["card"]>, upvotes 
 }
 
 const snapshotEntries = [
-  entry("toronto", { name: "Toronto Hacks", startsAt: "2099-08-01T00:00:00.000Z" }, 4),
+  entry("toronto", { name: "Toronto Hacks", description: "Six-a-side", startsAt: "2099-08-01T00:00:00.000Z" }, 4),
   entry("remote", { country: null, countryCode: null, format: "online", name: "Remote Jam" }, 2),
   entry("boston", { country: "United States", countryCode: "US", name: "Boston Hacks" }, 1),
 ];
@@ -99,6 +106,20 @@ const staticCards: HackathonCardData[] = snapshotEntries.map(({ card, upvotes })
   upvotes,
   downvotes: 0,
 }));
+
+/* The three files, as the routes build them from snapshotEntries. */
+const catalogFiles: Record<string, unknown> = {
+  [CATALOG_SNAPSHOT_URL]: {
+    entries: snapshotEntries.map(catalogFileEntry),
+  },
+  [CATALOG_DESCRIPTIONS_URL]: { descriptions: { toronto: "Six-a-side" } },
+  [CATALOG_VOTES_URL]: { votes: { toronto: [4, 0], remote: [2, 0], boston: [1, 0] } },
+};
+
+async function allFilesLoaded() {
+  await loadCatalogSnapshot({ votes: true });
+  await loadCatalogDescriptions();
+}
 
 function button(container: HTMLElement, label: string) {
   const found = [...container.querySelectorAll("button")].find((node) => node.textContent?.trim() === label);
@@ -118,6 +139,7 @@ describe("HackathonSearch with the local catalog", () => {
   let container: HTMLDivElement;
   let root: Root;
   let fetchMock: ReturnType<typeof vi.fn>;
+  let served: Record<string, unknown>;
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -139,11 +161,17 @@ describe("HackathonSearch with the local catalog", () => {
     );
 
     resetCatalogSnapshotForTests();
-    fetchMock = vi.fn(async (url: string) =>
-      url === CATALOG_SNAPSHOT_URL
-        ? { ok: true, json: async () => ({ entries: snapshotEntries }) }
-        : { ok: true, json: async () => ({ data: [], hasMore: false, signedIn: true }) }
-    );
+    served = { ...catalogFiles };
+    fetchMock = vi.fn(async (url: string) => {
+      const path = String(url).split("?")[0];
+
+      if (path in served) {
+        const body = await served[path];
+        return body === false ? { ok: false, text: async () => "" } : { ok: true, text: async () => JSON.stringify(body) };
+      }
+
+      return { ok: true, json: async () => ({ data: [], hasMore: false, signedIn: true }) };
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     container = document.createElement("div");
@@ -158,10 +186,11 @@ describe("HackathonSearch with the local catalog", () => {
     vi.unstubAllGlobals();
   });
 
-  function render(viewerCards?: ViewerCardHydration) {
+  function render(viewerCards?: ViewerCardHydration, initialSort: "soonest" | "top" = "soonest") {
     root.render(
       React.createElement(HackathonSearch, {
         initialFilters: DEFAULT_SEARCH_FILTERS,
+        initialSort,
         initialHackathons: staticCards,
         initialHasSearched: true,
         searchLocally: true,
@@ -171,7 +200,7 @@ describe("HackathonSearch with the local catalog", () => {
   }
 
   it("answers a region tab in the same click, without asking the API", async () => {
-    await loadCatalogSnapshot();
+    await allFilesLoaded();
     fetchMock.mockClear();
 
     await act(async () => render());
@@ -198,12 +227,14 @@ describe("HackathonSearch with the local catalog", () => {
     await act(async () => button(container, "Online").click());
 
     expect(shownNames(container)).toEqual(["Remote Jam"]);
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([CATALOG_SNAPSHOT_URL]);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(CATALOG_SNAPSHOT_URL);
+    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(expect.stringMatching(/^\/api\/hackathons\?/));
   });
 
   it("falls back to the API when the file can't be had", async () => {
+    served[CATALOG_SNAPSHOT_URL] = false;
     fetchMock.mockImplementation(async (url: string) =>
-      url === CATALOG_SNAPSHOT_URL
+      String(url).split("?")[0] === CATALOG_SNAPSHOT_URL
         ? { ok: false }
         : {
             ok: true,
@@ -222,7 +253,7 @@ describe("HackathonSearch with the local catalog", () => {
   });
 
   it("keeps what it learned about the viewer on cards a search rebuilds", async () => {
-    await loadCatalogSnapshot();
+    await allFilesLoaded();
 
     const viewer = fakeViewerCards();
 
@@ -244,5 +275,61 @@ describe("HackathonSearch with the local catalog", () => {
 
     // Not asked twice.
     expect(viewer.requests).toEqual([["boston"], ["remote"]]);
+  });
+
+  it("doesn't download the blurbs until a search draws a card the page didn't come with", async () => {
+    await loadCatalogSnapshot();
+    await act(async () => render());
+    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(CATALOG_DESCRIPTIONS_URL);
+
+    act(() => button(container, "North America").click());
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain(CATALOG_DESCRIPTIONS_URL);
+  });
+
+  it("shows cards before their blurbs and scores arrive, then fills them in", async () => {
+    let sendSideFiles: () => void = () => {};
+    const sideFiles = new Promise<void>((resolve) => (sendSideFiles = resolve));
+    served[CATALOG_DESCRIPTIONS_URL] = sideFiles.then(() => catalogFiles[CATALOG_DESCRIPTIONS_URL]);
+    served[CATALOG_VOTES_URL] = sideFiles.then(() => catalogFiles[CATALOG_VOTES_URL]);
+
+    await loadCatalogSnapshot();
+    await act(async () => render());
+
+    act(() => button(container, "North America").click());
+
+    expect(container).toHaveTextContent("Toronto Hacks stage=none up=? blurb=pending");
+    expect(container).toHaveTextContent("Boston Hacks stage=none up=? blurb=pending");
+
+    await act(async () => {
+      sendSideFiles();
+      await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+      await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
+    });
+
+    expect(container).toHaveTextContent("Toronto Hacks stage=none up=4 blurb=Six-a-side");
+    expect(container).toHaveTextContent("Boston Hacks stage=none up=1 blurb=none");
+  });
+
+  it("waits for the votes before answering a Top voted search locally", async () => {
+    let sendVotes: () => void = () => {};
+    served[CATALOG_VOTES_URL] = new Promise<void>((resolve) => (sendVotes = resolve)).then(
+      () => ({ votes: { boston: [9, 0], toronto: [1, 0] } })
+    );
+
+    await loadCatalogSnapshot();
+    await act(async () => render(undefined, "top"));
+
+    act(() => button(container, "North America").click());
+    // Not ranked yet: the grid still shows the page's own cards while it searches.
+    expect(shownNames(container)).toEqual(["Toronto Hacks", "Remote Jam", "Boston Hacks"]);
+    expect(container.querySelector('[aria-label="Searching hackathons"]')).not.toBeNull();
+
+    await act(async () => {
+      sendVotes();
+      await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
+    });
+
+    expect(shownNames(container)).toEqual(["Boston Hacks", "Toronto Hacks"]);
+    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(expect.stringMatching(/^\/api\/hackathons\?/));
   });
 });

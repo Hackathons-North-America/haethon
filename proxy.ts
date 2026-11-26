@@ -49,9 +49,10 @@ export const config = {
      - /api/cities/search: CDN-cached for a day; the proxy would otherwise run
        on every autocomplete keystroke, cache hit or not.
      - /api/geo: only echoes Vercel's IP-geo request headers.
-     - /api/hackathons/catalog: the static catalog file /hackathons searches
-       in the browser. Fetched on every catalog visit, so the proxy would add
-       an invocation to each one.
+     - /api/hackathons/catalog and the files under it (/descriptions,
+       /votes, /versions): the static catalog files /hackathons searches in the browser.
+       Fetched on every catalog visit and re-checked while the tab is open,
+       so the proxy would add an invocation to each request.
      - /api/cron/*: authenticated by CRON_SECRET, not by a session.
      - /hackathons (exactly, not the pages under it): prerendered; per-viewer
        state loads in the browser, so Clerk would only add an invocation (and,
