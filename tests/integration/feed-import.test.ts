@@ -18,7 +18,16 @@ vi.mock("@/lib/discord/sync", async (importOriginal) => ({
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches: vi.fn() }));
 vi.mock("@/lib/hackathons/image-ingest", () => ({
   assertReachableImageUrl: vi.fn(async () => undefined),
+  fetchVerifiedImage: vi.fn(async (url?: string | null) =>
+    url ? { bytes: new Uint8Array([1]), contentType: "image/png" } : undefined
+  ),
   verifiedImageUrl: vi.fn(async (url?: string | null) => url ?? undefined),
+}));
+// Cover thumbnails have their own suite (cover-thumbnails.test.ts).
+vi.mock("@/lib/hackathons/cover-thumbnails", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/hackathons/cover-thumbnails")>()),
+  generateCoverThumbnails: vi.fn(async () => ({ status: "skipped", reason: "unreachable" })),
+  replaceCoverThumbnails: vi.fn(async () => undefined),
 }));
 
 const { db } = await import("@/lib/db");
@@ -37,7 +46,7 @@ const {
 } = await import("@/lib/db/schema");
 const { importAdminHackathons } = await import("@/lib/hackathons/review-service");
 const { ensureHackathonDiscordChannelOrThrow, syncHackathonDiscordChannel } = await import("@/lib/discord/sync");
-const { verifiedImageUrl } = await import("@/lib/hackathons/image-ingest");
+const { fetchVerifiedImage } = await import("@/lib/hackathons/image-ingest");
 const { backfillExternalIds } = await import("@/lib/hackathons/external-ids-backfill");
 const { adminHackathonImportSchema } = await import("@/lib/validations/hackathon");
 
@@ -388,7 +397,7 @@ describe("one request, many rows", () => {
   });
 
   it("clears an image that turns out to be unreachable, after publishing", async () => {
-    vi.mocked(verifiedImageUrl).mockResolvedValueOnce(undefined);
+    vi.mocked(fetchVerifiedImage).mockResolvedValueOnce(undefined);
 
     const result = await importRows([
       { ...BASE, imageUrl: "https://images.example.com/dead.png" },

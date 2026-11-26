@@ -22,6 +22,7 @@
     "backfill:import-submission-origin": "tsx scripts/backfill-import-submission-origin.ts",
     "backfill:passive-verification": "tsx scripts/backfill-passive-verification.ts",
     "backfill:location-coordinates": "tsx scripts/backfill-location-coordinates.ts",
+    "backfill:cover-thumbnails": "tsx scripts/backfill-cover-thumbnails.ts",
     "repair:checkin-codes": "node scripts/db/repair-checkin-codes.mjs"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-icons": "^5.7.0",
+    "sharp": "0.35.5",
     "undici": "6.29.1",
     "uploadthing": "^7.7.4",
     "zod": "^4.6.7"

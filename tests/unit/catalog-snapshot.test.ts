@@ -40,6 +40,8 @@ function entry(overrides: {
       highSchoolersOnly: overrides.highSchoolersOnly ?? false,
       id: overrides.id,
       image: null,
+      imageThumbSmall: null,
+      imageThumbLarge: null,
       latitude: null,
       longitude: null,
       location: "",

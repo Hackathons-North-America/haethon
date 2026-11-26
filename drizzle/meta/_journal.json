@@ -288,6 +288,13 @@
       "when": 1795500317315,
       "tag": "0040_perf_vote_totals_channel_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795679185373,
+      "tag": "0041_cover_thumbnails",
+      "breakpoints": true
     }
   ]
 }

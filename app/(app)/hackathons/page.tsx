@@ -5,7 +5,7 @@ import { preload } from "react-dom";
 import { HackathonCatalog } from "@/components/hackathon-catalog";
 import { applyUserCardState, CATALOG_PAGE_SIZE, getPublicHackathonCatalog } from "@/lib/hackathons/catalog";
 import { CATALOG_URL_BOOT_SCRIPT } from "@/lib/hackathons/catalog-url";
-import { hackathonLogoSrc } from "@/lib/hackathons/logo-hosts";
+import { coverImageAttributes } from "@/lib/hackathons/cover-image";
 
 export const metadata: Metadata = {
   title: "Hackathons | Hackathons North America",
@@ -55,9 +55,10 @@ async function loadCatalogSnapshot() {
 }
 
 /* One row of cards at the widest layout: the covers a visitor sees without
-   scrolling. Kept this small on purpose. Covers are the organizers' original
-   files (often several hundred KB each), and a prefetch of this page from the
-   landing page downloads them for visitors who may never click through. */
+   scrolling. Kept this small on purpose: a prefetch of this page from the
+   landing page downloads them for visitors who may never click through. With
+   thumbnails that is a few tens of KB per cover; a cover without them is
+   still the organizer's original (often several hundred KB). */
 const COVER_PRELOAD_COUNT = 3;
 
 export default async function HackathonsPage() {
@@ -67,10 +68,13 @@ export default async function HackathonsPage() {
      request them until the cards render. Preload hints from here travel with
      the page: in the HTML head on a direct visit, and in the prefetched
      payload on a client-side navigation, so the first covers are already
-     downloading (or done) when the cards appear. The URL must be exactly the
-     one HackathonCard renders. */
+     downloading (or done) when the cards appear. The hint must describe
+     exactly the image HackathonCard renders: with thumbnails that is a srcset,
+     so the browser preloads the same width it will then pick for the card. */
   for (const card of snapshot?.cards.filter((entry) => entry.image && !entry.isPast).slice(0, COVER_PRELOAD_COUNT) ?? []) {
-    preload(hackathonLogoSrc(card.id, card.image!), { as: "image" });
+    const cover = coverImageAttributes(card)!;
+
+    preload(cover.src, { as: "image", imageSrcSet: cover.srcSet, imageSizes: cover.sizes });
   }
 
   return (

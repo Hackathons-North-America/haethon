@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { afterResponse } from "@/lib/after-response";
 import { db } from "@/lib/db";
 import { drainDiscordChannelJobsSafely, enqueueDiscordChannelJobQuery } from "@/lib/discord/channel-jobs";
 import { categoryForHackathon } from "@/lib/discord/channel-rules";
@@ -34,7 +35,12 @@ import {
   toResolvedCity,
 } from "@/lib/hackathons/city-lookup";
 import { DATE_FIELDS, externalIdsOf, feedChanges, LOCATION_FIELDS, type FeedField } from "@/lib/hackathons/external-ids";
-import { verifiedImageUrl } from "@/lib/hackathons/image-ingest";
+import {
+  CLEARED_COVER_THUMBNAILS,
+  generateCoverThumbnails,
+  replaceCoverThumbnails,
+} from "@/lib/hackathons/cover-thumbnails";
+import { fetchVerifiedImage } from "@/lib/hackathons/image-ingest";
 import { normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
 import {
   calculateDuplicateScore,
@@ -293,12 +299,34 @@ async function applyFeedUpdate(
     }
   }
 
-  if (has("imageUrl")) {
-    const imageUrl = await verifiedImageUrl(payload.imageUrl);
+  let coverChange: Parameters<typeof replaceCoverThumbnails>[0] | null = null;
 
-    if (imageUrl) {
-      hackathonValues.imageUrl = imageUrl;
+  if (has("imageUrl")) {
+    const image = await fetchVerifiedImage(payload.imageUrl);
+
+    if (image) {
+      const [current] = await db
+        .select({
+          imageUrl: hackathons.imageUrl,
+          imageThumbSmallUrl: hackathons.imageThumbSmallUrl,
+          imageThumbLargeUrl: hackathons.imageThumbLargeUrl,
+        })
+        .from(hackathons)
+        .where(eq(hackathons.id, hackathonId))
+        .limit(1);
+
+      hackathonValues.imageUrl = payload.imageUrl;
       applied.add("imageUrl");
+
+      if (current && current.imageUrl !== payload.imageUrl) {
+        Object.assign(hackathonValues, CLEARED_COVER_THUMBNAILS);
+        coverChange = {
+          hackathonId,
+          previous: [current.imageThumbSmallUrl, current.imageThumbLargeUrl],
+          sourceUrl: payload.imageUrl!,
+          image,
+        };
+      }
     }
   }
 
@@ -366,6 +394,11 @@ async function applyFeedUpdate(
     await syncHackathonDiscordChannelSafely(hackathonId);
   }
 
+  if (coverChange) {
+    const change = coverChange;
+    await afterResponse(() => replaceCoverThumbnails(change));
+  }
+
   return FEED_FIELDS_IN_ORDER.filter((field) => applied.has(field));
 }
 
@@ -401,7 +434,9 @@ export async function createPublishedHackathon(
   payload = normalizeLocationPayload(payload);
   // Vetted once at ingest; a dead or non-image URL degrades to the initials
   // tile rather than failing the import (see lib/hackathons/image-ingest.ts).
-  payload = { ...payload, imageUrl: await verifiedImageUrl(payload.imageUrl) };
+  // The downloaded bytes are kept for the cover thumbnails made below.
+  const coverImage = await fetchVerifiedImage(payload.imageUrl);
+  payload = { ...payload, imageUrl: coverImage ? payload.imageUrl : undefined };
   const organizationId = await ensureOrganization(payload);
   const seriesId = await ensureHackathonSeries(payload);
   const slug = await uniqueHackathonSlug(payload.name);
@@ -459,6 +494,11 @@ export async function createPublishedHackathon(
     revalidateHackathonCaches();
   }
 
+  if (coverImage && payload.imageUrl) {
+    const sourceUrl = payload.imageUrl;
+    await afterResponse(() => generateCoverThumbnails({ hackathonId: created.id, sourceUrl, image: coverImage }));
+  }
+
   return created.id;
 }
 
@@ -476,6 +516,9 @@ async function mergeIntoHackathon(
   }
 
   const seriesId = existing.seriesId ?? (await ensureHackathonSeries(payload));
+  // The import's image only fills a hackathon that has none.
+  const filledImage = existing.imageUrl ? undefined : await fetchVerifiedImage(payload.imageUrl);
+  const filledImageUrl = filledImage ? payload.imageUrl : undefined;
 
   // When the target already had a series, ensureHackathonSeries was skipped
   // above, so the recurring toggle has to be applied to that series directly.
@@ -492,7 +535,7 @@ async function mergeIntoHackathon(
       seriesId,
       shortDescription: existing.shortDescription ?? payload.shortDescription,
       websiteUrl: existing.websiteUrl ?? payload.websiteUrl,
-      imageUrl: existing.imageUrl ?? (await verifiedImageUrl(payload.imageUrl)),
+      imageUrl: existing.imageUrl ?? filledImageUrl,
       applicationUrl: existing.applicationUrl ?? payload.applicationUrl,
       venue: existing.venue ?? payload.venue,
       beginnerFriendly: existing.beginnerFriendly || payload.beginnerFriendly,
@@ -561,6 +604,12 @@ async function mergeIntoHackathon(
   }
 
   revalidateHackathonCaches();
+
+  if (filledImage && filledImageUrl) {
+    await afterResponse(() =>
+      generateCoverThumbnails({ hackathonId: targetHackathonId, sourceUrl: filledImageUrl, image: filledImage })
+    );
+  }
 
   return targetHackathonId;
 }
@@ -928,28 +977,44 @@ function isUniqueViolation(error: unknown) {
  * out to be dead or not an image is cleared, which degrades the card to the
  * initials tile (see lib/hackathons/image-ingest.ts). The guard on the stored
  * URL keeps an admin's edit made in the meantime.
+ *
+ * A live image's cover thumbnails are cut from the same download, so each
+ * imported cover is fetched once.
  */
-async function dropUnreachableImages(images: Array<{ hackathonId: string; imageUrl: string }>) {
+async function vetImportedImages(images: Array<{ hackathonId: string; imageUrl: string }>) {
   let cursor = 0;
-  let dropped = 0;
+  let changed = 0;
 
   await Promise.all(
     Array.from({ length: Math.min(4, images.length) }, async () => {
       while (cursor < images.length) {
         const image = images[cursor++];
+        const fetched = await fetchVerifiedImage(image.imageUrl);
 
-        if (!(await verifiedImageUrl(image.imageUrl))) {
+        if (!fetched) {
           await db
             .update(hackathons)
             .set({ imageUrl: null })
             .where(and(eq(hackathons.id, image.hackathonId), eq(hackathons.imageUrl, image.imageUrl)));
-          dropped += 1;
+          changed += 1;
+          continue;
+        }
+
+        const thumbnails = await generateCoverThumbnails({
+          hackathonId: image.hackathonId,
+          sourceUrl: image.imageUrl,
+          image: fetched,
+          revalidate: false,
+        });
+
+        if (thumbnails.status === "stored") {
+          changed += 1;
         }
       }
     })
   );
 
-  if (dropped) {
+  if (changed) {
     revalidateHackathonCaches();
   }
 }
@@ -1368,7 +1433,7 @@ async function runAdminImport(input: {
         slug,
         shortDescription: payload.shortDescription,
         websiteUrl: payload.websiteUrl,
-        // Stored as sent and vetted after the response (dropUnreachableImages).
+        // Stored as sent and vetted after the response (vetImportedImages).
         imageUrl: payload.imageUrl,
         applicationUrl: payload.applicationUrl,
         venue: payload.venue,
@@ -1457,7 +1522,7 @@ async function runAdminImport(input: {
   const deferred: Array<() => Promise<unknown>> = [];
 
   if (newImages.length) {
-    deferred.push(() => dropUnreachableImages(newImages));
+    deferred.push(() => vetImportedImages(newImages));
   }
 
   if (queuedJobs) {
