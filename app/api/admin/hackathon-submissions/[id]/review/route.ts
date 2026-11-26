@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
 import { reviewHackathonSubmission } from "@/lib/hackathons/review-service";
+import { drainDiscordReviewQueueSafely } from "@/lib/discord/review-queue";
 import { reviewActionErrorPayload, reviewActionSchema } from "@/lib/validations/hackathon";
 
 type RouteContext = {
@@ -29,6 +30,9 @@ export async function POST(request: Request, context: RouteContext) {
       reviewerUserId: gate.user.id,
       submissionId: id,
     });
+
+    // Takes the buttons off this submission's message in the Discord review channel.
+    after(drainDiscordReviewQueueSafely);
 
     return NextResponse.json({ data: result });
   } catch (error) {

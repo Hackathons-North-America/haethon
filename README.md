@@ -245,6 +245,7 @@ template is [`.env.example`](.env.example).
 | --- | --- | --- |
 | Discord | `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_GUILD_ID` | Event channel creation, links, sorting, and archiving |
 | Discord categories | `DISCORD_CANADA_CATEGORY_ID`, `DISCORD_US_CATEGORY_ID`, `DISCORD_DELETED_CATEGORY_ID` | Explicit category mappings; categories can otherwise be resolved by name |
+| Discord review and `/add-hackathon` | `DISCORD_PUBLIC_KEY`, `DISCORD_TEAM_ROLE_ID` | Signed interactions (buttons, pop-ups, slash command) and the role that sees the private review channel |
 | UploadThing | `UPLOADTHING_TOKEN` | Admin-managed event image uploads |
 | Scraper import | `SCRAPER_IMPORT_SECRET` | Unattended imports from the hackathon scraper (`/api/cron/import-hackathons`) |
 | PostHog | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | Product analytics |
@@ -276,6 +277,40 @@ half-year archive categories such as `past-hackathons-h1-2026`. Deleted events
 are parked in the configured deleted category for manual cleanup rather than
 being destroyed automatically. New channels receive a pinned message linking
 to the event website and its Haethon detail page.
+
+</details>
+
+<details>
+<summary><strong>Discord review channel and /add-hackathon</strong></summary>
+
+Anything waiting on the team is posted to a private `#hackathon-review`
+channel with buttons: pending submissions (✅ Approve, ❌ Reject, and 🔀 Merge
+/ ♻️ Replace when a duplicate matched), the scraper's possible duplicates
+(🆕 Import as new, 🔀 Merge, 🗑️ Skip), and the scraper's new Canadian and US
+hackathons waiting on a channel (✅ Create channel, ❌ No channel). Approving a
+community tip, or a broken import, first opens a pop-up for its dates and
+location. Reviews done on the website update the Discord message, and the
+reverse.
+
+`/add-hackathon hacker` and `/add-hackathon organizer` take the same fields
+as the two tabs of the web form on `/submit`. Organizer mode runs as three
+pop-ups and a final step. Everything submitted from Discord waits for review,
+recorded under a `discord-bot` system account with the sender's Discord name.
+
+1. Copy the application's **Public Key** (General Information) to
+   `DISCORD_PUBLIC_KEY`.
+2. Copy the ID of the role that should review (for example "Team") to
+   `DISCORD_TEAM_ROLE_ID`. Server administrators can review too.
+3. Deploy, then set **Interactions Endpoint URL** (General Information) to
+   `https://<your domain>/api/discord/interactions`. Discord checks the
+   endpoint when you save.
+4. Run `pnpm discord:register-commands` to add `/add-hackathon` to the server.
+5. Optionally run `pnpm discord:post-review-backlog` to post the submissions
+   already waiting (`--dry-run` lists them first).
+
+The bot also needs **Embed Links** and **Read Message History**. It creates
+the channel the first time something is posted, hidden from everyone except
+that role and itself.
 
 </details>
 

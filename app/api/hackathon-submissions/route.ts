@@ -1,9 +1,10 @@
 import { desc, eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getCurrentIdentity, getCurrentUserContext } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hackathonSubmissions } from "@/lib/db/schema";
+import { enqueueAndDrainSafely, submissionReviewItems } from "@/lib/discord/review-queue";
 import { createHackathonSubmission } from "@/lib/hackathons/review-service";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { hackathonSubmissionSchema } from "@/lib/validations/hackathon";
@@ -61,6 +62,11 @@ export async function POST(request: Request) {
 
   try {
     const result = await createHackathonSubmission(parsed.data, context.user, context.role);
+
+    if (!result.publishedDirectly) {
+      // Also posted to the team's private review channel in Discord.
+      after(() => enqueueAndDrainSafely(submissionReviewItems([result.submission.id])));
+    }
 
     return NextResponse.json({ data: result }, { status: result.publishedDirectly ? 201 : 202 });
   } catch (error) {

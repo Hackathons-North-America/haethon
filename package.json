@@ -23,7 +23,9 @@
     "backfill:passive-verification": "tsx scripts/backfill-passive-verification.ts",
     "backfill:location-coordinates": "tsx scripts/backfill-location-coordinates.ts",
     "backfill:cover-thumbnails": "tsx scripts/backfill-cover-thumbnails.ts",
-    "repair:checkin-codes": "node scripts/db/repair-checkin-codes.mjs"
+    "repair:checkin-codes": "node scripts/db/repair-checkin-codes.mjs",
+    "discord:register-commands": "tsx scripts/discord/register-commands.ts",
+    "discord:post-review-backlog": "tsx scripts/discord/post-review-backlog.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.11",

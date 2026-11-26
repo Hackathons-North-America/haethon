@@ -1,6 +1,8 @@
 import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
+import { scraperImportReviewItems } from "@/lib/discord/review-items";
+import { enqueueAndDrainSafely } from "@/lib/discord/review-queue";
 import { env } from "@/lib/env";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
@@ -21,8 +23,8 @@ export const maxDuration = 60;
  *
  * `ignoreDuplicates` is not honoured here: importing a possible duplicate "as
  * new anyway" is an admin's decision. Such rows come back as
- * `duplicate_flagged` with nothing written, and the scraper saves them for
- * the admin import page.
+ * `duplicate_flagged` with nothing written; the scraper saves them for the
+ * admin import page, and they are posted to the Discord review channel.
  */
 export async function POST(request: Request) {
   if (!env.SCRAPER_IMPORT_SECRET) {
@@ -68,6 +70,14 @@ export async function POST(request: Request) {
     // The writes are committed; drop the prerendered catalog now rather than
     // waiting for the deferred work.
     revalidateHackathonCaches();
+
+    // No admin is watching an unattended import, so its possible duplicates
+    // and channel decisions go to the team's review channel in Discord.
+    const reviewItems = scraperImportReviewItems(parsed.data.hackathons, result.results);
+
+    if (reviewItems.length) {
+      after(() => enqueueAndDrainSafely(reviewItems));
+    }
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

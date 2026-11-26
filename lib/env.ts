@@ -15,6 +15,13 @@ export const env = createEnv({
     DISCORD_CANADA_CATEGORY_ID: z.string().min(1).optional(),
     DISCORD_US_CATEGORY_ID: z.string().min(1).optional(),
     DISCORD_DELETED_CATEGORY_ID: z.string().min(1).optional(),
+    // Optional: the application's public key from the Discord developer
+    // portal. Unset, /api/discord/interactions answers 503, so the review
+    // buttons and /add-hackathon do nothing.
+    DISCORD_PUBLIC_KEY: z.string().regex(/^[0-9a-f]{64}$/i).optional(),
+    // Optional: the role whose members see the private review channel and may
+    // use its buttons. Unset, nothing is posted for review in Discord.
+    DISCORD_TEAM_ROLE_ID: z.string().min(1).optional(),
     SENTRY_AUTH_TOKEN: z.string().min(1).optional(),
     SENTRY_ORG: z.string().min(1).optional(),
     SENTRY_PROJECT: z.string().min(1).optional(),
@@ -48,6 +55,8 @@ export const env = createEnv({
     DISCORD_CANADA_CATEGORY_ID: process.env.DISCORD_CANADA_CATEGORY_ID,
     DISCORD_US_CATEGORY_ID: process.env.DISCORD_US_CATEGORY_ID,
     DISCORD_DELETED_CATEGORY_ID: process.env.DISCORD_DELETED_CATEGORY_ID,
+    DISCORD_PUBLIC_KEY: process.env.DISCORD_PUBLIC_KEY,
+    DISCORD_TEAM_ROLE_ID: process.env.DISCORD_TEAM_ROLE_ID,
     SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN,
     SENTRY_ORG: process.env.SENTRY_ORG,
     SENTRY_PROJECT: process.env.SENTRY_PROJECT,

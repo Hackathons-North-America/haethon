@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { requireAdminUserId } from "@/lib/auth";
+import { enqueueAndDrainSafely, submissionReviewItems } from "@/lib/discord/review-queue";
 import { importAdminHackathonFixItems, listHackathonSubmissions } from "@/lib/hackathons/review-service";
 import { adminHackathonFixImportSchema } from "@/lib/validations/hackathon";
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     });
     // Auto-merged items are already resolved; only queued ones belong in the review workspace.
     const submissionIds = result.results.filter((item) => item.status === "queued").map((item) => item.submissionId);
+    after(() => enqueueAndDrainSafely(submissionReviewItems(submissionIds)));
     const importedSubmissions = await listHackathonSubmissions({
       limit: submissionIds.length,
       submissionIds,
