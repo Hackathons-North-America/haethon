@@ -73,8 +73,8 @@ export function HackathonCatalog({
   const request = urlSearch === null ? DEFAULT_CATALOG_REQUEST : catalogRequestFromSearch(urlSearch);
   const showsStaticCards = request.isDefault && initialHackathons !== null;
 
-  /* The catalog file every search is answered from, with its descriptions
-     and votes files behind it. Requested once the page is on screen (a
+  /* The catalog file every search is answered from, with its votes file
+     behind it (descriptions wait for the first search that needs them). Requested once the page is on screen (a
      filtered URL's boot script has usually started them already), at low
      priority, so the catalog has normally arrived before the visitor first
      touches a filter. */

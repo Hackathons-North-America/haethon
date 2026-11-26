@@ -11,6 +11,7 @@ import {
   CATALOG_SNAPSHOT_URL,
   CATALOG_VOTES_URL,
   catalogFileEntry,
+  loadCatalogDescriptions,
   loadCatalogSnapshot,
   peekCatalogSnapshot,
   resetCatalogSnapshotForTests,
@@ -117,7 +118,7 @@ const catalogFiles: Record<string, unknown> = {
 
 async function allFilesLoaded() {
   await loadCatalogSnapshot({ votes: true });
-  await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+  await loadCatalogDescriptions();
 }
 
 function button(container: HTMLElement, label: string) {
@@ -274,6 +275,15 @@ describe("HackathonSearch with the local catalog", () => {
 
     // Not asked twice.
     expect(viewer.requests).toEqual([["boston"], ["remote"]]);
+  });
+
+  it("doesn't download the blurbs until a search draws a card the page didn't come with", async () => {
+    await loadCatalogSnapshot();
+    await act(async () => render());
+    expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(CATALOG_DESCRIPTIONS_URL);
+
+    act(() => button(container, "North America").click());
+    expect(fetchMock.mock.calls.map(([url]) => url)).toContain(CATALOG_DESCRIPTIONS_URL);
   });
 
   it("shows cards before their blurbs and scores arrive, then fills them in", async () => {

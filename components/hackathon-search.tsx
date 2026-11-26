@@ -23,6 +23,7 @@ import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 import type { GeoPoint } from "@/lib/geo";
 import {
   fillCardsFromSnapshot,
+  loadCatalogDescriptions,
   loadCatalogSnapshot,
   peekCatalogSnapshot,
   searchCatalogSnapshot,
@@ -827,6 +828,11 @@ export function HackathonSearch({
     if (unrequested.length) {
       unrequested.forEach((id) => requestedViewerIdsRef.current.add(id));
       viewerCards?.request(unrequested);
+    }
+
+    // The page came with its own cards' blurbs; these are the first it didn't.
+    if (cards.some((card) => card.descriptionPending)) {
+      void loadCatalogDescriptions();
     }
 
     setCatalog((current) => (append ? [...current, ...cards] : cards));

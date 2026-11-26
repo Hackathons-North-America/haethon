@@ -9,6 +9,7 @@ import {
   catalogFileEntry,
   EARLY_CATALOG_GLOBAL,
   fillCardsFromSnapshot,
+  loadCatalogDescriptions,
   loadCatalogSnapshot,
   peekCatalogSnapshot,
   resetCatalogSnapshotForTests,
@@ -255,7 +256,7 @@ describe("loadCatalogSnapshot", () => {
     window[EARLY_CATALOG_GLOBAL] = undefined;
   });
 
-  it("downloads the catalog once, then the descriptions and votes once each", async () => {
+  it("downloads the catalog once, then the votes, and the descriptions only when asked", async () => {
     const fetchMock = serve(filesOf(entries));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -264,8 +265,11 @@ describe("loadCatalogSnapshot", () => {
     expect(first).toBe(second);
     expect(first?.entries).toHaveLength(entries.length);
     await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
-    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
-    expect(urlsOf(fetchMock)).toEqual([CATALOG_SNAPSHOT_URL, CATALOG_DESCRIPTIONS_URL, CATALOG_VOTES_URL]);
+    expect(urlsOf(fetchMock)).toEqual([CATALOG_SNAPSHOT_URL, CATALOG_VOTES_URL]);
+    expect(peekCatalogSnapshot()?.descriptions).toBeNull();
+
+    await Promise.all([loadCatalogDescriptions(), loadCatalogDescriptions()]);
+    expect(urlsOf(fetchMock)).toEqual([CATALOG_SNAPSHOT_URL, CATALOG_VOTES_URL, CATALOG_DESCRIPTIONS_URL]);
 
     // The catalog file carries no blurbs and the snapshot ranks with the votes file's totals.
     const toronto = peekCatalogSnapshot()?.entries.find((item) => item.card.id === "toronto");
@@ -303,7 +307,8 @@ describe("loadCatalogSnapshot", () => {
     );
 
     expect((await loadCatalogSnapshot())?.entries).toHaveLength(entries.length);
-    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions?.size).toBe(1));
+    await loadCatalogDescriptions();
+    expect(peekCatalogSnapshot()?.descriptions?.size).toBe(1);
     await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
     expect(fetchMock).not.toHaveBeenCalled();
     expect(window[EARLY_CATALOG_GLOBAL]).toEqual({});
@@ -334,7 +339,7 @@ describe("recheckCatalogFiles", () => {
     vi.stubGlobal("fetch", fetchMock);
     await loadCatalogSnapshot();
     await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
-    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+    await loadCatalogDescriptions();
     fetchMock.mockClear();
     return fetchMock;
   }
@@ -434,7 +439,7 @@ describe("startCatalogRefresh", () => {
     vi.stubGlobal("fetch", fetchMock);
     await loadCatalogSnapshot();
     await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
-    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+    await loadCatalogDescriptions();
     fetchMock.mockClear();
     return fetchMock;
   }

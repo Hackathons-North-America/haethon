@@ -18,8 +18,11 @@ import type { ViewerCardState } from "@/lib/hackathons/viewer-card-state";
    - the catalog: every listed hackathon's card, minus its description. Enough
      to filter, sort and draw a card. About half the bytes of the old single
      file.
-   - descriptions: the cards' blurbs. A card drawn before they arrive shows a
-     placeholder where its blurb goes, filled in when they land.
+   - descriptions: the cards' blurbs. Downloaded only once a search (or the
+     infinite scroll) first draws a card the page didn't come with, so a
+     visitor who only browses the first page never pays for it. A card drawn
+     before they arrive shows a placeholder where its blurb goes, filled in
+     when they land.
    - votes: the vote totals, regenerated every minute rather than every ten.
      Until they arrive a card shows no score, and a "Top voted" search waits
      for them (they are a few KB, so it's rarely long).
@@ -225,8 +228,8 @@ function loadFile<T>(file: CatalogFile<T>): Promise<T | null> {
 }
 
 /**
- * The catalog, downloading it on first use, and starting the descriptions and
- * votes downloads behind it. Resolves to null when it can't be had (offline,
+ * The catalog, downloading it on first use, and starting the votes download
+ * behind it. Resolves to null when it can't be had (offline,
  * or a file built without a database), in which case the caller searches
  * through the API instead.
  *
@@ -238,10 +241,8 @@ export async function loadCatalogSnapshot({ votes = false } = {}): Promise<Loade
 
   // Behind the catalog, not alongside it: it is the one a search waits for.
   void catalog.then((entries) => {
-    // Without a catalog the search goes through the API, which sends both.
-    if (!entries) return;
-    void loadFile(files.descriptions);
-    if (!votes) void loadFile(files.votes);
+    // Without a catalog the search goes through the API, which sends totals.
+    if (entries && !votes) void loadFile(files.votes);
   });
 
   const [entries, voteTotals] = await Promise.all([
@@ -254,6 +255,14 @@ export async function loadCatalogSnapshot({ votes = false } = {}): Promise<Loade
   }
 
   return composed;
+}
+
+/**
+ * Starts the descriptions download, for cards drawn with a pending blurb.
+ * Subscribers hear when it lands.
+ */
+export function loadCatalogDescriptions() {
+  return loadFile(files.descriptions);
 }
 
 /** What has already arrived, so a search can run without awaiting. */
