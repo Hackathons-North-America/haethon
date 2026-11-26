@@ -17,7 +17,7 @@ import { hackathons } from "@/lib/db/schema";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { COVER_THUMBNAIL_SIZES } from "@/lib/hackathons/cover-image";
 import { deleteCoverThumbnailFiles, uploadCoverThumbnailFiles } from "@/lib/hackathons/cover-thumbnail-store";
-import { fetchImageForThumbnails, type VerifiedImage } from "@/lib/hackathons/image-ingest";
+import { fetchVerifiedImage, type VerifiedImage } from "@/lib/hackathons/image-ingest";
 
 /* Matches next/image's default. Covers are photos and posters seen at card
    size, where 75 is indistinguishable from the original. */
@@ -95,7 +95,7 @@ export async function generateCoverThumbnails(input: {
   let uploaded: string[] = [];
 
   try {
-    const image = input.image ?? (await fetchImageForThumbnails(input.sourceUrl));
+    const image = input.image ?? (await fetchVerifiedImage(input.sourceUrl));
 
     if (!image) {
       return { status: "skipped", reason: "unreachable" };

@@ -106,10 +106,6 @@ vi.mock("@/lib/hackathons/image-ingest", () => ({
     await sleep(perfState.imageLatencyMs);
     return { bytes: new Uint8Array([1]), contentType: "image/png" };
   },
-  fetchImageForThumbnails: async () => {
-    await sleep(perfState.imageLatencyMs);
-    return { bytes: new Uint8Array([1]), contentType: "image/png" };
-  },
   verifiedImageUrl: async (imageUrl: string | null | undefined) => {
     if (!imageUrl) {
       return undefined;

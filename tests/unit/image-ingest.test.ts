@@ -5,31 +5,39 @@ vi.mock("@/lib/security/remote-image", () => ({
 }));
 
 const { fetchSafeRemoteImage } = await import("@/lib/security/remote-image");
-const { assertReachableImageUrl, fetchImageForThumbnails, fetchVerifiedImage } = await import(
-  "@/lib/hackathons/image-ingest"
-);
+const { assertReachableImageUrl, fetchVerifiedImage, verifiedImageUrl } = await import("@/lib/hackathons/image-ingest");
 
 const MB = 1024 * 1024;
 
 describe("image download limits", () => {
   beforeEach(() => vi.mocked(fetchSafeRemoteImage).mockClear());
 
-  it("keeps the 4MB limit for images that are stored or shown", async () => {
-    await fetchVerifiedImage("https://cdn.example.com/cover.png");
+  it("lets imports and the thumbnail job read covers up to 15MB, so large covers are kept and shrunk", async () => {
+    await fetchVerifiedImage("https://cdn.example.com/huge-cover.png");
+    await verifiedImageUrl("https://cdn.example.com/huge-cover.png");
+
+    expect(vi.mocked(fetchSafeRemoteImage).mock.calls).toEqual([
+      ["https://cdn.example.com/huge-cover.png", 15 * MB],
+      ["https://cdn.example.com/huge-cover.png", 15 * MB],
+    ]);
+  });
+
+  it("keeps the 4MB limit for admin and organizer edits", async () => {
     await assertReachableImageUrl("https://cdn.example.com/cover.png");
 
-    expect(vi.mocked(fetchSafeRemoteImage).mock.calls.map(([, maxBytes]) => maxBytes)).toEqual([4 * MB, 4 * MB]);
+    expect(fetchSafeRemoteImage).toHaveBeenCalledWith("https://cdn.example.com/cover.png", 4 * MB);
   });
 
-  it("lets the thumbnail job read originals up to 15MB, so large covers still get shrunk", async () => {
-    await fetchImageForThumbnails("https://cdn.example.com/huge-cover.png");
-
-    expect(fetchSafeRemoteImage).toHaveBeenCalledWith("https://cdn.example.com/huge-cover.png", 15 * MB);
-  });
-
-  it("treats a failed download as no image", async () => {
+  it("drops an image it can't fetch instead of failing the import", async () => {
     vi.mocked(fetchSafeRemoteImage).mockRejectedValueOnce(new Error("too large"));
 
-    expect(await fetchImageForThumbnails("https://cdn.example.com/enormous.png")).toBeUndefined();
+    expect(await fetchVerifiedImage("https://cdn.example.com/enormous.png")).toBeUndefined();
+    expect(await verifiedImageUrl(null)).toBeUndefined();
+  });
+
+  it("tells an editor about the 4MB limit", async () => {
+    vi.mocked(fetchSafeRemoteImage).mockRejectedValueOnce(new Error("too large"));
+
+    await expect(assertReachableImageUrl("https://cdn.example.com/huge-cover.png")).rejects.toThrow("under 4MB");
   });
 });

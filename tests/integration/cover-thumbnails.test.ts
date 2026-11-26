@@ -37,7 +37,6 @@ vi.mock("@/lib/hackathons/image-ingest", () => {
 
   return {
     fetchVerifiedImage,
-    fetchImageForThumbnails: fetchVerifiedImage,
     verifiedImageUrl: async (url?: string | null) => ((await fetchVerifiedImage(url)) ? url! : undefined),
     assertReachableImageUrl: async (url: string) => {
       const image = await fetchVerifiedImage(url);
