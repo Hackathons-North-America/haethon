@@ -58,6 +58,7 @@ describe("proxy matcher", () => {
     "/api/health",
     "/api/geo",
     "/api/cities/search",
+    "/api/hackathons/catalog",
     "/api/cron/sync-discord",
     "/api/cron/cleanup-hackathons",
     "/_next/static/chunks/app.js",
@@ -85,6 +86,8 @@ describe("proxy matcher", () => {
     "/api/cronjobs",
     "/api/cron",
     "/hackathons-archive",
+    "/api/hackathons/catalogs",
+    "/api/hackathons/catalog-admin",
   ])("still runs Clerk on the look-alike %s", (pathname) => {
     expect(runsProxy(pathname)).toBe(true);
   });

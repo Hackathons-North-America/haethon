@@ -5,19 +5,31 @@ import {
   DEFAULT_SEARCH_FILTERS,
   catalogRequestFromSearch,
 } from "@/lib/hackathons/catalog-url";
+import { CATALOG_SNAPSHOT_URL, EARLY_CATALOG_GLOBAL } from "@/lib/hackathons/catalog-client";
 
 /* The boot script is a string that runs before React; evaluate it against a
    stand-in location and document the way the browser would. */
-function bootScriptMarks(search: string) {
+function runBootScript(search: string) {
   const attributes: Record<string, string> = {};
-  const run = new Function("location", "document", CATALOG_URL_BOOT_SCRIPT);
+  const fetched: string[] = [];
+  const fakeWindow: Record<string, unknown> = {};
+  const run = new Function("location", "document", "window", "fetch", CATALOG_URL_BOOT_SCRIPT);
 
   run(
     { search },
-    { documentElement: { setAttribute: (name: string, value: string) => (attributes[name] = value) } }
+    { documentElement: { setAttribute: (name: string, value: string) => (attributes[name] = value) } },
+    fakeWindow,
+    (url: string) => {
+      fetched.push(url);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ entries: [] }) });
+    }
   );
 
-  return attributes["data-catalog-url"] === "filtered";
+  return { marked: attributes["data-catalog-url"] === "filtered", fetched, early: fakeWindow[EARLY_CATALOG_GLOBAL] };
+}
+
+function bootScriptMarks(search: string) {
+  return runBootScript(search).marked;
 }
 
 describe("catalogRequestFromSearch", () => {
@@ -72,6 +84,18 @@ describe("CATALOG_URL_BOOT_SCRIPT", () => {
     expect(bootScriptMarks("?countries=Canada&search=1")).toBe(true);
     expect(bootScriptMarks("?search=1&sort=top")).toBe(true);
     expect(bootScriptMarks("?q=hack")).toBe(true);
+  });
+
+  it("starts downloading the catalog file on a filtered URL, and only there", async () => {
+    const filtered = runBootScript("?countries=Canada&search=1");
+
+    expect(filtered.fetched).toEqual([CATALOG_SNAPSHOT_URL]);
+    await expect(filtered.early).resolves.toEqual({ entries: [] });
+
+    const plain = runBootScript("?search=1");
+
+    expect(plain.fetched).toEqual([]);
+    expect(plain.early).toBeUndefined();
   });
 
   it("agrees with catalogRequestFromSearch on every URL the page itself writes", () => {

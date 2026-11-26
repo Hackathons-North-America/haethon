@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import type { HackathonCardData } from "@/components/hackathon-card";
 import { HackathonSearch } from "@/components/hackathon-search";
 import { useViewerCardHydration } from "@/components/use-viewer-card-hydration";
+import { loadCatalogSnapshot } from "@/lib/hackathons/catalog-client";
 import {
   CATALOG_URL_ATTRIBUTE,
   DEFAULT_CATALOG_REQUEST,
@@ -24,7 +25,10 @@ function subscribeToNothing() {
  *
  * - The query string. A plain /hackathons shows the static cards as they are.
  *   A filtered URL (a reload or a shared link) mounts the search already set
- *   to those filters and loads its results from the API.
+ *   to those filters and selects its results from the catalog file.
+ * - Searches. Every search, sort and further page is answered from the
+ *   browser's copy of the catalog (lib/hackathons/catalog-client.ts), which
+ *   is downloaded once right after the page appears.
  * - The viewer. Signed-in visitors get their pipeline stages and votes laid
  *   over the static cards by one small request (useViewerCardHydration).
  *
@@ -69,6 +73,16 @@ export function HackathonCatalog({
   const request = urlSearch === null ? DEFAULT_CATALOG_REQUEST : catalogRequestFromSearch(urlSearch);
   const showsStaticCards = request.isDefault && initialHackathons !== null;
 
+  /* The catalog file every search is answered from. Requested once the page
+     is on screen (a filtered URL's boot script has usually started it
+     already), at low priority, so it has normally arrived before the visitor
+     first touches a filter. */
+  useEffect(() => {
+    if (urlSearch !== null) {
+      void loadCatalogSnapshot();
+    }
+  }, [urlSearch]);
+
   useEffect(() => {
     if (urlSearch === null || !showsStaticCards || !initialHackathons || requestedViewerStateRef.current) {
       return;
@@ -89,6 +103,7 @@ export function HackathonCatalog({
         initialHasMore={initialHasMore}
         initialHasSearched
         key="static"
+        searchLocally
         viewerCards={viewerCards}
       />
     );
@@ -103,6 +118,7 @@ export function HackathonCatalog({
       initialSort={request.sort}
       // A different URL is a different search, so it gets a fresh instance.
       key={`url:${urlSearch ?? ""}`}
+      searchLocally
       viewerCards={viewerCards}
     />
   );

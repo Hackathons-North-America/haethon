@@ -1,3 +1,4 @@
+import { CATALOG_SNAPSHOT_URL, EARLY_CATALOG_GLOBAL } from "@/lib/hackathons/catalog-client";
 import {
   normalizeCatalogSort,
   normalizeSearchFilters,
@@ -84,8 +85,13 @@ export const CATALOG_URL_ATTRIBUTE = "data-catalog-url";
    app/globals.css keep them hidden until the browser has swapped in the
    filtered view (components/hackathon-catalog.tsx clears the mark). It errs
    toward hiding: a parameter that later normalizes away costs one blank
-   moment, never wrong cards. Dependency-free and wrapped in try/catch, like
+   moment, never wrong cards.
+
+   The same URL also needs the catalog file its results are selected from, so
+   the download starts here, while the HTML is still parsing, rather than once
+   the JavaScript has loaded and hydrated (lib/hackathons/catalog-client.ts
+   picks the promise up). Dependency-free ES5 and wrapped in try/catch, like
    the theme boot script. */
 export const CATALOG_URL_BOOT_SCRIPT = `try{if(/[?&](?:${CATALOG_URL_PARAMS.join(
   "|"
-)})=[^&]/.test(location.search))document.documentElement.setAttribute("${CATALOG_URL_ATTRIBUTE}","filtered")}catch(e){}`;
+)})=[^&]/.test(location.search)){document.documentElement.setAttribute("${CATALOG_URL_ATTRIBUTE}","filtered");window.${EARLY_CATALOG_GLOBAL}=fetch("${CATALOG_SNAPSHOT_URL}").then(function(r){return r.ok?r.json():null})["catch"](function(){return null})}}catch(e){}`;
