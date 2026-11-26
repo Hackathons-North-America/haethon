@@ -10,7 +10,7 @@ const dbState = vi.hoisted(() => ({ updatedRows: [{ id: "h1" }] as Array<{ id: s
 
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches: vi.fn() }));
-vi.mock("@/lib/hackathons/image-ingest", () => ({ fetchVerifiedImage: vi.fn() }));
+vi.mock("@/lib/hackathons/image-ingest", () => ({ fetchImageForThumbnails: vi.fn() }));
 vi.mock("@/lib/hackathons/cover-thumbnail-store", () => ({
   deleteCoverThumbnailFiles: vi.fn(async () => undefined),
   uploadCoverThumbnailFiles: vi.fn(async () => ["https://app.ufs.sh/f/small", "https://app.ufs.sh/f/large"]),
@@ -30,7 +30,7 @@ const { generateCoverThumbnails, renderCoverThumbnails, replaceCoverThumbnails }
   "@/lib/hackathons/cover-thumbnails"
 );
 const { deleteCoverThumbnailFiles, uploadCoverThumbnailFiles } = await import("@/lib/hackathons/cover-thumbnail-store");
-const { fetchVerifiedImage } = await import("@/lib/hackathons/image-ingest");
+const { fetchImageForThumbnails } = await import("@/lib/hackathons/image-ingest");
 const { revalidateHackathonCaches } = await import("@/lib/hackathons/catalog");
 
 /* Random noise compresses badly, so these stand in for a heavy photo. */
@@ -110,7 +110,7 @@ describe("generateCoverThumbnails", () => {
     });
 
     expect(result).toEqual({ status: "stored", small: "https://app.ufs.sh/f/small", large: "https://app.ufs.sh/f/large" });
-    expect(fetchVerifiedImage).not.toHaveBeenCalled();
+    expect(fetchImageForThumbnails).not.toHaveBeenCalled();
     expect(vi.mocked(uploadCoverThumbnailFiles).mock.calls[0][0].map((file) => file.name)).toEqual([
       "cover-h1-640x320.webp",
       "cover-h1-1280x640.webp",
@@ -122,16 +122,16 @@ describe("generateCoverThumbnails", () => {
   });
 
   it("fetches the original itself when the caller has no bytes", async () => {
-    vi.mocked(fetchVerifiedImage).mockResolvedValueOnce({ bytes: await noiseImage(1600, 800), contentType: "image/png" });
+    vi.mocked(fetchImageForThumbnails).mockResolvedValueOnce({ bytes: await noiseImage(1600, 800), contentType: "image/png" });
 
     const result = await generateCoverThumbnails({ hackathonId: "h1", sourceUrl: "https://cdn.example.com/cover.png" });
 
-    expect(fetchVerifiedImage).toHaveBeenCalledWith("https://cdn.example.com/cover.png");
+    expect(fetchImageForThumbnails).toHaveBeenCalledWith("https://cdn.example.com/cover.png");
     expect(result.status).toBe("stored");
   });
 
   it("skips an unreachable original without touching storage", async () => {
-    vi.mocked(fetchVerifiedImage).mockResolvedValueOnce(undefined);
+    vi.mocked(fetchImageForThumbnails).mockResolvedValueOnce(undefined);
 
     expect(await generateCoverThumbnails({ hackathonId: "h1", sourceUrl: "https://cdn.example.com/dead.png" })).toEqual({
       status: "skipped",

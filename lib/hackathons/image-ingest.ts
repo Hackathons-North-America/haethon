@@ -33,6 +33,25 @@ export async function fetchVerifiedImage(url: string | null | undefined): Promis
   }
 }
 
+/* The thumbnail job reads the original only to shrink it, on the server and
+   in the background (lib/hackathons/cover-thumbnails.ts), so it may download
+   more than an image we would accept for display. Without this, the covers
+   that most need shrinking (organizers' 5-10 MB PNGs) were the ones skipped,
+   and visitors downloaded them at full size instead. */
+const THUMBNAIL_SOURCE_MAX_BYTES = 15 * 1024 * 1024;
+
+/** The original cover's bytes for cutting thumbnails, up to 15MB, or
+    undefined when the URL is dead, larger than that or not a supported raster
+    image. Not a vetting step: what may be stored is still decided by the 4MB
+    checks above. */
+export async function fetchImageForThumbnails(url: string): Promise<VerifiedImage | undefined> {
+  try {
+    return await fetchSafeRemoteImage(url, THUMBNAIL_SOURCE_MAX_BYTES);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Automated imports (Luma sync, bulk JSON): drop a broken image rather than
     fail the whole import. */
 export async function verifiedImageUrl(url: string | null | undefined) {
