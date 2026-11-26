@@ -3,30 +3,21 @@
 import dynamic from "next/dynamic";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  Archive,
-  Check,
-  ChevronDown,
-  Globe2,
-  LocateFixed,
-  Navigation,
-  Search,
-  X,
-} from "lucide-react";
+import { Archive, ChevronDown, Search, X } from "lucide-react";
 
 import { AppNavCenter } from "@/components/app-nav-slot";
 import { NavUnderline } from "@/components/nav-underline";
 import { HackathonCard } from "@/components/hackathon-card";
 import type { HackathonCardData } from "@/components/hackathon-card";
+import type { FeatureTag } from "@/components/hackathon-search-panels";
 import type { ViewerCardHydration } from "@/components/use-viewer-card-hydration";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 import type { GeoPoint } from "@/lib/geo";
-import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
 import { sortByStartDateWithLocalBoost } from "@/lib/hackathons/ranking";
 import { activeRegionPreset, regionPresets } from "@/lib/hackathons/region-presets";
 import type { RegionPresetId } from "@/lib/hackathons/region-presets";
-import { datePeriodOptions, dateRangeForPeriod, distanceOptions } from "@/lib/hackathons/search-filters";
+import { datePeriodOptions, dateRangeForPeriod } from "@/lib/hackathons/search-filters";
 import { subscribeToHackathonStatusChanges } from "@/lib/hackathons/status-events";
 import { mergeViewerCardState } from "@/lib/hackathons/viewer-card-state";
 import type {
@@ -38,7 +29,6 @@ import type {
   HackathonSearchFilters,
 } from "@/lib/hackathons/search-filters";
 
-const countryListboxId = "hackathon-country-options";
 const locationPopoverId = "hackathon-location-popover";
 const datePopoverId = "hackathon-date-popover";
 const formatPopoverId = "hackathon-format-popover";
@@ -157,18 +147,19 @@ const sortOptions: { label: string; value: CatalogSort; detail: string }[] = [
   { label: "Votes", value: "top", detail: "Most upvoted by hackers first" },
 ];
 
-/* The dropdown panels and the open-field pill animate with the motion
+/* The dropdowns (each field's panel inside its animated popover) and the
+   open-field pill live in hackathon-search-panels.tsx with the motion
    library. Nothing they render is visible until a field is opened, so they
-   load after the page is interactive instead of with it. A field opened in
-   the brief gap before the chunk lands simply shows its panel a beat later. */
-const SearchPopover = dynamic(
-  () => import("@/components/hackathon-search-popover").then((module) => module.SearchPopover),
-  { ssr: false }
-);
-const SegmentPill = dynamic(
-  () => import("@/components/hackathon-search-popover").then((module) => module.SegmentPill),
-  { ssr: false }
-);
+   load after the page is interactive instead of with it, as one chunk: every
+   one of them comes from that module. A field opened in the brief gap before
+   the chunk lands simply shows its panel a beat later. */
+const loadPanels = () => import("@/components/hackathon-search-panels");
+const SegmentPill = dynamic(() => loadPanels().then((module) => module.SegmentPill), { ssr: false });
+const LocationPopover = dynamic(() => loadPanels().then((module) => module.LocationPopover), { ssr: false });
+const DatePopover = dynamic(() => loadPanels().then((module) => module.DatePopover), { ssr: false });
+const FeaturesPopover = dynamic(() => loadPanels().then((module) => module.FeaturesPopover), { ssr: false });
+const SortPopover = dynamic(() => loadPanels().then((module) => module.SortPopover), { ssr: false });
+const FormatPopover = dynamic(() => loadPanels().then((module) => module.FormatPopover), { ssr: false });
 
 /* Stand-ins for the grid while the first page is on its way (a filtered URL
    opened directly). Sized like a cover card so the page doesn't jump. */
@@ -385,12 +376,7 @@ export function HackathonSearch({
     return () => observer.disconnect();
   }, [countries]);
 
-  const featureTags: {
-    key: string;
-    label: string;
-    value: FeatureFilter;
-    setValue: (next: FeatureFilter) => void;
-  }[] = [
+  const featureTags: FeatureTag[] = [
     { key: "beginnerFriendly", label: "Beginner friendly", value: beginnerFriendly, setValue: setBeginnerFriendly },
     {
       key: "travelReimbursement",
@@ -439,7 +425,6 @@ export function HackathonSearch({
     [sortedHackathons]
   );
   const selectedPreset = useMemo(() => activeRegionPreset({ countries, format }), [countries, format]);
-  const filteredCountries = useMemo(() => filterCountryOptions(countryQuery), [countryQuery]);
 
   /* Deferred a microtask because on the first render this effect runs before
      Next's app router (a parent) patches history.replaceState, and the raw call
@@ -574,6 +559,14 @@ export function HackathonSearch({
     setCountries((selectedCountries) => selectedCountries.filter((selectedCountry) => selectedCountry !== country));
   }
 
+  function pickDistance(next: DistanceFilter) {
+    setDistanceKm(next);
+
+    if (next !== "any" && !origin && locationState === "idle") {
+      void locate();
+    }
+  }
+
   function toggleCountry(country: string) {
     if (countries.includes(country)) {
       removeCountry(country);
@@ -581,18 +574,6 @@ export function HackathonSearch({
     }
 
     selectCountry(country);
-  }
-
-  function countryDetail(country: string) {
-    if (country === "Canada" || country === "United States" || country === "Mexico") {
-      return "North America";
-    }
-
-    if (country === "United Kingdom" || country === "Ireland" || country === "France" || country === "Germany") {
-      return "Frequent hackathon market";
-    }
-
-    return "International destination";
   }
 
   function applyRegionPreset(presetId: RegionPresetId) {
@@ -880,195 +861,24 @@ export function HackathonSearch({
                   <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55">Country or near me</span>
                 )}
               </button>
-              <SearchPopover
-                className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 overflow-hidden border border-ink/10 bg-surface p-4 md:left-[-1rem] md:right-auto md:w-[34rem]"
+              <LocationPopover
+                countries={countries}
+                countryQuery={countryQuery}
+                countrySearchRef={countrySearchRef}
+                distanceKm={distanceKm}
                 id={locationPopoverId}
+                locationMode={locationMode}
+                locationState={locationState}
+                onCountryQueryChange={setCountryQuery}
+                onDistanceChange={pickDistance}
+                onLocatePrecisely={locateWithBrowser}
+                onLocationModeChange={setLocationMode}
+                onRemoveCountry={removeCountry}
+                onToggleCountry={toggleCountry}
+                origin={origin}
                 show={openPopover === "location"}
                 switched={popoverSwitched}
-              >
-                {/* Segmented toggle picks which filter this tab edits. Both panels
-                    keep the exact UI they had as standalone tabs. */}
-                {/* Bleeds past the popover's p-4 so the tabs sit flush with its
-                    top and sides like a nav bar; the popover's rounded corners and
-                    overflow-hidden clip the top edge. */}
-                <div
-                  aria-label="Location filter type"
-                  className="-mx-4 -mt-4 mb-4 grid grid-cols-2 border-b border-ink/10"
-                  role="tablist"
-                >
-                  {(
-                    [
-                      { mode: "country", label: "Country", icon: Globe2 },
-                      { mode: "near_me", label: "Near me", icon: Navigation },
-                    ] as const
-                  ).map(({ mode, label, icon: Icon }) => {
-                    const active = locationMode === mode;
-
-                    return (
-                      <button
-                        aria-selected={active}
-                        className={`relative inline-flex min-h-12 items-center justify-center gap-1.5 px-4 text-sm font-semibold transition-colors after:absolute after:inset-x-6 after:bottom-[-1px] after:h-0.5 after:rounded-full after:transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine/35 ${
-                          active
-                            ? "text-ink after:bg-pine"
-                            : "text-ink/55 after:bg-transparent hover:text-ink"
-                        }`}
-                        key={mode}
-                        onClick={() => setLocationMode(mode)}
-                        role="tab"
-                        type="button"
-                      >
-                        <Icon aria-hidden="true" className="size-4" />
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {locationMode === "country" ? (
-                  <>
-                    <div className="flex items-center gap-2 rounded-full border border-ink/10 bg-paper px-4 py-3">
-                      <Search aria-hidden="true" className="size-4 text-ink/55" />
-                      <input
-                        aria-autocomplete="list"
-                        aria-controls={countryListboxId}
-                        aria-expanded="true"
-                        aria-label="Search countries"
-                        className="min-w-0 flex-1 bg-transparent text-sm leading-5 text-ink outline-none placeholder:text-ink/55"
-                        onChange={(event) => setCountryQuery(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && filteredCountries[0]) {
-                            event.preventDefault();
-                            toggleCountry(filteredCountries[0]);
-                          }
-                        }}
-                        placeholder="Search countries"
-                        ref={countrySearchRef}
-                        role="combobox"
-                        type="search"
-                        value={countryQuery}
-                      />
-                    </div>
-                    {countries.length ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {countries.map((country) => (
-                          <button
-                            aria-label={`Remove ${country}`}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-surface px-3 py-1.5 text-xs font-semibold text-ink hover:border-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35"
-                            key={country}
-                            onClick={() => removeCountry(country)}
-                            type="button"
-                          >
-                            {country}
-                            <X aria-hidden="true" className="size-3.5" />
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div
-                      className="mt-4 grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2"
-                      id={countryListboxId}
-                      role="listbox"
-                    >
-                      {filteredCountries.map((country) => {
-                        const selected = countries.includes(country);
-
-                        return (
-                          <button
-                            aria-selected={selected}
-                            className={`flex min-h-[4.25rem] items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                              selected
-                                ? "border-pine/35 bg-pine/5"
-                                : "border-transparent bg-surface hover:bg-paper"
-                            }`}
-                            key={country}
-                            onClick={() => toggleCountry(country)}
-                            role="option"
-                            type="button"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-ink">{country}</span>
-                              <span className="mt-0.5 block truncate text-xs text-ink/55">{countryDetail(country)}</span>
-                            </span>
-                            <span
-                              className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                                selected ? "border-pine bg-pine text-paper" : "border-ink/15 text-transparent"
-                              }`}
-                            >
-                              <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-                            </span>
-                          </button>
-                        );
-                      })}
-                      {!filteredCountries.length ? (
-                        <div className="col-span-full rounded-xl border border-ink/10 bg-paper px-4 py-5 text-sm font-semibold text-ink/55">
-                          No countries match that search.
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid gap-2">
-                      {distanceOptions.map((option) => {
-                        const selected = distanceKm === option.value;
-
-                        return (
-                          <button
-                            aria-pressed={selected}
-                            className={`flex min-h-[3.5rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                              selected
-                                ? "border-pine/35 bg-pine/5"
-                                : "border-transparent bg-surface hover:bg-paper"
-                            }`}
-                            key={option.value}
-                            onClick={() => {
-                              setDistanceKm(option.value);
-
-                              if (option.value !== "any" && !origin && locationState === "idle") {
-                                void locate();
-                              }
-                            }}
-                            type="button"
-                          >
-                            <span className="text-sm font-semibold text-ink">{option.label}</span>
-                            <span
-                              className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                                selected ? "border-pine bg-pine text-paper" : "border-ink/15 text-transparent"
-                              }`}
-                            >
-                              <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-3 border-t border-ink/10 pt-3">
-                      {locationState === "error" ? (
-                        <p className="mb-2 text-xs leading-5 text-pine">
-                          We couldn&apos;t find your location. Allow location access in your browser and try again.
-                        </p>
-                      ) : origin ? (
-                        <p className="mb-2 text-xs leading-5 text-ink/55">
-                          {origin.precise
-                            ? "Using your precise location."
-                            : `Using your approximate location${origin.label ? ` near ${origin.label}` : ""}.`}
-                        </p>
-                      ) : null}
-                      {!origin?.precise ? (
-                        <button
-                          className="inline-flex min-h-9 items-center gap-2 rounded-full border border-ink/15 px-4 text-xs font-semibold text-ink transition-colors hover:border-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 disabled:opacity-50"
-                          disabled={locationState === "locating"}
-                          onClick={locateWithBrowser}
-                          type="button"
-                        >
-                          <LocateFixed aria-hidden="true" className="size-3.5" />
-                          {locationState === "locating" ? "Locating..." : "Use precise location"}
-                        </button>
-                      ) : null}
-                    </div>
-                  </>
-                )}
-              </SearchPopover>
+              />
             </div>
 
             <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
@@ -1091,41 +901,16 @@ export function HackathonSearch({
                 </span>
                 <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55">{selectedDateLabel}</span>
               </button>
-              <SearchPopover
-                className="absolute left-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[18rem] border border-ink/10 bg-surface px-6 py-2 md:w-[24rem]"
+              <DatePopover
+                datePeriod={datePeriod}
                 id={datePopoverId}
+                onSelect={(period) => {
+                  setDatePeriod(period);
+                  setOpenPopover(null);
+                }}
                 show={openPopover === "date"}
                 switched={popoverSwitched}
-              >
-                {/* Flat rows split by hairlines inset to the popover's
-                    padding, like Airbnb's guest picker; only the selected
-                    row gets a check. Sort below uses the same list. */}
-                <div className="divide-y divide-ink/10">
-                  {datePeriodOptions.map((option) => {
-                    const selected = datePeriod === option.value;
-
-                    return (
-                      <button
-                        aria-pressed={selected}
-                        className={`flex min-h-[3.5rem] w-full items-center justify-between gap-3 py-3 text-left transition-colors focus-visible:rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                          selected ? "text-ink" : "text-ink/70 hover:text-ink"
-                        }`}
-                        key={option.value}
-                        onClick={() => {
-                          setDatePeriod(option.value);
-                          setOpenPopover(null);
-                        }}
-                        type="button"
-                      >
-                        <span className={`text-sm ${selected ? "font-semibold" : "font-medium"}`}>{option.label}</span>
-                        {selected ? (
-                          <Check aria-hidden="true" className="size-5 shrink-0 text-pine" strokeWidth={2.5} />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </SearchPopover>
+              />
             </div>
 
             <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
@@ -1155,41 +940,12 @@ export function HackathonSearch({
                   {selectedFeatureLabels.length ? selectedFeatureLabels.join(", ") : "Add features"}
                 </span>
               </button>
-              <SearchPopover
-                className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[20rem] border border-ink/10 bg-surface p-5 md:w-[27rem]"
+              <FeaturesPopover
+                featureTags={featureTags}
                 id={featurePopoverId}
                 show={openPopover === "features"}
                 switched={popoverSwitched}
-              >
-                <div className="flex flex-wrap gap-3">
-                  {featureTags.map((tag) => {
-                    const active = tag.value === "on";
-
-                    return (
-                      <button
-                        aria-pressed={active}
-                        className={`inline-flex min-h-12 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                          active
-                            ? "border-pine bg-pine text-paper hover:bg-pine/90"
-                            : "border-ink/15 bg-surface text-ink hover:border-ink"
-                        }`}
-                        key={tag.key}
-                        onClick={() => tag.setValue(active ? "any" : "on")}
-                        type="button"
-                      >
-                        <span
-                          className={`grid size-5 place-items-center rounded-full border ${
-                            active ? "border-paper text-paper" : "border-ink/15 text-transparent"
-                          }`}
-                        >
-                          <Check aria-hidden="true" className="size-3" strokeWidth={3} />
-                        </span>
-                        {tag.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </SearchPopover>
+              />
             </div>
 
             <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
@@ -1212,41 +968,17 @@ export function HackathonSearch({
                 <span className="block text-xs font-semibold leading-4 text-ink">Sort</span>
                 <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55">{selectedSortLabel}</span>
               </button>
-              <SearchPopover
-                className="absolute right-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[17rem] border border-ink/10 bg-surface px-6 py-2 md:w-[20rem]"
+              <SortPopover
                 id={sortPopoverId}
+                onSelect={(next) => {
+                  setOpenPopover(null);
+                  changeSort(next);
+                }}
                 show={openPopover === "sort"}
+                sort={sort}
+                sortOptions={sortOptions}
                 switched={popoverSwitched}
-              >
-                <div className="divide-y divide-ink/10">
-                  {sortOptions.map((option) => {
-                    const selected = sort === option.value;
-
-                    return (
-                      <button
-                        aria-pressed={selected}
-                        className={`flex min-h-[3.5rem] w-full items-center justify-between gap-3 py-3 text-left transition-colors focus-visible:rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                          selected ? "text-ink" : "text-ink/70 hover:text-ink"
-                        }`}
-                        key={option.value}
-                        onClick={() => {
-                          setOpenPopover(null);
-                          changeSort(option.value);
-                        }}
-                        type="button"
-                      >
-                        <span className="min-w-0">
-                          <span className={`block truncate text-sm ${selected ? "font-semibold" : "font-medium"}`}>{option.label}</span>
-                          <span className="mt-0.5 block truncate text-xs text-ink/55">{option.detail}</span>
-                        </span>
-                        {selected ? (
-                          <Check aria-hidden="true" className="size-5 shrink-0 text-pine" strokeWidth={2.5} />
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </SearchPopover>
+              />
             </div>
 
             <div className="flex items-center justify-end gap-1 px-1 py-1 md:py-0 md:pl-1 md:pr-2">
@@ -1311,47 +1043,17 @@ export function HackathonSearch({
                     </span>
                     <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55">{selectedFormatLabel}</span>
                   </button>
-                  <SearchPopover
-                    className="absolute left-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[19rem] border border-ink/10 bg-surface p-4 md:w-[24rem]"
+                  <FormatPopover
+                    format={format}
+                    formatOptions={formatOptions}
                     id={formatPopoverId}
+                    onSelect={(next) => {
+                      setFormat(next);
+                      setOpenPopover(null);
+                    }}
                     show={openPopover === "format"}
                     switched={popoverSwitched}
-                  >
-                    <div className="grid gap-2">
-                      {formatOptions.map((option) => {
-                        const selected = format === option.value;
-
-                        return (
-                          <button
-                            aria-pressed={selected}
-                            className={`flex min-h-[4.25rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                              selected
-                                ? "border-pine/35 bg-pine/5"
-                                : "border-ink/10 bg-surface hover:border-ink/20 hover:bg-paper"
-                            }`}
-                            key={option.value}
-                            onClick={() => {
-                              setFormat(option.value);
-                              setOpenPopover(null);
-                            }}
-                            type="button"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-ink">{option.label}</span>
-                              <span className="mt-0.5 block truncate text-xs text-ink/55">{option.detail}</span>
-                            </span>
-                            <span
-                              className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                                selected ? "border-pine bg-pine text-paper" : "border-ink/15 text-transparent"
-                              }`}
-                            >
-                              <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </SearchPopover>
+                  />
                 </div>
                 </div>
               </>

@@ -7,9 +7,10 @@ import type { Variants } from "motion/react";
 
 /* The search bar's dropdown panels and the pill behind the open field. They
    are the only part of the catalog page that needs the animation library, and
-   nothing renders until a field is opened, so hackathon-search.tsx loads this
-   module lazily: the library stays out of the JavaScript the page needs to
-   show its first cards. */
+   nothing renders until a field is opened, so this module is only reached
+   through hackathon-search-panels.tsx, which hackathon-search.tsx loads
+   lazily: the library stays out of the JavaScript the page needs to show its
+   first cards. */
 
 /* Airbnb-style field switching. Every field's dropdown (and the pill that
    highlights the open field in the bar) shares one layoutId, so moving from
