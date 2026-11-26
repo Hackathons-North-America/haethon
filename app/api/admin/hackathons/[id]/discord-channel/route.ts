@@ -2,7 +2,11 @@ import { after, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminUserId } from "@/lib/auth";
-import { drainDiscordChannelJobsSafely, requestHackathonDiscordChannel } from "@/lib/discord/channel-jobs";
+import {
+  denyHackathonDiscordChannel,
+  drainDiscordChannelJobsSafely,
+  requestHackathonDiscordChannel,
+} from "@/lib/discord/channel-jobs";
 import { discordChannelDecisionSchema } from "@/lib/validations/hackathon";
 
 /* The queue is drained after the response, inside this route's time limit. */
@@ -15,9 +19,11 @@ type RouteContext = {
 const hackathonIdSchema = z.string().uuid();
 
 /**
- * Explicit admin decision on whether to create the Discord channel for an
- * already-approved hackathon. The channel is only created when an admin approves
- * here — approving the import itself no longer creates the channel as a side effect.
+ * Explicit admin decision on whether to create the Discord channel for a
+ * published hackathon. The channel is only created when an admin approves
+ * here: publishing a hackathon, auto-approved or not, never creates one. The
+ * decision is stored either way, so a "deny" sticks and the hackathon leaves
+ * the decision queue on /admin/import.
  *
  * Approving answers at once with a queued job (202): the Discord work runs
  * after the response, one hackathon at a time, and the importer polls
@@ -45,7 +51,11 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     if (parsed.data.action === "deny") {
-      return NextResponse.json({ data: { status: "denied" as const } });
+      const denied = await denyHackathonDiscordChannel(id);
+
+      return denied.status === "not_found"
+        ? NextResponse.json({ error: "Hackathon not found." }, { status: 404 })
+        : NextResponse.json({ data: denied });
     }
 
     const outcome = await requestHackathonDiscordChannel(id, gate.userId);

@@ -395,9 +395,35 @@ import page sends (`{ "hackathons": [...] }`, at most 250 rows).
   and store the same value as the scraper repository's `HNA_IMPORT_SECRET`
   secret.
 - Imports are recorded under the longest-standing admin account.
-- A possible duplicate is never imported "as new anyway" here. It comes back as
-  `duplicate_flagged` with nothing written; the scraper saves those rows to
-  `duplicates.json` for the admin import page.
+- Only rows a trusted feed marked `autoApprove` are published. Nobody is
+  watching this import, so what needs a person is saved to the review queue on
+  `/admin/import` and reported back:
+
+  | Status | Meaning |
+  | --- | --- |
+  | `queued` | a row without `autoApprove`, saved as a card for a yes or no |
+  | `duplicate_flagged` (with `submissionId`) | a possible duplicate, saved as a card that names its match |
+  | `dismissed` | an event an admin already said no to; nothing is written |
+
+  A row for an event that is already published still updates it, with or
+  without `autoApprove`.
+- A body of `{ "needsReview": [...] }` (the scraper's `needs_review.json`
+  records) goes to the fix queue on `/admin/broken` instead. A record whose
+  source URL is already in that queue, in any state, is skipped.
+
+### Import review queue
+
+Cards waiting on `/admin/import` are pending `hackathon_submissions` rows
+whose payload carries `origin: "admin_import"`
+([`lib/hackathons/import-cards.ts`](lib/hackathons/import-cards.ts)), so the
+queue is the same after a closed tab, on another device and for another admin.
+An upload on that page works the same way as the scraper import: `autoApprove`
+rows are published at once and the rest become cards.
+
+A decision (`POST /api/admin/import-queue/:id`) runs the card through the same
+importer, resolving its row in the transaction that publishes or merges the
+hackathon. A "no" is kept: the event stays out when the scraper sends it
+again, matched by its feed ids, or by name and start day for a row without any.
 
 ## Deployment
 

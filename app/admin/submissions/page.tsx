@@ -29,7 +29,7 @@ function formatDate(value: Date | string) {
 }
 
 export default async function AdminSubmissionsPage() {
-  const submissions = await listHackathonSubmissions({ limit: 200 });
+  const submissions = await listHackathonSubmissions({ kind: "form", limit: 200 });
   const formSubmissions = submissions.filter((submission) => isFormSubmission(submission.payload));
   const pending = formSubmissions.filter((submission) => submission.status === "pending");
   const approvedCount = formSubmissions.filter(

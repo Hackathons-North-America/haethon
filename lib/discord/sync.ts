@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { REST } from "@discordjs/rest";
 import * as Sentry from "@sentry/nextjs";
 import { ChannelType, Routes } from "discord-api-types/v10";
@@ -24,7 +24,7 @@ import {
   findDuplicateChannels,
   hackathonCategoryIds,
 } from "@/lib/discord/duplicates";
-import { discordRest, isUnknownChannelError } from "@/lib/discord/rest";
+import { discordRest, isRateLimitError, isUnknownChannelError } from "@/lib/discord/rest";
 import {
   discordChannels,
   discordGuilds,
@@ -60,6 +60,8 @@ type MappedChannel = {
 type SyncTarget = {
   applicationUrl: string | null;
   country: string | null;
+  /* hackathons.discord_channel_decision: only "approved" gets a channel. */
+  discordChannelDecision: string | null;
   endsAt: Date | null;
   hackathonId: string;
   name: string;
@@ -84,6 +86,23 @@ type SyncContext = {
 const SYNC_CONCURRENCY = 4;
 
 const INELIGIBLE_REASON = "Only Canadian and US hackathons are synced to Discord.";
+const UNDECIDED_REASON = "Waiting for an admin to approve a Discord channel for this hackathon.";
+const DENIED_REASON = "An admin declined a Discord channel for this hackathon.";
+
+/* Why a hackathon gets no channel work at all, or null when it may have one.
+   This is the one gate every path to a channel goes through: the queued jobs,
+   the daily sync, and the syncs after an edit, a merge or a feed update. Only
+   an admin's approval (lib/discord/channel-decisions.ts) creates a channel,
+   or points an existing series channel at a new edition. A hackathon without
+   approval is left alone entirely, so another edition's channel is never
+   moved or removed on its account. */
+function channelDecisionBlock(decision: string | null) {
+  if (decision === "approved") {
+    return null;
+  }
+
+  return decision === "denied" ? DENIED_REASON : UNDECIDED_REASON;
+}
 
 // Holding category for channels whose hackathon was deleted. Never a sync
 // target — it just parks the channel so an admin can remove it on Discord later.
@@ -142,6 +161,12 @@ function channelTopic(input: {
 }
 
 export function reportHackathonSyncFailure(hackathonId: string, error: unknown) {
+  if (isRateLimitError(error)) {
+    // Not a fault: the next sync or drain gets it once Discord's limit resets.
+    console.warn("Discord rate-limited a channel sync; it is tried again later.", { hackathonId, route: error.route });
+    return;
+  }
+
   console.error("Unable to sync Discord channel for hackathon.", { error, hackathonId });
   Sentry.captureException(error, { extra: { hackathonId } });
 }
@@ -282,6 +307,9 @@ export async function assignExistingDiscordChannel(hackathonId: string, channelS
       )
     )
     .limit(1);
+
+  // An admin attaching a channel by hand is an admin approving one.
+  await db.update(hackathons).set({ discordChannelDecision: "approved" }).where(eq(hackathons.id, hackathon.id));
 
   if (current?.channelSnowflake === channelSnowflake) {
     await db
@@ -624,6 +652,12 @@ async function findAdoptableUntrackedChannel(
 }
 
 async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
+  const blocked = channelDecisionBlock(target.discordChannelDecision);
+
+  if (blocked) {
+    return { status: "skipped" as const, reason: blocked };
+  }
+
   const category = categoryForHackathon({
     country: target.country,
     endsAt: target.endsAt,
@@ -788,6 +822,7 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
     .select({
       applicationUrl: hackathons.applicationUrl,
       country: hackathonLocations.country,
+      discordChannelDecision: hackathons.discordChannelDecision,
       endsAt: hackathonDates.endsAt,
       hackathonId: hackathons.id,
       isRecurring: hackathonSeries.isRecurring,
@@ -807,6 +842,12 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
 
   if (!row) {
     throw new Error("Hackathon not found.");
+  }
+
+  const blocked = channelDecisionBlock(row.discordChannelDecision);
+
+  if (blocked) {
+    return { status: "skipped" as const, reason: blocked };
   }
 
   const pastRetention = isDiscordChannelPastRetention({
@@ -1233,9 +1274,32 @@ async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T
   );
 }
 
+/* A hackathon with a live channel attached already has its channel, however
+   it got it (before decisions were stored, or an admin attaching one by
+   hand), so it counts as approved. Kept in the daily sync so the rule holds
+   without a one-off backfill after every change. An explicit "denied" is
+   never overwritten. */
+export function approveHackathonsWithChannelsQuery() {
+  return db
+    .update(hackathons)
+    .set({ discordChannelDecision: "approved" })
+    .where(
+      and(
+        isNull(hackathons.discordChannelDecision),
+        sql`exists (
+          select 1 from ${discordChannels}
+          where ${discordChannels.hackathonId} = ${hackathons.id}
+            and coalesce(${discordChannels.category}, '') <> ${DELETED_CATEGORY_NAME}
+        )`
+      )
+    );
+}
+
 export async function syncPublishedHackathonDiscordChannels() {
   const rest = discordRest();
   const retentionCutoff = discordChannelRetentionCutoff(new Date());
+
+  await approveHackathonsWithChannelsQuery();
 
   // One query loads every published hackathon with its location and dates. The
   // left joins can fan out when a hackathon has multiple location or date rows,
@@ -1245,6 +1309,7 @@ export async function syncPublishedHackathonDiscordChannels() {
     .select({
       applicationUrl: hackathons.applicationUrl,
       country: hackathonLocations.country,
+      discordChannelDecision: hackathons.discordChannelDecision,
       endsAt: hackathonDates.endsAt,
       hackathonId: hackathons.id,
       name: hackathons.name,
@@ -1272,27 +1337,36 @@ export async function syncPublishedHackathonDiscordChannels() {
 
   const targets: (typeof rows)[number][] = [];
   const seen = new Set<string>();
+  // Hackathons nobody approved a channel for are not this sync's business:
+  // it maintains approved channels and never makes one on its own.
+  let skipped = 0;
 
   for (const row of rows) {
-    if (!seen.has(row.hackathonId)) {
-      seen.add(row.hackathonId);
+    if (seen.has(row.hackathonId)) {
+      continue;
+    }
+
+    seen.add(row.hackathonId);
+
+    if (channelDecisionBlock(row.discordChannelDecision)) {
+      skipped += 1;
+    } else {
       targets.push(row);
     }
   }
 
   const failures: { hackathonId: string; message: string }[] = [];
   let synced = 0;
-  let skipped = 0;
 
   if (!rest || !env.DISCORD_GUILD_ID) {
     return {
       duplicates: [] as DiscordChannelDuplicate[],
       failed: 0,
       failures,
-      skipped: targets.length,
+      skipped: skipped + targets.length,
       staleRemoved: 0,
       synced: 0,
-      total: targets.length,
+      total: skipped + targets.length,
     };
   }
 
@@ -1465,7 +1539,7 @@ export async function syncPublishedHackathonDiscordChannels() {
     skipped,
     staleRemoved,
     synced,
-    total: targets.length,
+    total: skipped + targets.length,
   };
 }
 

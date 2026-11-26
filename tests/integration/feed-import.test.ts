@@ -114,12 +114,6 @@ beforeEach(async () => {
   vi.mocked(syncHackathonDiscordChannel).mockClear();
 });
 
-async function jobFor(jobId: string) {
-  const [job] = await db.select().from(discordChannelJobs).where(eq(discordChannelJobs.id, jobId));
-
-  return job;
-}
-
 describe("feed-id imports", () => {
   it("links every feed id of a new import", async () => {
     const result = await importRows([BASE]);
@@ -211,27 +205,22 @@ describe("feed-id imports", () => {
 });
 
 describe("auto-approved imports", () => {
-  it("queues the channel of a new auto-approved import and runs it without a preview", async () => {
-    vi.mocked(ensureHackathonDiscordChannelOrThrow).mockResolvedValueOnce({
-      action: "created",
-      category: "us",
-      categoryName: "US Hackathons",
-      channelSnowflake: "123",
-      name: "embodied-metal-jul-17",
-      status: "synced",
-    });
-
+  it("publishes an auto-approved import without touching Discord", async () => {
+    // Auto-approval answers "may this be published without asking?". The
+    // channel still needs an admin: an admin importing now is asked (the
+    // preview), and nothing is queued.
     const result = await importRows([{ ...BASE, autoApprove: true }]);
 
     expect(result.results[0]).toMatchObject({ autoApprove: true, status: "imported" });
-    expect(result.results[0].discordSync).toMatchObject({ status: "queued" });
-    expect(result.results[0].discord).toBeUndefined();
-    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledWith(result.results[0].hackathonId, { keepExisting: false });
-    // Without a `defer` the queue is drained before the import returns.
-    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({
-      status: "done",
-      result: { action: "created", channelSnowflake: "123", status: "synced" },
-    });
+    expect(result.results[0].discordSync).toBeUndefined();
+    expect(result.results[0].discord).toMatchObject({ action: "create", eligible: true });
+    expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
+    const [row] = await db
+      .select({ decision: hackathons.discordChannelDecision })
+      .from(hackathons)
+      .where(eq(hackathons.id, result.results[0].hackathonId!));
+    expect(row.decision).toBeNull();
   });
 
   it("keeps asking about the channel when the flag is missing", async () => {
@@ -263,13 +252,15 @@ describe("auto-approved imports", () => {
     expect(result.results[0].discord).toEqual({ eligible: false });
   });
 
-  it("keeps an existing hackathon's channel when the feed sends it again", async () => {
+  it("queues no channel work when the feed sends an undecided hackathon again", async () => {
     const hackathonId = (await importRows([BASE])).results[0].hackathonId!;
 
-    const result = await importRows([{ ...BASE, autoApprove: true }]);
+    const result = await importRows([{ ...BASE, autoApprove: true, venue: "Frontier Tower" }]);
 
     expect(result.results[0]).toMatchObject({ status: "updated", hackathonId });
-    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledWith(hackathonId, { keepExisting: true });
+    expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+    expect(syncHackathonDiscordChannel).not.toHaveBeenCalled();
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
   });
 
   it("leaves a likely duplicate to the admin", async () => {
@@ -293,8 +284,9 @@ describe("auto-approved imports", () => {
     expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
   });
 
-  it("refreshes the channel through the queue when the feed changed the event", async () => {
+  it("refreshes an approved channel through the queue when the feed changed the event", async () => {
     const hackathonId = (await importRows([BASE])).results[0].hackathonId!;
+    await db.update(hackathons).set({ discordChannelDecision: "approved" }).where(eq(hackathons.id, hackathonId));
 
     await importRows([{ ...BASE, venue: "Frontier Tower" }]);
 
@@ -304,13 +296,17 @@ describe("auto-approved imports", () => {
     ]);
   });
 
-  it("records why a channel could not be set up", async () => {
-    vi.mocked(ensureHackathonDiscordChannelOrThrow).mockRejectedValueOnce(new Error("Missing Permissions"));
+  it("refreshes the channel a merge lands on only when it is approved", async () => {
+    const hackathonId = (await importRows([{ ...BASE, externalId: undefined, externalIds: undefined }])).results[0].hackathonId!;
+    const sameEvent = { ...BASE, externalId: "cerebralvalley:embodied", externalIds: ["cerebralvalley:embodied"] };
 
-    const result = await importRows([{ ...BASE, autoApprove: true }]);
+    expect((await importRows([sameEvent])).results[0]).toMatchObject({ hackathonId, status: "auto_merged" });
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
 
-    expect(result.results[0].status).toBe("imported");
-    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({ status: "failed", error: "Missing Permissions" });
+    await db.update(hackathons).set({ discordChannelDecision: "approved" }).where(eq(hackathons.id, hackathonId));
+    await importRows([{ ...sameEvent, externalId: "mlh:embodied", externalIds: ["mlh:embodied"] }]);
+
+    expect(await db.select({ kind: discordChannelJobs.kind }).from(discordChannelJobs)).toEqual([{ kind: "refresh" }]);
   });
 });
 
@@ -413,6 +409,7 @@ describe("one request, many rows", () => {
   });
 
   it("hands deferred work to the caller instead of waiting for it", async () => {
+    vi.mocked(fetchVerifiedImage).mockClear();
     const deferred: Array<() => Promise<unknown>> = [];
     const parsed = adminHackathonImportSchema.parse({ hackathons: [{ ...BASE, autoApprove: true, imageUrl: "https://images.example.com/a.png" }] });
 
@@ -422,12 +419,15 @@ describe("one request, many rows", () => {
       defer: (task) => deferred.push(task),
     });
 
-    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({ status: "pending" });
-    expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+    // The image check waits for the caller; no channel work is queued at all.
+    expect(deferred).toHaveLength(1);
+    expect(fetchVerifiedImage).not.toHaveBeenCalledWith("https://images.example.com/a.png");
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
 
     await Promise.all(deferred.map((task) => task()));
 
-    expect(await jobFor(result.results[0].discordSync!.jobId)).toMatchObject({ status: "done" });
+    expect(fetchVerifiedImage).toHaveBeenCalledWith("https://images.example.com/a.png");
+    expect(result.results[0].status).toBe("imported");
   });
 });
 

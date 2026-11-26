@@ -186,6 +186,13 @@ export const hackathons = pgTable(
     /* Discord username of one organizer hackers can ping. Required on the
        organizer submission form; null for scraped/community listings. */
     discordTag: varchar("discord_tag", { length: 32 }),
+    /* An admin's answer to "should this hackathon get a Discord channel?":
+       "approved" or "denied". Null means nobody has decided yet, and no
+       channel is made or reused for it until someone does (see
+       lib/discord/channel-decisions.ts). Being published says nothing about
+       the channel: auto-approved scraper events are published without asking,
+       but their channel still waits for an admin. */
+    discordChannelDecision: varchar("discord_channel_decision", { length: 16 }),
     /* Where the listing came from, compiled once when the hackathon is
        created (derived from the import's source URL) and admin-editable
        afterwards. Later sightings of the same event never overwrite it.
@@ -203,6 +210,10 @@ export const hackathons = pgTable(
     index("hackathons_format_idx").on(table.format),
     index("hackathons_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
     uniqueIndex("hackathons_name_slug_idx").on(table.name, table.slug),
+    check(
+      "hackathons_discord_channel_decision_check",
+      sql`${table.discordChannelDecision} is null or ${table.discordChannelDecision} in ('approved', 'denied')`
+    ),
   ]
 );
 

@@ -40,9 +40,9 @@ const optionalTextFields = [
 ] as const;
 
 /* Modal editor for one queued import card. Mirrors the published-hackathon
-   edit dialog, but nothing is persisted here: saving hands the corrected
-   payload back to the review queue, and the import only happens when the
-   admin approves the card. */
+   edit dialog. Saving hands the corrected payload back to the import page,
+   which stores it on the card in the review queue; the import itself only
+   happens when the admin approves the card. */
 export function HackathonImportEditDialog({
   payload,
   onClose,

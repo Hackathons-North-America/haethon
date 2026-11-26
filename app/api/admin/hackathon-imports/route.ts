@@ -35,6 +35,12 @@ export async function POST(request: Request) {
       payloads: parsed.data.hackathons,
       reviewerUserId: gate.userId,
       ignoreDuplicates: parsed.data.ignoreDuplicates ?? false,
+      // An upload publishes only its auto-approved rows. Every other row, and
+      // any possible duplicate, is saved as a card in the review queue
+      // (lib/hackathons/import-queue.ts), where it waits for a yes or no
+      // however long that takes.
+      review: "queue",
+      via: "upload",
       // Validation, duplicate checks and the writes are done before the
       // response; image vetting and Discord run after it.
       defer: after,

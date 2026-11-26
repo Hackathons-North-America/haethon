@@ -6,7 +6,9 @@ function needsFix(payload: Record<string, unknown>) {
 }
 
 export default async function AdminBrokenPage() {
-  const submissions = await listHackathonSubmissions({ limit: 200 });
+  // Asked for by kind and status: the queue's rows can be far older than the
+  // newest few hundred submissions, which are mostly finished imports.
+  const submissions = await listHackathonSubmissions({ kind: "fix", limit: 500, status: "pending" });
   const fixQueue = submissions.filter((submission) => submission.status === "pending" && needsFix(submission.payload));
 
   return (

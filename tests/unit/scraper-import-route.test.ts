@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const testEnv: { SCRAPER_IMPORT_SECRET?: string } = {};
 const importAdminHackathons = vi.fn();
+const importAdminHackathonFixItems = vi.fn();
 const findScraperImportReviewerId = vi.fn();
 const revalidateHackathonCaches = vi.fn();
 const after = vi.fn();
@@ -9,7 +10,7 @@ const enqueueAndDrainSafely = vi.fn();
 
 vi.mock("@/lib/env", () => ({ env: testEnv }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
-vi.mock("@/lib/hackathons/review-service", () => ({ importAdminHackathons }));
+vi.mock("@/lib/hackathons/review-service", () => ({ importAdminHackathonFixItems, importAdminHackathons }));
 vi.mock("@/lib/db", () => ({ db: {} }));
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches }));
 vi.mock("@/lib/discord/review-queue", () => ({ enqueueAndDrainSafely }));
@@ -63,6 +64,7 @@ describe("POST /api/cron/import-hackathons", () => {
   beforeEach(() => {
     testEnv.SCRAPER_IMPORT_SECRET = "s3cret";
     importAdminHackathons.mockReset().mockResolvedValue({ importedCount: 1, results: [{ index: 0, status: "imported" }] });
+    importAdminHackathonFixItems.mockReset().mockResolvedValue({ queuedCount: 1, results: [{ index: 0, status: "queued" }] });
     findScraperImportReviewerId.mockReset().mockResolvedValue("admin-user-id");
     revalidateHackathonCaches.mockReset();
     after.mockReset();
@@ -123,6 +125,35 @@ describe("POST /api/cron/import-hackathons", () => {
     await POST(request({ hackathons: [row], ignoreDuplicates: true }, "Bearer s3cret"));
 
     expect(importAdminHackathons).toHaveBeenCalledWith(expect.objectContaining({ ignoreDuplicates: false }));
+  });
+
+  it("queues rows that need a person instead of publishing them", async () => {
+    await POST(request({ hackathons: [row] }, "Bearer s3cret"));
+
+    // Nobody is watching this import: a row without autoApprove, or a
+    // possible duplicate, waits on /admin/import.
+    expect(importAdminHackathons).toHaveBeenCalledWith(expect.objectContaining({ review: "queue", via: "scraper" }));
+  });
+
+  it("sends the scraper's review records to the fix queue, each one once", async () => {
+    const record = { source: "luma", reason: "missing country", sourceUrl: "https://luma.com/x", raw: { event: { name: "X" } } };
+
+    const response = await POST(request({ needsReview: [record] }, "Bearer s3cret"));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ data: { queuedCount: 1, results: [{ index: 0, status: "queued" }] } });
+    expect(importAdminHackathonFixItems).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewerUserId: "admin-user-id", skipKnown: true })
+    );
+    expect(importAdminHackathonFixItems.mock.calls[0][0].items[0]).toMatchObject({ reason: "missing country" });
+    expect(importAdminHackathons).not.toHaveBeenCalled();
+  });
+
+  it("rejects review records the fix queue cannot read, and keeps them behind the secret", async () => {
+    expect((await POST(request({ needsReview: [{ source: "luma" }] }, "Bearer s3cret"))).status).toBe(400);
+    expect((await POST(request({ needsReview: [] }, "Bearer s3cret"))).status).toBe(400);
+    expect((await POST(request({ needsReview: [{ reason: "x", raw: {} }] }, "Bearer wrong"))).status).toBe(401);
+    expect(importAdminHackathonFixItems).not.toHaveBeenCalled();
   });
 
   it("refuses when there is no admin to record the import under", async () => {
