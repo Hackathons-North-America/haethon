@@ -143,6 +143,6 @@ token-refresh round trip, which a real search could hit.
 
 - **On the phone profile, the remaining ~70 ms is React mounting about 30
   cards** at 4× CPU. Search no longer waits on the network, so card render cost
-  is now the bottleneck (see the JS bundle report, 6).
+  is now the bottleneck.
 - **The page itself** still dominates a filtered link's ~0.8–1.5 s. That is the
-  JS bundle and covers work (reports 5 and 6).
+  JS bundle and the covers (report 5).
