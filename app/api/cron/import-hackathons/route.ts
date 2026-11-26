@@ -1,8 +1,8 @@
 import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
-import { scraperImportReviewItems } from "@/lib/discord/review-items";
-import { enqueueAndDrainSafely } from "@/lib/discord/review-queue";
+import { importReviewItems } from "@/lib/discord/review-items";
+import { enqueueAndDrainSafely, submissionReviewItems } from "@/lib/discord/review-queue";
 import { env } from "@/lib/env";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathonFixItems, importAdminHackathons } from "@/lib/hackathons/review-service";
@@ -87,9 +87,10 @@ export async function POST(request: Request) {
     // waiting for the deferred work.
     revalidateHackathonCaches();
 
-    // No admin is watching an unattended import, so its possible duplicates
-    // and channel decisions go to the team's review channel in Discord.
-    const reviewItems = scraperImportReviewItems(parsed.data.hackathons, result.results);
+    // No admin is watching an unattended import, so what it left waiting
+    // (cards and channel decisions) also goes to the team's review channel in
+    // Discord. Deciding in either place settles both.
+    const reviewItems = importReviewItems(parsed.data.hackathons, result.results);
 
     if (reviewItems.length) {
       after(() => enqueueAndDrainSafely(reviewItems));
@@ -126,6 +127,12 @@ async function importNeedsReview(records: unknown) {
       skipKnown: true,
       defer: after,
     });
+    // As for an admin's upload of broken records (/api/admin/hackathon-fix-imports).
+    const submissionIds = result.results.flatMap((item) => (item.status === "queued" && item.submissionId ? [item.submissionId] : []));
+
+    if (submissionIds.length) {
+      after(() => enqueueAndDrainSafely(submissionReviewItems(submissionIds)));
+    }
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

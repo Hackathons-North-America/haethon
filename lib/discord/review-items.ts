@@ -23,6 +23,8 @@ export type ImportResultForReview = {
   matchedHackathonId?: string;
   matchedName?: string | null;
   status: string;
+  /* Set for a row saved as a card in the website's import review queue. */
+  submissionId?: string;
 };
 
 function jsonRecord(value: unknown): Record<string, unknown> {
@@ -48,24 +50,32 @@ export function duplicateDedupeKey(payload: Record<string, unknown>, matchedHack
 }
 
 /**
- * Review items for an unattended scraper import. A possible duplicate is
- * stored with its payload, because nothing else keeps it. A new Canadian or
- * US hackathon that was not auto-approved waits on its channel decision.
+ * Review items for an import (the scraper's, or an upload on /admin/import).
+ *
+ * A row saved as a card in the website's review queue (`queued`, or a
+ * possible duplicate with a `submissionId`) is posted as that card's
+ * submission: one record, decided in either place, and the reconcile step
+ * clears the other. A possible duplicate the import did not save (an admin's
+ * own import) is stored with its payload, because nothing else keeps it. A
+ * new Canadian or US hackathon waits on its channel decision, auto-approved or
+ * not: auto-approval publishes without asking, but never makes a channel.
  */
-export function scraperImportReviewItems(payloads: unknown[], results: ImportResultForReview[]): NewReviewItem[] {
+export function importReviewItems(payloads: unknown[], results: ImportResultForReview[]): NewReviewItem[] {
   const items: NewReviewItem[] = [];
 
   for (const result of results) {
     const payload = jsonRecord(payloads[result.index]);
 
-    if (result.status === "duplicate_flagged") {
+    if (result.submissionId && (result.status === "queued" || result.status === "duplicate_flagged")) {
+      items.push({ dedupeKey: result.submissionId, kind: "submission", submissionId: result.submissionId });
+    } else if (result.status === "duplicate_flagged") {
       items.push({
         dedupeKey: duplicateDedupeKey(payload, result.matchedHackathonId),
         hackathonId: result.matchedHackathonId,
         kind: "import_duplicate",
         payload: { ...payload, duplicateScore: result.duplicateScore, matchedName: result.matchedName ?? null },
       });
-    } else if (result.status === "imported" && result.autoApprove !== true && result.discord?.eligible && result.hackathonId) {
+    } else if (result.status === "imported" && result.discord?.eligible && result.hackathonId) {
       items.push(channelDecisionItem(result.hackathonId, payload, result.discord));
     }
   }

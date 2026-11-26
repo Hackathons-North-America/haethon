@@ -72,6 +72,21 @@ describe("renderReviewMessage", () => {
     );
   });
 
+  it("offers an import card's own choices and links its queue", () => {
+    const card = { name: "MapleHacks 2027", origin: "admin_import", importVia: "scraper", submitterType: "community" };
+    const plain = renderReviewMessage(submissionItem({}, { payload: card }), APP);
+    const flagged = renderReviewMessage(
+      submissionItem({}, { matchedHackathonId: "h1", matchedHackathonName: "MapleHacks", matchedHackathonSlug: "maplehacks", payload: card }),
+      APP
+    );
+
+    expect(buttons(plain).map((button) => button.label)).toEqual(["Approve", "Reject", "Open queue"]);
+    // Decided as on /admin/import: merge or import as new, never replace.
+    expect(buttons(flagged).map((button) => button.label)).toEqual(["Approve", "Reject", "Merge into match", "Import as new", "Open queue"]);
+    expect(buttons(flagged)[3].custom_id).toBe(`rv:new:${ITEM_ID}`);
+    expect(buttons(flagged).at(-1)?.url).toBe(`${APP}/admin/import`);
+  });
+
   it("links broken imports to their own queue", () => {
     const body = renderReviewMessage(submissionItem({}, { payload: { needsFix: true } }), APP);
 

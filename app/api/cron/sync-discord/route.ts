@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { drainDiscordChannelJobs } from "@/lib/discord/channel-jobs";
-import { deleteAbandonedFormDrafts, drainDiscordReviewQueue } from "@/lib/discord/review-queue";
+import { waitingWebsiteReviewItems } from "@/lib/discord/review-backfill";
+import { deleteAbandonedFormDrafts, drainDiscordReviewQueue, enqueueReviewItems } from "@/lib/discord/review-queue";
 import { syncPublishedHackathonDiscordChannels } from "@/lib/discord/sync";
 import { env } from "@/lib/env";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
@@ -27,8 +28,12 @@ export async function GET(request: Request) {
 
     const data = await syncPublishedHackathonDiscordChannels();
 
-    // Backstop for the review channel: posts what earlier drains left, and
-    // updates messages for items reviewed on the website.
+    // Backstop for the review channel: queues what is waiting on the website
+    // and was not posted yet, posts what earlier drains left, and updates
+    // messages for items reviewed on the website.
+    await waitingWebsiteReviewItems()
+      .then(enqueueReviewItems)
+      .catch((error) => Sentry.captureException(error));
     const review = await drainDiscordReviewQueue({ budgetMs: 10_000 }).catch((error) => {
       Sentry.captureException(error);
 

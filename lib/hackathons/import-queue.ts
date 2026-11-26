@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { hackathons, hackathonSubmissions } from "@/lib/db/schema";
+import { discordReviewItems, hackathons, hackathonSubmissions } from "@/lib/db/schema";
 import {
   IMPORT_ORIGIN,
   importCardPayload,
@@ -42,6 +42,22 @@ const pendingImportCard = and(eq(hackathonSubmissions.status, "pending"), import
 const CLAIM_TIMEOUT_MS = 5 * 60 * 1000;
 /* A card is one event; anything larger is not a card. */
 const MAX_CARD_BYTES = 60_000;
+
+/* The card's message in the Discord review channel, if it was posted there,
+   shows what the card said when it was posted. After an edit or a new match
+   it is redrawn by the next drain (lib/discord/review-queue.ts). */
+function refreshDiscordMessage(submissionId: string) {
+  return db
+    .update(discordReviewItems)
+    .set({ messageStale: sql`${discordReviewItems.messageSnowflake} is not null`, updatedAt: new Date() })
+    .where(
+      and(
+        eq(discordReviewItems.kind, "submission"),
+        eq(discordReviewItems.submissionId, submissionId),
+        eq(discordReviewItems.status, "pending")
+      )
+    );
+}
 
 function text(value: unknown, limit: number) {
   return typeof value === "string" ? value.trim().slice(0, limit) : "";
@@ -181,6 +197,8 @@ export async function updateImportCard(input: { event: Record<string, unknown>; 
     throw new ImportCardError("conflict", "This card has already been reviewed.");
   }
 
+  await refreshDiscordMessage(card.id);
+
   return toImportCardView({ ...updated, matchedHackathonName: null });
 }
 
@@ -198,6 +216,8 @@ export async function updateImportCard(input: { event: Record<string, unknown>; 
 export async function decideImportCard(input: {
   action: ImportCardAction;
   defer?: (task: () => Promise<unknown>) => void;
+  /* Shown with a "no"; the import page's "no" gives none. */
+  rejectionReason?: string;
   reviewerUserId: string;
   submissionId: string;
 }) {
@@ -233,7 +253,7 @@ export async function decideImportCard(input: {
     if (input.action === "reject") {
       await release({
         status: "rejected",
-        rejectionReason: "Declined on the import page.",
+        rejectionReason: input.rejectionReason?.trim() || "Declined on the import page.",
         reviewedByUserId: input.reviewerUserId,
         reviewedAt: claimedAt,
       });
@@ -266,6 +286,7 @@ export async function decideImportCard(input: {
     if (result.status === "duplicate_flagged") {
       // Nothing was written. The card stays, now showing what it matches.
       await release({ matchedHackathonId: result.matchedHackathonId ?? null, duplicateScore: result.duplicateScore.toFixed(2) });
+      await refreshDiscordMessage(card.id);
     }
 
     return { status: "decided" as const, result };

@@ -1,6 +1,8 @@
 import { after, NextResponse } from "next/server";
 
 import { requireAdminUserId } from "@/lib/auth";
+import { importReviewItems } from "@/lib/discord/review-items";
+import { enqueueAndDrainSafely } from "@/lib/discord/review-queue";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
 import { adminHackathonImportSchema } from "@/lib/validations/hackathon";
@@ -50,6 +52,14 @@ export async function POST(request: Request) {
     // writes are committed. Channel jobs queued for auto-approved rows
     // invalidate again when they finish in the background.
     revalidateHackathonCaches();
+
+    // The cards and channel decisions this upload left waiting also go to the
+    // team's review channel in Discord; deciding in either place settles both.
+    const reviewItems = importReviewItems(parsed.data.hackathons, result.results);
+
+    if (reviewItems.length) {
+      after(() => enqueueAndDrainSafely(reviewItems));
+    }
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

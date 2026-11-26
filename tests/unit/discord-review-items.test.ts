@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { approvalCandidate, duplicateDedupeKey, scraperImportReviewItems } from "@/lib/discord/review-items";
+import { approvalCandidate, duplicateDedupeKey, importReviewItems } from "@/lib/discord/review-items";
 
 const payload = {
   name: "MapleHacks 2027",
@@ -11,9 +11,9 @@ const payload = {
   format: "in_person",
 };
 
-describe("scraperImportReviewItems", () => {
-  it("keeps a flagged duplicate's payload and queues channel decisions for new Canadian/US events", () => {
-    const items = scraperImportReviewItems(
+describe("importReviewItems", () => {
+  it("keeps a flagged duplicate's payload and queues channel decisions for new Canadian/US events, auto-approved or not", () => {
+    const items = importReviewItems(
       [{ ...payload, externalId: "luma:1" }, payload, payload, payload],
       [
         { duplicateScore: 0.7, index: 0, matchedHackathonId: "match", matchedName: "Maple", status: "duplicate_flagged" },
@@ -23,7 +23,7 @@ describe("scraperImportReviewItems", () => {
       ]
     );
 
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
     expect(items[0]).toMatchObject({
       dedupeKey: "feed:luma:1",
       hackathonId: "match",
@@ -31,11 +31,13 @@ describe("scraperImportReviewItems", () => {
       payload: { duplicateScore: 0.7, matchedName: "Maple", name: "MapleHacks 2027", startDate: "2027-01-16T00:00:00.000Z" },
     });
     expect(items[1]).toMatchObject({ dedupeKey: "h1", hackathonId: "h1", kind: "channel_decision" });
+    // Auto-approval publishes without asking; the channel still needs a yes.
+    expect(items[2]).toMatchObject({ dedupeKey: "h2", hackathonId: "h2", kind: "channel_decision" });
   });
 
   it("ignores updates and auto-merges", () => {
     expect(
-      scraperImportReviewItems([payload], [{ duplicateScore: 1, hackathonId: "h", index: 0, status: "updated" }])
+      importReviewItems([payload], [{ duplicateScore: 1, hackathonId: "h", index: 0, status: "updated" }])
     ).toEqual([]);
   });
 });

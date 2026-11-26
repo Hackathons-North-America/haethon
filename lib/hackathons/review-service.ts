@@ -1243,12 +1243,12 @@ async function runAdminImport(input: AdminImportInput) {
 
   /* Auto-approval publishes a row without asking; it says nothing about a
      Discord channel, which every hackathon needs an admin's yes for. An admin
-     deciding now is asked about the channel straight away; everything else
-     (an upload, the scraper) waits in the channel decision queue on
-     /admin/import. Only Canadian and US events get a channel. */
+     deciding now is asked about the channel straight away with this preview;
+     for an upload or the scraper it goes with the channel decision posted to
+     the Discord review channel, and the hackathon waits in the channel
+     decision queue on /admin/import. Only Canadian and US events get one. */
   const wantsPreview = rows.some(
     (row) =>
-      review === "publish" &&
       categoryForHackathon({ country: row.payload.country, endsAt: row.payload.endDate, startsAt: row.payload.startDate, status: row.status })
   );
   // Started now, awaited last: the call to Discord overlaps the database work.
@@ -1825,22 +1825,19 @@ async function runAdminImport(input: AdminImportInput) {
     };
     results.push(result);
 
-    // No channel yet, auto-approved or not. An admin deciding now is asked
-    // with this preview; otherwise the hackathon waits in the channel
-    // decision queue (lib/discord/channel-decisions.ts).
-    if (review === "publish") {
-      previews.push({
-        result,
-        event: {
-          country: payload.country,
-          endsAt: payload.endDate,
-          name: payload.name,
-          seriesId: existingSeries?.id ?? null,
-          startsAt: payload.startDate,
-          status: row.status,
-        },
-      });
-    }
+    // No channel yet, auto-approved or not: the preview is what the admin is
+    // asked with, here or in Discord (lib/discord/channel-decisions.ts).
+    previews.push({
+      result,
+      event: {
+        country: payload.country,
+        endsAt: payload.endDate,
+        name: payload.name,
+        seriesId: existingSeries?.id ?? null,
+        startsAt: payload.startDate,
+        status: row.status,
+      },
+    });
   }
 
   /* ---- One round trip of writes ---- */
