@@ -64,6 +64,8 @@ function entry(id: string, card: Partial<CatalogSnapshotEntry["card"]>, upvotes 
       highSchoolersOnly: false,
       id,
       image: null,
+      imageThumbSmall: null,
+      imageThumbLarge: null,
       latitude: null,
       longitude: null,
       location: "Somewhere",
