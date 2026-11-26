@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import type { HackathonCardData } from "@/components/hackathon-card";
 import { HackathonSearch } from "@/components/hackathon-search";
 import { useViewerCardHydration } from "@/components/use-viewer-card-hydration";
-import { loadCatalogSnapshot } from "@/lib/hackathons/catalog-client";
+import { loadCatalogSnapshot, startCatalogRefresh } from "@/lib/hackathons/catalog-client";
 import {
   CATALOG_URL_ATTRIBUTE,
   DEFAULT_CATALOG_REQUEST,
@@ -73,15 +73,19 @@ export function HackathonCatalog({
   const request = urlSearch === null ? DEFAULT_CATALOG_REQUEST : catalogRequestFromSearch(urlSearch);
   const showsStaticCards = request.isDefault && initialHackathons !== null;
 
-  /* The catalog file every search is answered from. Requested once the page
-     is on screen (a filtered URL's boot script has usually started it
-     already), at low priority, so it has normally arrived before the visitor
-     first touches a filter. */
+  /* The catalog file every search is answered from, with its descriptions
+     and votes files behind it. Requested once the page is on screen (a
+     filtered URL's boot script has usually started them already), at low
+     priority, so the catalog has normally arrived before the visitor first
+     touches a filter. */
   useEffect(() => {
     if (urlSearch !== null) {
       void loadCatalogSnapshot();
     }
   }, [urlSearch]);
+
+  // Keeps those copies fresh while the tab stays open.
+  useEffect(() => startCatalogRefresh(), []);
 
   useEffect(() => {
     if (urlSearch === null || !showsStaticCards || !initialHackathons || requestedViewerStateRef.current) {

@@ -1,13 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CATALOG_DESCRIPTIONS_URL,
+  CATALOG_FILE_URLS,
   CATALOG_SNAPSHOT_URL,
+  CATALOG_VERSIONS_URL,
+  CATALOG_VOTES_URL,
+  catalogFileEntry,
   EARLY_CATALOG_GLOBAL,
+  fillCardsFromSnapshot,
   loadCatalogSnapshot,
   peekCatalogSnapshot,
   resetCatalogSnapshotForTests,
   searchCatalogSnapshot,
-  type CatalogSnapshotResponse,
+  recheckCatalogFiles,
+  startCatalogRefresh,
+  subscribeCatalogSnapshot,
   type LoadedCatalogSnapshot,
 } from "@/lib/hackathons/catalog-client";
 import { selectCatalogPage, type CatalogSnapshotEntry } from "@/lib/hackathons/catalog-snapshot";
@@ -34,6 +42,8 @@ function entry(
       highSchoolersOnly: false,
       id,
       image: null,
+      imageThumbSmall: null,
+      imageThumbLarge: null,
       latitude: null,
       longitude: null,
       location: "",
@@ -56,18 +66,72 @@ function entry(
 }
 
 const entries = [
-  entry("toronto", { name: "Hack  Toronto", startsAt: "2026-08-01T00:00:00.000Z", upvotes: 5, downvotes: 1 }),
+  entry("toronto", {
+    name: "Hack  Toronto",
+    description: "Build things in Toronto.",
+    startsAt: "2026-08-01T00:00:00.000Z",
+    upvotes: 5,
+    downvotes: 1,
+  }),
   entry("boston", { country: "United States", countryCode: "US", name: "Boston Hacks" }),
   entry("online", { country: null, countryCode: null, format: "online", name: "Remote Jam" }),
   entry("montreal", { name: "Hack Montreal", beginnerFriendly: true, startsAt: "2026-10-01T00:00:00.000Z" }),
 ];
 
-function snapshotOf(list: CatalogSnapshotEntry[]): LoadedCatalogSnapshot {
-  return { entries: list, votesById: new Map(list.map((item) => [item.card.id, item])), loadedAt: Date.now() };
+function snapshotOf(
+  list: CatalogSnapshotEntry[],
+  { descriptions = true, votes = true } = {}
+): LoadedCatalogSnapshot {
+  return {
+    entries: list,
+    descriptions: descriptions
+      ? new Map(list.flatMap((item) => (item.card.description ? [[item.card.id, item.card.description]] : [])))
+      : null,
+    votes: votes ? new Map(list.map((item) => [item.card.id, [item.upvotes, item.downvotes] as const])) : null,
+  };
 }
 
-function jsonResponse(body: CatalogSnapshotResponse) {
-  return { ok: true, json: async () => body };
+/* The four files' bodies, as the routes build them from `list`. `version`
+   stands in for the content fingerprint. */
+function filesOf(list: CatalogSnapshotEntry[], version = "v1") {
+  return {
+    [CATALOG_SNAPSHOT_URL]: { version, entries: list.map(catalogFileEntry) },
+    [CATALOG_DESCRIPTIONS_URL]: {
+      version,
+      descriptions: Object.fromEntries(
+        list.flatMap(({ card }) => (card.description ? [[card.id, card.description]] : []))
+      ),
+    },
+    [CATALOG_VOTES_URL]: {
+      version,
+      votes: Object.fromEntries(
+        list.filter((item) => item.upvotes || item.downvotes).map((item) => [item.card.id, [item.upvotes, item.downvotes]])
+      ),
+    },
+    [CATALOG_VERSIONS_URL]: { catalog: version, descriptions: version, votes: version },
+  } as Record<string, unknown>;
+}
+
+type Served = Record<string, unknown>;
+
+/* A fetch that answers each file URL from `served` (read at call time, so a
+   test can change a file between calls). A value of Error rejects, `false`
+   answers 404, and a promise is awaited first. */
+type FakeResponse = { ok: boolean; text: () => Promise<string>; json?: () => Promise<unknown> };
+
+function serve(served: Served) {
+  return vi.fn(async (url: string): Promise<FakeResponse> => {
+    const body: unknown = await served[url];
+
+    if (body instanceof Error) throw body;
+    if (body === false || body === undefined) return { ok: false, text: async () => "" };
+
+    return { ok: true, text: async () => JSON.stringify(body), json: async () => body };
+  });
+}
+
+function urlsOf(fetchMock: ReturnType<typeof serve>) {
+  return fetchMock.mock.calls.map(([url]) => url);
 }
 
 describe("searchCatalogSnapshot", () => {
@@ -112,7 +176,7 @@ describe("searchCatalogSnapshot", () => {
     expect(search({}, 2, 2)).toMatchObject({ hasMore: false });
   });
 
-  it("carries the snapshot's vote totals, overlaid by what the page knows about the viewer", () => {
+  it("adds blurbs and vote totals from the side files, overlaid by what the page knows about the viewer", () => {
     const page = searchCatalogSnapshot(
       snapshotOf(entries),
       {
@@ -125,8 +189,60 @@ describe("searchCatalogSnapshot", () => {
       now
     );
 
-    expect(page.cards[0]).toMatchObject({ id: "toronto", upvotes: 5, downvotes: 1, viewerVote: null, trackedStatus: null });
+    expect(page.cards[0]).toMatchObject({
+      id: "toronto",
+      description: "Build things in Toronto.",
+      upvotes: 5,
+      downvotes: 1,
+      viewerVote: null,
+      trackedStatus: null,
+    });
+    expect(page.cards[0]).not.toHaveProperty("descriptionPending");
     expect(page.cards[1]).toMatchObject({ id: "montreal", upvotes: 9, viewerVote: 1, trackedStatus: "applied" });
+  });
+
+  it("marks the blurb pending and leaves the score out until those files arrive", () => {
+    const page = searchCatalogSnapshot(
+      snapshotOf(entries, { descriptions: false, votes: false }),
+      { filters: DEFAULT_SEARCH_FILTERS, offset: 0, limit: 1, sort: "soonest" },
+      now
+    );
+
+    expect(page.cards[0]).toMatchObject({ id: "toronto", description: null, descriptionPending: true });
+    expect(page.cards[0]?.upvotes).toBeUndefined();
+  });
+});
+
+describe("fillCardsFromSnapshot", () => {
+  const pending = searchCatalogSnapshot(
+    snapshotOf(entries, { descriptions: false, votes: false }),
+    { filters: DEFAULT_SEARCH_FILTERS, offset: 0, limit: 30, sort: "soonest" },
+    now
+  ).cards;
+
+  it("fills in pending blurbs and the vote totals once they arrive", () => {
+    const filled = fillCardsFromSnapshot(pending, snapshotOf(entries));
+    const toronto = filled.find((card) => card.id === "toronto");
+
+    expect(toronto).toMatchObject({ description: "Build things in Toronto.", upvotes: 5, downvotes: 1 });
+    expect(toronto).not.toHaveProperty("descriptionPending");
+    expect(filled.find((card) => card.id === "boston")).toMatchObject({ description: null, upvotes: 0 });
+  });
+
+  it("updates scores already on screen, but not the ones the viewer's live answer covers", () => {
+    const shown = fillCardsFromSnapshot(pending, snapshotOf(entries));
+    const later = snapshotOf(entries.map((item) => ({ ...item, upvotes: item.upvotes + 2 })));
+    const filled = fillCardsFromSnapshot(shown, later, new Map([["boston", {}]]));
+
+    expect(filled.find((card) => card.id === "toronto")?.upvotes).toBe(7);
+    expect(filled.find((card) => card.id === "boston")?.upvotes).toBe(0);
+  });
+
+  it("returns the same array when nothing changed, so React skips the render", () => {
+    const shown = fillCardsFromSnapshot(pending, snapshotOf(entries));
+
+    expect(fillCardsFromSnapshot(shown, snapshotOf(entries))).toBe(shown);
+    expect(fillCardsFromSnapshot(pending, snapshotOf(entries, { descriptions: false, votes: false }))).toBe(pending);
   });
 });
 
@@ -139,74 +255,219 @@ describe("loadCatalogSnapshot", () => {
     window[EARLY_CATALOG_GLOBAL] = undefined;
   });
 
-  it("downloads the file once, however many searches ask at the same time", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ entries }));
+  it("downloads the catalog once, then the descriptions and votes once each", async () => {
+    const fetchMock = serve(filesOf(entries));
     vi.stubGlobal("fetch", fetchMock);
 
     const [first, second] = await Promise.all([loadCatalogSnapshot(), loadCatalogSnapshot()]);
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(CATALOG_SNAPSHOT_URL);
     expect(first).toBe(second);
-    expect(peekCatalogSnapshot()?.entries).toHaveLength(entries.length);
+    expect(first?.entries).toHaveLength(entries.length);
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+    expect(urlsOf(fetchMock)).toEqual([CATALOG_SNAPSHOT_URL, CATALOG_DESCRIPTIONS_URL, CATALOG_VOTES_URL]);
+
+    // The catalog file carries no blurbs and the snapshot ranks with the votes file's totals.
+    const toronto = peekCatalogSnapshot()?.entries.find((item) => item.card.id === "toronto");
+    expect(toronto).toMatchObject({ upvotes: 5, downvotes: 1, card: { description: null } });
+    expect(peekCatalogSnapshot()?.descriptions?.get("toronto")).toBe("Build things in Toronto.");
   });
 
-  it("takes over the download the boot script started", async () => {
+  it("answers as soon as the catalog arrives, without waiting for the side files", async () => {
+    const served: Served = { ...filesOf(entries), [CATALOG_VOTES_URL]: new Promise(() => {}) };
+    vi.stubGlobal("fetch", serve(served));
+
+    const snapshot = await loadCatalogSnapshot();
+
+    expect(snapshot?.votes).toBeNull();
+    expect(snapshot?.entries).toHaveLength(entries.length);
+  });
+
+  it("waits for the votes when asked to (Top voted), and gives up on the snapshot without them", async () => {
+    vi.stubGlobal("fetch", serve(filesOf(entries)));
+    expect((await loadCatalogSnapshot({ votes: true }))?.votes?.get("toronto")).toEqual([5, 1]);
+
+    resetCatalogSnapshotForTests();
+    vi.stubGlobal("fetch", serve({ ...filesOf(entries), [CATALOG_VOTES_URL]: false }));
+    expect(await loadCatalogSnapshot({ votes: true })).toBeNull();
+    // The catalog itself still arrived, for searches that don't need votes.
+    expect(await loadCatalogSnapshot()).not.toBeNull();
+  });
+
+  it("takes over the downloads the boot script started", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    window[EARLY_CATALOG_GLOBAL] = Promise.resolve({ entries });
+    const bodies = filesOf(entries);
+    window[EARLY_CATALOG_GLOBAL] = Object.fromEntries(
+      CATALOG_FILE_URLS.map((url) => [url, Promise.resolve(JSON.stringify(bodies[url]))])
+    );
 
     expect((await loadCatalogSnapshot())?.entries).toHaveLength(entries.length);
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions?.size).toBe(1));
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(window[EARLY_CATALOG_GLOBAL]).toBeUndefined();
+    expect(window[EARLY_CATALOG_GLOBAL]).toEqual({});
   });
 
-  it("resolves to null when there is no copy to be had, so the caller uses the API", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse({ entries: null })));
+  it("resolves to null when there is no catalog to be had, so the caller uses the API", async () => {
+    vi.stubGlobal("fetch", serve({ [CATALOG_SNAPSHOT_URL]: { entries: null } }));
     expect(await loadCatalogSnapshot()).toBeNull();
 
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new TypeError("offline")));
+    vi.stubGlobal("fetch", serve({ [CATALOG_SNAPSHOT_URL]: new TypeError("offline") }));
     expect(await loadCatalogSnapshot()).toBeNull();
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: false }));
+    vi.stubGlobal("fetch", serve({ [CATALOG_SNAPSHOT_URL]: false }));
     expect(await loadCatalogSnapshot()).toBeNull();
   });
 
-  it("keeps answering from an aged copy while it downloads a fresh one", async () => {
-    vi.useFakeTimers({ now: new Date("2026-07-14T12:00:00.000Z") });
+});
 
-    let finishRefresh: (value: unknown) => void = () => {};
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse({ entries }))
-      .mockReturnValueOnce(new Promise((resolve) => (finishRefresh = resolve)));
+describe("recheckCatalogFiles", () => {
+  beforeEach(() => resetCatalogSnapshotForTests());
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function loaded(served: Served) {
+    const fetchMock = serve(served);
     vi.stubGlobal("fetch", fetchMock);
+    await loadCatalogSnapshot();
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+    fetchMock.mockClear();
+    return fetchMock;
+  }
 
-    const original = await loadCatalogSnapshot();
+  it("asks only for the versions file while nothing has changed", async () => {
+    const fetchMock = await loaded(filesOf(entries));
+    const settled = peekCatalogSnapshot();
 
-    vi.setSystemTime(new Date("2026-07-14T12:11:00.000Z"));
+    await recheckCatalogFiles();
 
-    // Past its age: the old copy comes straight back, and a refresh starts.
-    expect(await loadCatalogSnapshot()).toBe(original);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls).toEqual([[CATALOG_VERSIONS_URL, { cache: "no-store", priority: "low" }]]);
+    expect(peekCatalogSnapshot()).toBe(settled);
+  });
 
-    finishRefresh(jsonResponse({ entries: entries.slice(0, 1) }));
+  it("re-downloads just the file that changed, past the browser's cache, and tells subscribers", async () => {
+    const served = filesOf(entries);
+    const fetchMock = await loaded(served);
+    const listener = vi.fn();
+    subscribeCatalogSnapshot(listener);
+
+    served[CATALOG_VOTES_URL] = { version: "v2", votes: { toronto: [8, 1] } };
+    served[CATALOG_VERSIONS_URL] = { catalog: "v1", descriptions: "v1", votes: "v2" };
+    await recheckCatalogFiles();
+
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes?.get("toronto")).toEqual([8, 1]));
+    expect(fetchMock.mock.calls[1]).toEqual([CATALOG_VOTES_URL, { cache: "no-cache", priority: "low" }]);
+    expect(urlsOf(fetchMock)).toEqual([CATALOG_VERSIONS_URL, CATALOG_VOTES_URL]);
+    expect(listener).toHaveBeenCalledOnce();
+    // "Top voted" ranks with the new totals.
+    expect(peekCatalogSnapshot()?.entries.find((item) => item.card.id === "toronto")?.upvotes).toBe(8);
+  });
+
+  it("tries again next time when the CDN still hands out the old file", async () => {
+    const served = filesOf(entries);
+    const fetchMock = await loaded(served);
+    const settled = peekCatalogSnapshot();
+
+    served[CATALOG_VERSIONS_URL] = { catalog: "v2", descriptions: "v1", votes: "v1" };
+    await recheckCatalogFiles();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(peekCatalogSnapshot()).toBe(settled);
+
+    served[CATALOG_SNAPSHOT_URL] = filesOf(entries.slice(0, 1), "v2")[CATALOG_SNAPSHOT_URL];
+    await recheckCatalogFiles();
     await vi.waitFor(() => expect(peekCatalogSnapshot()?.entries).toHaveLength(1));
   });
 
-  it("keeps the copy it has when a refresh fails", async () => {
+  it("keeps the copies it has when the versions or a download fail", async () => {
+    const served = filesOf(entries);
+    const fetchMock = await loaded(served);
+    const settled = peekCatalogSnapshot();
+
+    served[CATALOG_VERSIONS_URL] = new TypeError("offline");
+    await recheckCatalogFiles();
+    expect(urlsOf(fetchMock)).toEqual([CATALOG_VERSIONS_URL]);
+
+    served[CATALOG_VERSIONS_URL] = { catalog: "v2", descriptions: "v2", votes: "v2" };
+    served[CATALOG_SNAPSHOT_URL] = new TypeError("offline");
+    served[CATALOG_DESCRIPTIONS_URL] = false;
+    served[CATALOG_VOTES_URL] = new TypeError("offline");
+    await recheckCatalogFiles();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(peekCatalogSnapshot()).toBe(settled);
+  });
+
+  it("does nothing before the catalog has been downloaded", async () => {
+    const fetchMock = serve(filesOf(entries));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await recheckCatalogFiles();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("startCatalogRefresh", () => {
+  let visibility: DocumentVisibilityState = "visible";
+
+  beforeEach(() => {
+    resetCatalogSnapshotForTests();
+    visibility = "visible";
+    vi.spyOn(document, "visibilityState", "get").mockImplementation(() => visibility);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  async function loaded() {
     vi.useFakeTimers({ now: new Date("2026-07-14T12:00:00.000Z") });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(jsonResponse({ entries })).mockRejectedValueOnce(new TypeError("offline"))
-    );
-
-    const original = await loadCatalogSnapshot();
-
-    vi.setSystemTime(new Date("2026-07-14T12:11:00.000Z"));
+    const fetchMock = serve(filesOf(entries));
+    vi.stubGlobal("fetch", fetchMock);
     await loadCatalogSnapshot();
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
+    await vi.waitFor(() => expect(peekCatalogSnapshot()?.descriptions).not.toBeNull());
+    fetchMock.mockClear();
+    return fetchMock;
+  }
 
-    expect(peekCatalogSnapshot()).toBe(original);
+  it("checks the versions every minute while the tab is visible, and stops when cleaned up", async () => {
+    const fetchMock = await loaded();
+    const stop = startCatalogRefresh();
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(urlsOf(fetchMock)).toEqual(Array(5).fill(CATALOG_VERSIONS_URL));
+
+    stop();
+    fetchMock.mockClear();
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing while the tab is hidden, and asks at once when it comes back", async () => {
+    const fetchMock = await loaded();
+    const stop = startCatalogRefresh();
+
+    visibility = "hidden";
+    await vi.advanceTimersByTimeAsync(3 * 60_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    visibility = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(urlsOf(fetchMock)).toEqual([CATALOG_VERSIONS_URL]);
+
+    // A quick switch away and back doesn't ask again.
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(urlsOf(fetchMock)).toHaveLength(1);
+
+    stop();
   });
 });

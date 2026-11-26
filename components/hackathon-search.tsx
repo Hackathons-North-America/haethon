@@ -21,7 +21,13 @@ import type { HackathonCardData } from "@/components/hackathon-card";
 import type { ViewerCardHydration } from "@/components/use-viewer-card-hydration";
 import { WatercolorBackdrop } from "@/components/watercolor-backdrop";
 import type { GeoPoint } from "@/lib/geo";
-import { loadCatalogSnapshot, peekCatalogSnapshot, searchCatalogSnapshot } from "@/lib/hackathons/catalog-client";
+import {
+  fillCardsFromSnapshot,
+  loadCatalogSnapshot,
+  peekCatalogSnapshot,
+  searchCatalogSnapshot,
+  subscribeCatalogSnapshot,
+} from "@/lib/hackathons/catalog-client";
 import type { LoadedCatalogSnapshot } from "@/lib/hackathons/catalog-client";
 import { filterCountryOptions } from "@/lib/hackathons/countries";
 import { filterLocalHackathonCatalog } from "@/lib/hackathons/local-catalog-search";
@@ -515,6 +521,21 @@ export function HackathonSearch({
     [viewerCards]
   );
 
+  /* Blurbs and vote totals come in files of their own, after the catalog
+     (lib/hackathons/catalog-client.ts), and the votes are re-checked every
+     minute: cards already on screen are filled in and rescored as they land.
+     Cards the viewer's card-state answer covers keep that answer's live
+     totals. */
+  useEffect(
+    () =>
+      searchLocally
+        ? subscribeCatalogSnapshot((snapshot) =>
+            setCatalog((current) => fillCardsFromSnapshot(current, snapshot, viewerStatesRef.current))
+          )
+        : undefined,
+    [searchLocally]
+  );
+
   /* Watch the sentinel rather than the scroll position so nested scroll
      containers and the page itself both work. The margin starts the fetch a
      screen early, so the next rows are usually there before the visitor
@@ -669,7 +690,10 @@ export function HackathonSearch({
     /* With the catalog already in the browser the page is answered in this
        same event, so the grid changes in the frame after the click with no
        loading state in between. */
-    const ready = searchLocally ? peekCatalogSnapshot() : null;
+    const needsVotes = sortOrder === "top";
+    const peeked = searchLocally ? peekCatalogSnapshot() : null;
+    // "Top voted" ranks by the vote totals, which arrive in a file of their own.
+    const ready = peeked && (!needsVotes || peeked.votes) ? peeked : null;
 
     if (ready) {
       showLocalPage(ready, filters, offset, append, sortOrder);
@@ -686,7 +710,7 @@ export function HackathonSearch({
     if (searchLocally) {
       // Not here yet (a search in the first moment after the page opened):
       // waiting for it is about as fast as the API, which it replaces.
-      const snapshot = await loadCatalogSnapshot();
+      const snapshot = await loadCatalogSnapshot({ votes: needsVotes });
 
       if (searchGeneration !== searchGenerationRef.current || abortController.signal.aborted) {
         return;

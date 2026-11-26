@@ -24,6 +24,10 @@ export type HackathonCardData = {
   countryCode?: string | null;
   date: string;
   description?: string | null;
+  /* The blurb hasn't arrived yet: the catalog page draws cards from its
+     catalog file and fills the blurbs in from a second one
+     (lib/hackathons/catalog-client.ts). Shows a placeholder meanwhile. */
+  descriptionPending?: boolean;
   /* Deep link to the event's Discord channel, when available. */
   discordUrl?: string | null;
   /** ISO end date. */
@@ -916,9 +920,19 @@ export function HackathonCard({
               `mt-auto`, so the leftover height falls between the two and the
               footer rule still lines up across a row of cards. `mb-5` is the
               minimum gap when the body is full. */}
-          <p className="mb-5 mt-3 line-clamp-4 text-[13px] leading-[19px] text-ink/70">
-            {cardDescription(hackathon)}
-          </p>
+          {hackathon.descriptionPending ? (
+            /* Three of the blurb's four lines, at its line height, so the card
+               barely moves when the text lands. */
+            <div aria-hidden="true" className="mb-5 mt-3 space-y-[7px] py-[3.5px]">
+              {["w-full", "w-11/12", "w-3/5"].map((width) => (
+                <div className={`${width} h-3 rounded-sm bg-ink/[0.06] motion-safe:animate-pulse`} key={width} />
+              ))}
+            </div>
+          ) : (
+            <p className="mb-5 mt-3 line-clamp-4 text-[13px] leading-[19px] text-ink/70">
+              {cardDescription(hackathon)}
+            </p>
+          )}
 
           {/* Ruled footer: votes on the left; More info (and the board's
               remove button, when present) on the right. The rule is its own element so the cursor
