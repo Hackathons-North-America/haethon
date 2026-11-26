@@ -336,14 +336,16 @@ export const adminHackathonFixImportSchema = z.preprocess(
   }).strip()
 );
 
-export const organizerSubmissionSchema = normalizedHackathonPayloadBaseSchema
-  .extend({
-    submitterType: z.literal("organizer"),
-    organizationName: z.string().trim().min(2).max(160),
-    shortDescription: z.string().trim().min(20).max(500),
-    discordTag: requiredDiscordTag,
-  })
-  .superRefine(dateRangeRefinement);
+/* The organizer form's fields without the cross-field date check, so the
+   Discord bot can validate its form one step at a time with .pick(). */
+export const organizerSubmissionFieldsSchema = normalizedHackathonPayloadBaseSchema.extend({
+  submitterType: z.literal("organizer"),
+  organizationName: z.string().trim().min(2).max(160),
+  shortDescription: z.string().trim().min(20).max(500),
+  discordTag: requiredDiscordTag,
+});
+
+export const organizerSubmissionSchema = organizerSubmissionFieldsSchema.superRefine(dateRangeRefinement);
 
 // Community submitters only vouch that a hackathon exists — they give us the
 // name and a link. A reviewer fills in the date, province, location, format,

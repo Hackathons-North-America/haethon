@@ -17,6 +17,8 @@ const isPublicRoute = createRouteMatcher([
   "/api/cities/search",
   "/api/geo",
   "/api/cron(.*)",
+  // Discord calls this server-to-server, signed with the application's key.
+  "/api/discord/interactions",
   // UploadThing calls this back server-to-server (signature-verified, no Clerk
   // session). Uploads themselves are still admin-gated in the file router.
   "/api/uploadthing(.*)",
@@ -54,6 +56,8 @@ export const config = {
        Fetched on every catalog visit and re-checked while the tab is open,
        so the proxy would add an invocation to each request.
      - /api/cron/*: authenticated by CRON_SECRET, not by a session.
+     - /api/discord/*: Discord's interaction webhooks, authenticated by their
+       Ed25519 signature, not by a session.
      - /hackathons (exactly, not the pages under it): prerendered; per-viewer
        state loads in the browser, so Clerk would only add an invocation (and,
        for an expired token, a redirect round trip) to every visit and prefetch.
@@ -62,7 +66,7 @@ export const config = {
      that starts reading the session must be removed from the exclusions here
      (and stay in isPublicRoute above if signed-out visitors may see it). */
   matcher: [
-    "/((?!(?:about|corporate|discord)(?:/|$)|hackathons/?$|p/|api/(?:health|geo|cities/search|hackathons/catalog)(?:/|$)|api/cron/|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api(?!/(?:health|geo|cities/search|hackathons/catalog)(?:/|$)|/cron/)|trpc)(.*)",
+    "/((?!(?:about|corporate|discord)(?:/|$)|hackathons/?$|p/|api/(?:health|geo|cities/search|hackathons/catalog)(?:/|$)|api/(?:cron|discord)/|_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|avif|png|gif|svg|mp4|webm|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api(?!/(?:health|geo|cities/search|hackathons/catalog)(?:/|$)|/(?:cron|discord)/)|trpc)(.*)",
   ],
 };

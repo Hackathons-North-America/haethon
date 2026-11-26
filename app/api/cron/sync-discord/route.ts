@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 import { drainDiscordChannelJobs } from "@/lib/discord/channel-jobs";
+import { deleteAbandonedFormDrafts, drainDiscordReviewQueue } from "@/lib/discord/review-queue";
 import { syncPublishedHackathonDiscordChannels } from "@/lib/discord/sync";
 import { env } from "@/lib/env";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
@@ -26,11 +27,20 @@ export async function GET(request: Request) {
 
     const data = await syncPublishedHackathonDiscordChannels();
 
+    // Backstop for the review channel: posts what earlier drains left, and
+    // updates messages for items reviewed on the website.
+    const review = await drainDiscordReviewQueue({ budgetMs: 10_000 }).catch((error) => {
+      Sentry.captureException(error);
+
+      return null;
+    });
+    await deleteAbandonedFormDrafts().catch((error) => Sentry.captureException(error));
+
     // The sync creates and re-links channels (and series), all of which the
     // prerendered catalog shows on its cards.
     revalidateHackathonCaches();
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: { ...data, review } });
   } catch (error) {
     Sentry.captureException(error);
     console.error("Discord sync run failed.", { error });

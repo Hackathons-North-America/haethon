@@ -607,6 +607,12 @@ export const discordGuilds = pgTable("discord_guilds", {
   guildSnowflake: text("guild_snowflake").notNull().unique(),
   hackathonId: uuid("hackathon_id").references(() => hackathons.id, { onDelete: "set null" }),
   name: varchar("name", { length: 180 }).notNull(),
+  /* The private channel the bot posts review items to (see
+     lib/discord/review-queue.ts). Created by the bot on first use. */
+  reviewChannelSnowflake: text("review_channel_snowflake"),
+  /* Lease held by the one request currently posting review messages, so two
+     drains never create two review channels or post an item twice. */
+  reviewLeaseUntil: timestamp("review_lease_until", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -666,6 +672,66 @@ export const discordChannelJobs = pgTable(
     check("discord_channel_jobs_status_check", sql`${table.status} in ('pending', 'running', 'done', 'failed')`),
     check("discord_channel_jobs_kind_check", sql`${table.kind} in ('ensure', 'refresh')`),
   ]
+);
+
+/* One thing waiting on the team, posted as a message with action buttons to
+   the private review channel (lib/discord/review-queue.ts):
+
+   - "submission": a pending hackathon_submissions row.
+   - "channel_decision": a scraper-imported hackathon waiting on whether it
+     gets a Discord channel.
+   - "import_duplicate": a scraper row flagged as a possible duplicate of
+     `hackathonId`. Nothing else stores these, so the row's import payload is
+     kept in `payload`.
+
+   `dedupeKey` keeps the scraper's daily re-sends from posting the same thing
+   twice, including after it was skipped. */
+export const discordReviewItems = pgTable(
+  "discord_review_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    kind: varchar("kind", { length: 24 }).notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    submissionId: uuid("submission_id").references(() => hackathonSubmissions.id, { onDelete: "set null" }),
+    hackathonId: uuid("hackathon_id").references(() => hackathons.id, { onDelete: "set null" }),
+    payload: jsonb("payload").$type<Record<string, unknown>>(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    /* What happened, as the resolved message shows it ("Approved", …). */
+    outcome: text("outcome"),
+    /* "@discord-name" for a click in Discord, "the website" otherwise. */
+    resolvedBy: text("resolved_by"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    channelSnowflake: text("channel_snowflake"),
+    messageSnowflake: text("message_snowflake"),
+    /* Resolved somewhere other than its own buttons: the posted message still
+       shows them and is edited by the next drain. */
+    messageStale: boolean("message_stale").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("discord_review_items_kind_dedupe_idx").on(table.kind, table.dedupeKey),
+    index("discord_review_items_status_created_idx").on(table.status, table.createdAt),
+    index("discord_review_items_submission_idx").on(table.submissionId),
+    check("discord_review_items_kind_check", sql`${table.kind} in ('submission', 'channel_decision', 'import_duplicate')`),
+    check("discord_review_items_status_check", sql`${table.status} in ('pending', 'resolved')`),
+  ]
+);
+
+/* An /add-hackathon form in progress. Discord pop-ups hold five fields, so
+   the organizer form is filled over several; each step's answers are kept
+   here until the last one is submitted. Removed on submit, and by the daily
+   Discord sync once a day old. */
+export const discordFormDrafts = pgTable(
+  "discord_form_drafts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    discordUserId: text("discord_user_id").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("discord_form_drafts_updated_idx").on(table.updatedAt)]
 );
 
 export const usersRelations = relations(users, ({ one, many }) => ({

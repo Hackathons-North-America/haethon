@@ -614,9 +614,28 @@ async function mergeIntoHackathon(
   return targetHackathonId;
 }
 
+/**
+ * "Merge into match" for a scraper row flagged as a possible duplicate: the
+ * same merge the import does on a near-certain match (the import only fills
+ * fields the existing hackathon lacks), then the row's feed ids are linked so
+ * the scraper's later runs update that hackathon instead of flagging again.
+ */
+export async function mergeImportedDuplicate(targetHackathonId: string, rawPayload: AdminHackathonImportPayload) {
+  const payload = payloadWithValidOrganizationId(rawPayload);
+
+  await mergeIntoHackathon(targetHackathonId, payload);
+  await linkExternalIdsQuery(targetHackathonId, externalIdsOf(rawPayload), payloadForJson(payload));
+
+  return targetHackathonId;
+}
+
 // A community submission is just a name + link, so it always lands in the
 // pending queue for a reviewer to complete — never a candidate for direct publish.
-async function createCommunitySubmission(input: CommunitySubmissionInput, submitter: SelectUser) {
+async function createCommunitySubmission(
+  input: CommunitySubmissionInput,
+  submitter: SelectUser,
+  extraPayload: Record<string, unknown> = {}
+) {
   const websiteUrl = input.websiteUrl;
   const sourceUrl = input.sourceUrl ?? websiteUrl;
   const duplicate = await findBestDuplicate({ name: input.name, websiteUrl, sourceUrl });
@@ -630,7 +649,7 @@ async function createCommunitySubmission(input: CommunitySubmissionInput, submit
       status: "pending",
       // Only the fields the submitter actually provided; the reviewer supplies
       // dates, location, and format from the admin queue before publishing.
-      payload: { submitterType: "community", name: input.name, websiteUrl, sourceUrl },
+      payload: { ...extraPayload, submitterType: "community", name: input.name, websiteUrl, sourceUrl },
       normalizedName: input.name,
       websiteUrl,
       sourceUrl,
@@ -641,9 +660,17 @@ async function createCommunitySubmission(input: CommunitySubmissionInput, submit
   return { submission, publishedHackathonId: null, publishedDirectly: false };
 }
 
-export async function createHackathonSubmission(input: HackathonSubmissionInput, submitter: SelectUser, submitterRole: string) {
+/* extraPayload is stored with the submission for reviewers and never
+   published: the Discord bot uses it to record who sent a submission, since
+   every Discord submission shares one bot account. */
+export async function createHackathonSubmission(
+  input: HackathonSubmissionInput,
+  submitter: SelectUser,
+  submitterRole: string,
+  extraPayload: Record<string, unknown> = {}
+) {
   if (input.submitterType === "community") {
-    return createCommunitySubmission(input, submitter);
+    return createCommunitySubmission(input, submitter, extraPayload);
   }
 
   const normalizedPayload = normalizeSubmissionPayload(input);
@@ -667,7 +694,7 @@ export async function createHackathonSubmission(input: HackathonSubmissionInput,
         matchedHackathonId: duplicate?.id,
         approvedHackathonId,
         status: "approved",
-        payload: payloadForJson({ ...normalizedPayload, submitterType: input.submitterType }),
+        payload: { ...extraPayload, ...payloadForJson({ ...normalizedPayload, submitterType: input.submitterType }) },
         normalizedName: normalizedPayload.name,
         websiteUrl: normalizedPayload.websiteUrl,
         sourceUrl: normalizedPayload.sourceUrl ?? normalizedPayload.websiteUrl,
@@ -688,7 +715,7 @@ export async function createHackathonSubmission(input: HackathonSubmissionInput,
       organizationId,
       matchedHackathonId: duplicate?.id,
       status: "pending",
-      payload: payloadForJson({ ...normalizedPayload, submitterType: input.submitterType }),
+      payload: { ...extraPayload, ...payloadForJson({ ...normalizedPayload, submitterType: input.submitterType }) },
       normalizedName: normalizedPayload.name,
       websiteUrl: normalizedPayload.websiteUrl,
       sourceUrl: normalizedPayload.sourceUrl ?? normalizedPayload.websiteUrl,
