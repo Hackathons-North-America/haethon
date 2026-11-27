@@ -26,6 +26,7 @@ import {
 } from "@/lib/discord/duplicates";
 import { discordRest, isRateLimitError, isUnknownChannelError } from "@/lib/discord/rest";
 import {
+  discordChannelJobs,
   discordChannels,
   discordGuilds,
   hackathonDates,
@@ -79,7 +80,7 @@ type SyncContext = {
   guildSnowflake: string;
   rest: REST;
   /* Snowflakes confirmed alive or created during this run. The cron's stale-row
-     cleanup skips these, since they are newer than its channel-listing snapshot. */
+     cleanup leaves them alone even if the guild listing has not caught up. */
   touchedSnowflakes: Set<string>;
 };
 
@@ -754,7 +755,6 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
     // An undated new channel needs no placement — Discord already appends it to
     // the bottom of the category, which is where undated channels belong.
     needsDatePlacement = target.startsAt !== null;
-    await postAndPinChannelLinks(ctx.rest, channelSnowflake, target);
   }
 
   if (mapped) {
@@ -784,6 +784,10 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
   }
 
   ctx.touchedSnowflakes.add(channelSnowflake);
+
+  if (action === "created") {
+    await postAndPinChannelLinks(ctx.rest, channelSnowflake, target);
+  }
 
   // After the DB write, so concurrent lanes placing siblings can already see
   // this channel's date. Best-effort: the channel is created and tracked, so a
@@ -1327,6 +1331,11 @@ export async function syncPublishedHackathonDiscordChannels() {
       and(
         isNotNull(hackathons.publishedAt),
         inArray(hackathons.status, ["upcoming", "live", "completed", "archived"]),
+        sql`not exists (
+          select 1 from ${discordChannelJobs}
+          where ${discordChannelJobs.hackathonId} = ${hackathons.id}
+            and ${discordChannelJobs.status} in ('pending', 'running', 'retrying')
+        )`,
         or(
           eq(hackathonSeries.isRecurring, true),
           isNull(hackathonDates.endsAt),
@@ -1470,11 +1479,11 @@ export async function syncPublishedHackathonDiscordChannels() {
   let staleRemoved = 0;
 
   try {
-    const liveSnowflakes = new Set((await directory.listChannels()).map((channel) => channel.id));
     const guildRows = await db
       .select({ channelSnowflake: discordChannels.channelSnowflake, id: discordChannels.id })
       .from(discordChannels)
       .where(eq(discordChannels.guildId, guildId));
+    const liveSnowflakes = new Set((await listGuildChannels(rest, env.DISCORD_GUILD_ID)).map((channel) => channel.id));
     const stale = guildRows.filter(
       (row) => !liveSnowflakes.has(row.channelSnowflake) && !touchedSnowflakes.has(row.channelSnowflake)
     );

@@ -5,10 +5,9 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { hackathonSubmissions, hackathons } from "@/lib/db/schema";
+import { startDiscordChannelJobs } from "@/lib/discord/channel-job-worker";
 import {
   denyHackathonDiscordChannel,
-  drainDiscordChannelJobsSafely,
-  getDiscordChannelJobs,
   requestHackathonDiscordChannel,
 } from "@/lib/discord/channel-jobs";
 import { issuesText } from "@/lib/discord/form-fields";
@@ -220,17 +219,8 @@ async function runChannelAction(action: ReviewAction, hackathonId: string | null
     return { outcome: `No channel: ${request.reason}` };
   }
 
-  await drainDiscordChannelJobsSafely();
-  const [job] = await getDiscordChannelJobs([request.jobId]);
-
-  if (job?.status === "failed") {
-    // Left pending so the button can be tried again.
-    throw new ReviewActionError(`The channel could not be created: ${job.error ?? "unknown error"}`);
-  }
-
-  const name = job?.result && "name" in job.result ? `#${String(job.result.name)}` : null;
-
-  return { outcome: job?.status === "done" ? `Channel created${name ? ` (${name})` : ""}` : "Channel queued" };
+  await startDiscordChannelJobs();
+  return { outcome: "Channel approved" };
 }
 
 async function runDuplicateAction(

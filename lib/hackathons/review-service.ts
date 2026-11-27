@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { afterResponse } from "@/lib/after-response";
 import { db } from "@/lib/db";
-import { drainDiscordChannelJobsSafely, enqueueDiscordChannelJobQuery } from "@/lib/discord/channel-jobs";
+import { startDiscordChannelJobs } from "@/lib/discord/channel-job-worker";
+import { enqueueDiscordChannelJobQuery } from "@/lib/discord/channel-jobs";
 import { categoryForHackathon } from "@/lib/discord/channel-rules";
 import {
   type DiscordChannelPreview,
@@ -1022,9 +1023,9 @@ export async function importAdminHackathonFixItems(input: {
 
   if (queuedJobs) {
     if (input.defer) {
-      input.defer(drainDiscordChannelJobsSafely);
+      input.defer(startDiscordChannelJobs);
     } else {
-      await drainDiscordChannelJobsSafely();
+      await startDiscordChannelJobs();
     }
   }
 
@@ -1862,7 +1863,7 @@ async function runAdminImport(input: AdminImportInput) {
   }
 
   if (queuedJobs) {
-    deferred.push(drainDiscordChannelJobsSafely);
+    deferred.push(startDiscordChannelJobs);
   }
 
   for (const task of deferred) {

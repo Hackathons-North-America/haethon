@@ -670,6 +670,8 @@ export const discordChannelJobs = pgTable(
     result: jsonb("result").$type<Record<string, unknown>>(),
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    blocksQueue: boolean("blocks_queue").notNull().default(false),
     requestedByUserId: uuid("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }),
@@ -680,7 +682,7 @@ export const discordChannelJobs = pgTable(
       .on(table.hackathonId)
       .where(sql`${table.status} = 'pending'`),
     index("discord_channel_jobs_status_created_idx").on(table.status, table.createdAt),
-    check("discord_channel_jobs_status_check", sql`${table.status} in ('pending', 'running', 'done', 'failed')`),
+    check("discord_channel_jobs_status_check", sql`${table.status} in ('pending', 'running', 'retrying', 'done', 'failed')`),
     check("discord_channel_jobs_kind_check", sql`${table.kind} in ('ensure', 'refresh')`),
   ]
 );

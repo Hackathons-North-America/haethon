@@ -33,6 +33,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@sentry/nextjs": "^10.78.0",
     "@uploadthing/react": "^7.3.3",
+    "@vercel/queue": "^0.11.0",
     "discord-api-types": "0.38.49",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.22.0",

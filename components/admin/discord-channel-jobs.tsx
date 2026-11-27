@@ -97,7 +97,10 @@ export function describeDiscordChannelJob(job: DiscordChannelJobView | undefined
   tone: DiscordChannelJobTone;
 } {
   if (isOpen(job)) {
-    return { text: "Setting up the Discord channel…", tone: "working" };
+    return {
+      text: job?.nextAttemptAt ? "Waiting to retry automatically." : "Setting up the Discord channel…",
+      tone: "working",
+    };
   }
 
   if (job!.status === "failed") {

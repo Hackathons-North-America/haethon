@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
-import { drainDiscordChannelJobs } from "@/lib/discord/channel-jobs";
+import { startDiscordChannelJobs } from "@/lib/discord/channel-job-worker";
+import { drainDiscordChannelJobs, nextDiscordChannelJobAttempt } from "@/lib/discord/channel-jobs";
 import { waitingWebsiteReviewItems } from "@/lib/discord/review-backfill";
 import { deleteAbandonedFormDrafts, drainDiscordReviewQueue, enqueueReviewItems } from "@/lib/discord/review-queue";
 import { syncPublishedHackathonDiscordChannels } from "@/lib/discord/sync";
@@ -20,10 +21,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Backstop for channel jobs whose after() run never finished: clear the
-    // queue first so the full sync below starts with nothing else in flight.
+    // Recover jobs left behind, then wake the worker again if any are still waiting.
     await drainDiscordChannelJobs({ budgetMs: 15_000 }).catch((error) => {
       Sentry.captureException(error);
+    });
+    after(async () => {
+      try {
+        const delay = await nextDiscordChannelJobAttempt();
+        if (delay !== null) await startDiscordChannelJobs(delay);
+      } catch (error) {
+        Sentry.captureException(error);
+      }
     });
 
     const data = await syncPublishedHackathonDiscordChannels();

@@ -374,6 +374,22 @@ describe("the website's import queue in Discord", () => {
     expect(await channelItemFor(hackathonId)).toMatchObject({ outcome: "Channel approved", resolvedBy: "the website", status: "resolved" });
   });
 
+  it("approves the same website decision and runs its channel job after a Discord click", async () => {
+    const result = await scraperImport([feedRow("Discord Channel Hacks", { autoApprove: true, source: "luma", externalId: "luma:discord" })]);
+    const hackathonId = result.results[0].hackathonId!;
+    const item = await channelItemFor(hackathonId);
+
+    expect(await runReviewAction({ action: "channel", actor: "james", itemId: item.id })).toMatchObject({
+      ok: true,
+      view: { outcome: "Channel approved" },
+    });
+
+    const [row] = await db.select({ decision: hackathons.discordChannelDecision }).from(hackathons).where(eq(hackathons.id, hackathonId));
+    expect(row.decision).toBe("approved");
+    const { ensureHackathonDiscordChannelOrThrow } = await import("@/lib/discord/sync");
+    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledWith(hackathonId, { keepExisting: false });
+  });
+
   it("backfills what is waiting on the website, once", async () => {
     // Published and carded before anything was posted, e.g. a closed prompt.
     const parsed = adminHackathonImportSchema.parse({
