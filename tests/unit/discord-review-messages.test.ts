@@ -51,6 +51,27 @@ describe("review custom ids", () => {
 });
 
 describe("renderReviewMessage", () => {
+  it("counts what waits behind a card and offers to skip it, on a row of its own", () => {
+    const body = renderReviewMessage(submissionItem(), APP, { waiting: 3 });
+
+    expect(body.embeds[0].footer?.text).toBe("3 more waiting after this one");
+    expect(body.components).toHaveLength(2);
+    expect(body.components[1].components).toEqual([expect.objectContaining({ custom_id: `rv:later:${ITEM_ID}`, label: "Skip for now" })]);
+    expect(parseReviewCustomId(`rv:later:${ITEM_ID}`)).toEqual({ action: "later", itemId: ITEM_ID });
+  });
+
+  it("offers no skip when nothing else is waiting, and no count once decided", () => {
+    const last = renderReviewMessage(submissionItem(), APP, { waiting: 0 });
+
+    expect(last.embeds[0].footer?.text).toBe("Nothing else waiting");
+    expect(buttons(last).map((button) => button.label)).not.toContain("Skip for now");
+
+    const decided = renderReviewMessage(submissionItem({ outcome: "Approved", resolvedBy: "@james", status: "resolved" }), APP, { waiting: 3 });
+
+    expect(decided.embeds[0].footer?.text).toBe("Approved · by @james");
+    expect(buttons(decided).map((button) => button.label)).not.toContain("Skip for now");
+  });
+
   it("gives a pending submission approve and reject buttons, and names the Discord submitter", () => {
     const body = renderReviewMessage(submissionItem(), APP);
 

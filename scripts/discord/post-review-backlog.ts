@@ -1,9 +1,11 @@
 /**
- * Posts every hackathon submission already waiting for review, and every
- * hackathon waiting for its Discord channel decision, to the Discord review
- * channel, once. New ones are posted as they arrive (and the daily
- * sync-discord cron catches the rest); this covers the ones from before the
- * channel existed. Safe to re-run: an item already queued is not posted again.
+ * Queues every hackathon submission already waiting for review, and every
+ * hackathon waiting for its Discord channel decision, for the Discord review
+ * channel, once. The channel shows one card at a time, so this posts the
+ * first; each decision brings up the next. New ones are queued as they
+ * arrive (and the daily sync-discord cron catches the rest); this covers the
+ * ones from before the channel existed. Safe to re-run: an item already
+ * queued is not queued again.
  *
  * Usage: pnpm discord:post-review-backlog [--dry-run]
  */
@@ -48,22 +50,16 @@ async function main() {
   const queued =
     (await enqueueSubmissionReviews(pending.map((submission) => submission.id))) +
     (await enqueueReviewItems(channels.map((channel) => channelDecisionItem(channel.hackathonId, channel.payload, channel.discord))));
-  console.log(`Queued ${queued} new; posting…`);
+  console.log(`Queued ${queued} new; updating the channel…`);
 
-  // No request time limit here, so keep draining until everything is posted.
-  for (;;) {
-    const result = await drainDiscordReviewQueue({ budgetMs: 60_000 });
-    console.log(`Posted ${result.posted}, updated ${result.updated}.`);
+  // One card at a time: a drain tidies the channel and shows the oldest.
+  const result = await drainDiscordReviewQueue({ budgetMs: 60_000 });
 
-    if (result.busy) {
-      console.log("Another drain is running; it will post the rest.");
-      break;
-    }
-
-    if (!result.posted && !result.updated) {
-      break;
-    }
-  }
+  console.log(
+    result.busy
+      ? "Another drain is running; it will update the channel."
+      : `Posted ${result.posted}, redrew ${result.updated}, removed ${result.removed}.`
+  );
 }
 
 main().catch((error) => {

@@ -1,13 +1,16 @@
-/* The private review channel: things waiting on the team are posted there as
-   messages with action buttons (rendered by review-messages.ts, acted on by
-   review-actions.ts through /api/discord/interactions).
+/* The private review channel: things waiting on the team are shown there one
+   at a time, as a message with action buttons (rendered by
+   review-messages.ts, acted on by review-actions.ts through
+   /api/discord/interactions).
 
    Items are written to discord_review_items when they appear and posted by a
    drain that runs after the request that queued them, after a web review, and
-   in the daily Discord sync. One drain runs at a time (a lease on the guild
-   row), so the channel is created once and nothing is posted twice. */
+   in the daily Discord sync. The channel holds at most one card: the oldest
+   waiting item. Once it is decided (here or on the website) the drain deletes
+   its message and posts the next. One drain runs at a time (a lease on the
+   guild row), so the channel is created once and nothing is posted twice. */
 import type { REST } from "@discordjs/rest";
-import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { ChannelType, OverwriteType, PermissionFlagsBits, Routes, type APIChannel, type APIGuild, type APIUser } from "discord-api-types/v10";
 
 import { db } from "@/lib/db";
@@ -24,6 +27,9 @@ export const IN_PROGRESS_OUTCOME = "In progress";
 const LEASE_MS = 90_000;
 const DRAIN_BUDGET_MS = 40_000;
 const BATCH_SIZE = 10;
+/* A drain usually takes a second or two; a busy one is waited out this long. */
+const BUSY_ATTEMPTS = 5;
+const BUSY_RETRY_MS = 2_000;
 const UNKNOWN_MESSAGE = 10008;
 const INVALID_FORM_BODY = 50035;
 
@@ -149,15 +155,14 @@ export async function releaseReviewItem(itemId: string) {
     .where(and(eq(discordReviewItems.id, itemId), eq(discordReviewItems.outcome, IN_PROGRESS_OUTCOME)));
 }
 
-export async function finishReviewItem(
-  itemId: string,
-  result: { outcome: string; resolvedBy: string; hackathonId?: string | null; messageStale?: boolean }
-) {
+/* Records a decision. Its message is deleted by the drain that follows, which
+   then posts the next card. */
+export async function finishReviewItem(itemId: string, result: { outcome: string; resolvedBy: string; hackathonId?: string | null }) {
   const [row] = await db
     .update(discordReviewItems)
     .set({
       hackathonId: result.hackathonId === undefined ? undefined : result.hackathonId,
-      messageStale: result.messageStale ?? false,
+      messageStale: false,
       outcome: result.outcome,
       resolvedAt: new Date(),
       resolvedBy: result.resolvedBy,
@@ -168,6 +173,44 @@ export async function finishReviewItem(
     .returning();
 
   return row ?? null;
+}
+
+/**
+ * "Skip for now": sends the card on `messageSnowflake` to the back of the
+ * queue (created_at is its place in line) and marks it unposted, so the next
+ * drain posts whatever is oldest instead. Only the item's current card can
+ * defer it, so a double click defers once. Returns null when nothing changed.
+ */
+export async function deferReviewItem(itemId: string, messageSnowflake: string) {
+  const now = new Date();
+  const [row] = await db
+    .update(discordReviewItems)
+    .set({ channelSnowflake: null, createdAt: now, messageSnowflake: null, messageStale: false, updatedAt: now })
+    .where(
+      and(
+        eq(discordReviewItems.id, itemId),
+        eq(discordReviewItems.status, "pending"),
+        eq(discordReviewItems.messageSnowflake, messageSnowflake)
+      )
+    )
+    .returning();
+
+  return row ?? null;
+}
+
+/* How many other items are waiting behind this one. */
+export async function waitingBehind(itemId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(discordReviewItems)
+    .where(and(eq(discordReviewItems.status, "pending"), ne(discordReviewItems.id, itemId)));
+
+  return row?.count ?? 0;
+}
+
+/* The message for an item's card, with the queue count when it is still waiting. */
+export async function renderReviewCard(view: ReviewItemView) {
+  return renderReviewMessage(view, appBaseUrl(), view.status === "pending" ? { waiting: await waitingBehind(view.id) } : undefined);
 }
 
 /* ---- Reconciling with what happened elsewhere ---- */
@@ -327,15 +370,80 @@ function fallbackMessage(view: ReviewItemView, appUrl: string) {
 
 /* ---- The drain ---- */
 
+type DrainOutcome = { busy: boolean; posted: number; updated: number; removed: number };
+
+/* Deletes an item's message and forgets it. A message or channel already gone
+   counts as deleted; any other failure is logged and given up on, so one
+   message cannot hold up the queue. */
+async function removeMessage(rest: REST, row: ReviewItemRow) {
+  try {
+    await rest.delete(Routes.channelMessage(row.channelSnowflake!, row.messageSnowflake!));
+  } catch (error) {
+    if (discordErrorCode(error) !== UNKNOWN_MESSAGE && !isUnknownChannelError(error)) {
+      console.error("Unable to delete a Discord review message.", { error, itemId: row.id });
+    }
+  }
+
+  await db
+    .update(discordReviewItems)
+    .set({ channelSnowflake: null, messageSnowflake: null, messageStale: false })
+    .where(eq(discordReviewItems.id, row.id));
+}
+
+/* Redraws a waiting item's card with the current queue count. False when its
+   message no longer exists (deleted by hand), so the item is unposted again. */
+async function redrawCard(rest: REST, row: ReviewItemRow, view: ReviewItemView) {
+  try {
+    await rest.patch(Routes.channelMessage(row.channelSnowflake!, row.messageSnowflake!), { body: await renderReviewCard(view) });
+  } catch (error) {
+    // A stand-in (fallbackMessage) stays as it is.
+    if (discordErrorCode(error) === INVALID_FORM_BODY) {
+      return true;
+    }
+
+    if (discordErrorCode(error) === UNKNOWN_MESSAGE || isUnknownChannelError(error)) {
+      await db
+        .update(discordReviewItems)
+        .set({ channelSnowflake: null, messageSnowflake: null, messageStale: false })
+        .where(eq(discordReviewItems.id, row.id));
+
+      return false;
+    }
+
+    console.error("Unable to update a Discord review message.", { error, itemId: row.id });
+  }
+
+  await db.update(discordReviewItems).set({ messageStale: false }).where(eq(discordReviewItems.id, row.id));
+
+  return true;
+}
+
+/* An item whose card is in the channel: waiting, or mid-click. */
+const onScreen = and(
+  isNotNull(discordReviewItems.messageSnowflake),
+  or(eq(discordReviewItems.status, "pending"), eq(discordReviewItems.outcome, IN_PROGRESS_OUTCOME))
+);
+/* A decided item whose card is still in the channel. */
+const decidedOnScreen = and(
+  isNotNull(discordReviewItems.messageSnowflake),
+  eq(discordReviewItems.status, "resolved"),
+  or(isNull(discordReviewItems.outcome), ne(discordReviewItems.outcome, IN_PROGRESS_OUTCOME))
+);
+
 /**
- * Brings the channel up to date: resolves items handled elsewhere, edits
- * their messages, and posts new items oldest first, until done or out of
- * time (what is left goes to the next drain). Returns what it did; `busy`
- * when another drain holds the lease.
+ * Brings the channel up to date, until done or out of time (what is left goes
+ * to the next drain):
+ *   1. deletes the cards of decided items;
+ *   2. keeps one card on screen: the oldest, or the one mid-click. Extra cards
+ *      (posted before the channel went one at a time) are deleted and wait
+ *      their turn again;
+ *   3. redraws that card (its queue count), or posts the oldest waiting item
+ *      when there is none.
+ * Returns what it did; `busy` when another drain holds the lease.
  */
 export async function drainDiscordReviewQueue(options?: { budgetMs?: number }) {
   const rest = discordRest();
-  const outcome = { busy: false, posted: 0, updated: 0 };
+  const outcome: DrainOutcome = { busy: false, posted: 0, removed: 0, updated: 0 };
 
   if (!rest || !discordReviewEnabled()) {
     return outcome;
@@ -356,77 +464,85 @@ export async function drainDiscordReviewQueue(options?: { budgetMs?: number }) {
 
   try {
     while (Date.now() < deadline) {
-      const stale = await db
+      const decided = await db
         .select()
         .from(discordReviewItems)
-        .where(eq(discordReviewItems.messageStale, true))
+        .where(decidedOnScreen)
         .orderBy(asc(discordReviewItems.updatedAt))
         .limit(BATCH_SIZE);
 
-      if (!stale.length) {
+      if (!decided.length) {
         break;
       }
 
-      for (const view of await loadReviewViews(stale)) {
-        const row = stale.find((item) => item.id === view.id)!;
-
-        try {
-          await rest.patch(Routes.channelMessage(row.channelSnowflake!, row.messageSnowflake!), {
-            body: renderReviewMessage(view, appUrl),
-          });
-        } catch (error) {
-          // A deleted message or channel has nothing left to update. Anything
-          // else is logged and given up on, so the queue keeps moving.
-          if (discordErrorCode(error) !== UNKNOWN_MESSAGE && !isUnknownChannelError(error)) {
-            console.error("Unable to update a Discord review message.", { error, itemId: row.id });
-          }
-        }
-
-        await db.update(discordReviewItems).set({ messageStale: false }).where(eq(discordReviewItems.id, row.id));
-        outcome.updated += 1;
+      for (const row of decided) {
+        await removeMessage(rest, row);
+        outcome.removed += 1;
       }
     }
 
-    let channel: string | null = null;
-
     while (Date.now() < deadline) {
-      const unposted = await db
+      const shown = await db.select().from(discordReviewItems).where(onScreen).orderBy(asc(discordReviewItems.createdAt));
+      // A card mid-click stays; otherwise the oldest does.
+      const keep = shown.find((row) => row.status === "resolved") ?? shown[0];
+
+      for (const row of shown) {
+        if (row !== keep && Date.now() < deadline) {
+          await removeMessage(rest, row);
+          outcome.removed += 1;
+        }
+      }
+
+      if (keep) {
+        // Mid-click: its action redraws it (failed) or the drain after it
+        // deletes it (decided).
+        if (keep.status === "resolved") {
+          break;
+        }
+
+        const [view] = await loadReviewViews([keep]);
+
+        if (await redrawCard(rest, keep, view)) {
+          outcome.updated += 1;
+          break;
+        }
+
+        // Its message was gone: post the next card instead.
+        continue;
+      }
+
+      const [next] = await db
         .select()
         .from(discordReviewItems)
         .where(and(eq(discordReviewItems.status, "pending"), isNull(discordReviewItems.messageSnowflake)))
         .orderBy(asc(discordReviewItems.createdAt))
-        .limit(BATCH_SIZE);
+        .limit(1);
 
-      if (!unposted.length) {
+      if (!next) {
         break;
       }
 
-      channel ??= await ensureReviewChannel(rest, guildId, lease.reviewChannelSnowflake);
+      const channel = await ensureReviewChannel(rest, guildId, lease.reviewChannelSnowflake);
+      const [view] = await loadReviewViews([next]);
+      let message: { id: string };
 
-      for (const view of await loadReviewViews(unposted)) {
-        if (Date.now() >= deadline) {
-          break;
+      try {
+        message = (await rest.post(Routes.channelMessages(channel), { body: await renderReviewCard(view) })) as { id: string };
+      } catch (error) {
+        if (discordErrorCode(error) !== INVALID_FORM_BODY) {
+          throw error;
         }
 
-        let message: { id: string };
-
-        try {
-          message = (await rest.post(Routes.channelMessages(channel), { body: renderReviewMessage(view, appUrl) })) as { id: string };
-        } catch (error) {
-          if (discordErrorCode(error) !== INVALID_FORM_BODY) {
-            throw error;
-          }
-
-          console.error("Discord refused a review message; posting a stand-in.", { error, itemId: view.id });
-          message = (await rest.post(Routes.channelMessages(channel), { body: fallbackMessage(view, appUrl) })) as { id: string };
-        }
-
-        await db
-          .update(discordReviewItems)
-          .set({ channelSnowflake: channel, messageSnowflake: message.id, updatedAt: new Date() })
-          .where(eq(discordReviewItems.id, view.id));
-        outcome.posted += 1;
+        console.error("Discord refused a review message; posting a stand-in.", { error, itemId: view.id });
+        message = (await rest.post(Routes.channelMessages(channel), { body: fallbackMessage(view, appUrl) })) as { id: string };
       }
+
+      await db
+        .update(discordReviewItems)
+        .set({ channelSnowflake: channel, messageSnowflake: message.id, messageStale: false, updatedAt: new Date() })
+        .where(eq(discordReviewItems.id, view.id));
+      outcome.posted += 1;
+      break;
     }
   } finally {
     await releaseLease(guildId);
@@ -435,15 +551,26 @@ export async function drainDiscordReviewQueue(options?: { budgetMs?: number }) {
   return outcome;
 }
 
-/* drainDiscordReviewQueue for after() and crons: a failure has no request to
-   report to, and whatever was not posted stays queued for the next drain. */
+/* drainDiscordReviewQueue for after(): a failure has no request to report
+   to, and whatever was not posted stays queued for the next drain. A drain
+   already running may have looked before this request's change (the card it
+   decided would stay up, and the next would not be posted until some later
+   drain), so a busy drain is retried a few times. */
 export async function drainDiscordReviewQueueSafely(options?: { budgetMs?: number }) {
-  try {
-    return await drainDiscordReviewQueue(options);
-  } catch (error) {
-    console.error("Unable to drain the Discord review queue.", { error });
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const result = await drainDiscordReviewQueue(options);
 
-    return null;
+      if (!result.busy || attempt >= BUSY_ATTEMPTS) {
+        return result;
+      }
+    } catch (error) {
+      console.error("Unable to drain the Discord review queue.", { error });
+
+      return null;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, BUSY_RETRY_MS));
   }
 }
 

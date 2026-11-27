@@ -1,19 +1,26 @@
 import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/* The review channel queue against a real database: posting once, staying in
-   sync with reviews on the website, and one reviewer per click. Discord's
-   REST API is a fake that records calls. */
+/* The review channel queue against a real database: posting once, one card
+   at a time, staying in sync with reviews on the website, and one reviewer
+   per click. Discord's REST API is a fake that records calls. */
 process.env.DISCORD_BOT_TOKEN = "test-token";
 process.env.DISCORD_GUILD_ID = "guild-1";
 process.env.DISCORD_TEAM_ROLE_ID = "team-role";
 process.env.NEXT_PUBLIC_APP_URL = "https://haethon.test";
 
 type Call = { route: string; body?: unknown };
-const calls: { get: Call[]; patch: Call[]; post: Call[] } = { get: [], patch: [], post: [] };
+const calls: { delete: Call[]; get: Call[]; patch: Call[]; post: Call[] } = { delete: [], get: [], patch: [], post: [] };
 let messageCounter = 0;
+/* Messages "deleted by hand": patching one fails as Discord would. */
+const missingMessages = new Set<string>();
 
 const fakeRest = {
+  delete: vi.fn(async (route: string) => {
+    calls.delete.push({ route });
+
+    return undefined;
+  }),
   get: vi.fn(async (route: string) => {
     calls.get.push({ route });
 
@@ -29,6 +36,10 @@ const fakeRest = {
   }),
   patch: vi.fn(async (route: string, options?: { body?: unknown }) => {
     calls.patch.push({ body: options?.body, route });
+
+    if (missingMessages.has(route.split("/").pop()!)) {
+      throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+    }
 
     return {};
   }),
@@ -64,7 +75,9 @@ vi.mock("@/lib/hackathons/image-ingest", () => ({
 
 const { db } = await import("@/lib/db");
 const { discordGuilds, discordReviewItems, hackathonExternalIds, hackathonSubmissions, hackathons, users } = await import("@/lib/db/schema");
-const { claimReviewItem, drainDiscordReviewQueue, enqueueReviewItems, enqueueSubmissionReviews } = await import("@/lib/discord/review-queue");
+const { claimReviewItem, deferReviewItem, drainDiscordReviewQueue, enqueueReviewItems, enqueueSubmissionReviews } = await import(
+  "@/lib/discord/review-queue"
+);
 const { runReviewAction } = await import("@/lib/discord/review-actions");
 const { importReviewItems } = await import("@/lib/discord/review-items");
 const { waitingWebsiteReviewItems } = await import("@/lib/discord/review-backfill");
@@ -104,10 +117,12 @@ beforeEach(async () => {
     .values({ clerkUserId: "user_admin", email: "admin@example.test", role: "admin", username: "admin" })
     .returning({ id: users.id });
   adminId = user.id;
+  calls.delete.length = 0;
   calls.get.length = 0;
   calls.patch.length = 0;
   calls.post.length = 0;
   messageCounter = 0;
+  missingMessages.clear();
 });
 
 describe("posting", () => {
@@ -117,7 +132,7 @@ describe("posting", () => {
     expect(await enqueueSubmissionReviews([submissionId])).toBe(1);
     expect(await enqueueSubmissionReviews([submissionId])).toBe(0);
 
-    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 1, updated: 0 });
+    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 1, removed: 0, updated: 0 });
 
     const [channelCall, messageCall] = calls.post;
     expect(channelCall.route).toBe("/guilds/guild-1/channels");
@@ -130,13 +145,14 @@ describe("posting", () => {
       ],
     });
     expect(messageCall.route).toBe("/channels/review-channel/messages");
+    expect(messageCall.body).toMatchObject({ embeds: [expect.objectContaining({ footer: { text: "Nothing else waiting" } })] });
     expect(await itemFor(submissionId)).toMatchObject({ channelSnowflake: "review-channel", messageSnowflake: "message-1" });
 
     const [guild] = await db.select().from(discordGuilds);
     expect(guild).toMatchObject({ reviewChannelSnowflake: "review-channel", reviewLeaseUntil: null });
 
-    // Nothing left: a second drain posts nothing and reuses the channel.
-    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 0, updated: 0 });
+    // Nothing new: a second drain only redraws the card on screen.
+    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 0, removed: 0, updated: 1 });
     expect(calls.post).toHaveLength(2);
   });
 
@@ -145,23 +161,113 @@ describe("posting", () => {
 
     const results = await Promise.all([drainDiscordReviewQueue(), drainDiscordReviewQueue()]);
 
-    expect(results.map((result) => result.posted).sort()).toEqual([0, 2]);
+    expect(results.map((result) => result.posted).sort()).toEqual([0, 1]);
     expect(calls.post.filter((call) => call.route.endsWith("/channels"))).toHaveLength(1);
-    expect(calls.post.filter((call) => call.route.endsWith("/messages"))).toHaveLength(2);
+    expect(calls.post.filter((call) => call.route.endsWith("/messages"))).toHaveLength(1);
+  });
+});
+
+describe("one card at a time", () => {
+  it("shows the oldest item, then the next once it is decided", async () => {
+    const first = await createSubmission("First Hacks");
+    const second = await createSubmission("Second Hacks");
+    await enqueueSubmissionReviews([first]);
+    await enqueueSubmissionReviews([second]);
+
+    expect(await drainDiscordReviewQueue()).toMatchObject({ posted: 1 });
+    expect(await itemFor(first)).toMatchObject({ messageSnowflake: "message-1" });
+    expect(await itemFor(second)).toMatchObject({ messageSnowflake: null });
+    // The count, and a way past it.
+    const card = calls.post.at(-1)!.body as { components: Array<{ components: Array<{ custom_id?: string }> }>; embeds: Array<{ footer?: { text: string } }> };
+    expect(card.embeds[0].footer?.text).toBe("1 more waiting after this one");
+    expect(card.components.at(-1)!.components[0].custom_id).toBe(`rv:later:${(await itemFor(first)).id}`);
+
+    expect(await runReviewAction({ action: "reject", actor: "james", itemId: (await itemFor(first)).id, rejectionReason: "Meetup." })).toMatchObject({
+      ok: true,
+    });
+    expect(await drainDiscordReviewQueue()).toMatchObject({ posted: 1, removed: 1 });
+
+    expect(calls.delete.map((call) => call.route)).toEqual(["/channels/review-channel/messages/message-1"]);
+    expect(await itemFor(first)).toMatchObject({ messageSnowflake: null, status: "resolved" });
+    expect(await itemFor(second)).toMatchObject({ messageSnowflake: "message-2" });
+  });
+
+  it("pulls back cards posted before the channel went one at a time", async () => {
+    const ids = [await createSubmission("Old One"), await createSubmission("Old Two"), await createSubmission("Old Three")];
+    for (const id of ids) {
+      await enqueueSubmissionReviews([id]);
+    }
+    for (const [index, id] of ids.entries()) {
+      await db
+        .update(discordReviewItems)
+        .set({ channelSnowflake: "review-channel", messageSnowflake: `old-${index}` })
+        .where(eq(discordReviewItems.submissionId, id));
+    }
+
+    expect(await drainDiscordReviewQueue()).toMatchObject({ posted: 0, removed: 2, updated: 1 });
+
+    expect(calls.delete.map((call) => call.route).sort()).toEqual([
+      "/channels/review-channel/messages/old-1",
+      "/channels/review-channel/messages/old-2",
+    ]);
+    expect((await Promise.all(ids.map(itemFor))).map((item) => item.messageSnowflake)).toEqual(["old-0", null, null]);
+  });
+
+  it("leaves a card mid-click alone and posts nothing beside it", async () => {
+    const first = await createSubmission("Clicked Hacks");
+    await enqueueSubmissionReviews([first, await createSubmission("Waiting Hacks")]);
+    await drainDiscordReviewQueue();
+    await claimReviewItem((await itemFor(first)).id);
+    calls.patch.length = 0;
+
+    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 0, removed: 0, updated: 0 });
+    expect(calls.patch).toHaveLength(0);
+  });
+
+  it("sends a skipped card to the back of the line", async () => {
+    const first = await createSubmission("Skipped Hacks");
+    const second = await createSubmission("Next Hacks");
+    await enqueueSubmissionReviews([first]);
+    await enqueueSubmissionReviews([second]);
+    await drainDiscordReviewQueue();
+    const item = await itemFor(first);
+
+    expect(await deferReviewItem(item.id, "some-other-message")).toBeNull();
+    expect(await deferReviewItem(item.id, "message-1")).not.toBeNull();
+    expect(await deferReviewItem(item.id, "message-1")).toBeNull();
+
+    expect(await drainDiscordReviewQueue()).toMatchObject({ posted: 1 });
+    expect(await itemFor(first)).toMatchObject({ messageSnowflake: null, status: "pending" });
+    expect(await itemFor(second)).toMatchObject({ messageSnowflake: "message-2" });
+  });
+
+  it("posts the card again when its message was deleted by hand", async () => {
+    const submissionId = await createSubmission("Vanished Hacks");
+    await enqueueSubmissionReviews([submissionId]);
+    await drainDiscordReviewQueue();
+    missingMessages.add("message-1");
+
+    expect(await drainDiscordReviewQueue()).toMatchObject({ posted: 1 });
+    expect(await itemFor(submissionId)).toMatchObject({ messageSnowflake: "message-2" });
   });
 });
 
 describe("staying in sync with the website", () => {
-  it("takes the buttons off a message when the submission is reviewed on the website", async () => {
+  it("deletes the card when the submission is reviewed on the website", async () => {
     const submissionId = await createSubmission("Web Reviewed Hacks");
     await enqueueSubmissionReviews([submissionId]);
     await drainDiscordReviewQueue();
 
     await db.update(hackathonSubmissions).set({ status: "rejected" }).where(eq(hackathonSubmissions.id, submissionId));
 
-    expect(await drainDiscordReviewQueue()).toMatchObject({ posted: 0, updated: 1 });
-    expect(await itemFor(submissionId)).toMatchObject({ messageStale: false, outcome: "Rejected", resolvedBy: "the website", status: "resolved" });
-    expect(calls.patch[0]).toMatchObject({ body: expect.objectContaining({ components: [] }), route: "/channels/review-channel/messages/message-1" });
+    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 0, removed: 1, updated: 0 });
+    expect(await itemFor(submissionId)).toMatchObject({
+      messageSnowflake: null,
+      outcome: "Rejected",
+      resolvedBy: "the website",
+      status: "resolved",
+    });
+    expect(calls.delete).toEqual([{ route: "/channels/review-channel/messages/message-1" }]);
   });
 
   it("never posts an item that was resolved before its turn", async () => {
@@ -169,7 +275,7 @@ describe("staying in sync with the website", () => {
     await enqueueSubmissionReviews([submissionId]);
     await db.update(hackathonSubmissions).set({ status: "approved" }).where(eq(hackathonSubmissions.id, submissionId));
 
-    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 0, updated: 0 });
+    expect(await drainDiscordReviewQueue()).toEqual({ busy: false, posted: 0, removed: 0, updated: 0 });
     expect(calls.post).toHaveLength(0);
   });
 
