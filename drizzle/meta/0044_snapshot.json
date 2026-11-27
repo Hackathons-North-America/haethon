@@ -1,6 +1,6 @@
 {
   "id": "83ad88bb-0677-44e5-badc-d7da78d58b85",
-  "prevId": "c85e3b9c-fcb6-417a-8d3d-eebc7dd33dbe",
+  "prevId": "f2438733-241c-4a97-9e18-19392b736408",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2159,6 +2159,19 @@
         "discord_channel_decision": {
           "name": "discord_channel_decision",
           "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hna_approved": {
+          "name": "hna_approved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "hna_approved_at": {
+          "name": "hna_approved_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

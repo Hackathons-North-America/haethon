@@ -1,7 +1,8 @@
-import { and, desc, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { hackathons } from "@/lib/db/schema";
+import { hackathonDates, hackathons } from "@/lib/db/schema";
+import { coverRetentionCutoff } from "@/lib/hackathons/cover-retention";
 import { generateCoverThumbnails, type CoverThumbnailResult } from "@/lib/hackathons/cover-thumbnails";
 
 export const DEFAULT_BACKFILL_CONCURRENCY = 3;
@@ -24,7 +25,10 @@ export type CoverThumbnailBackfillResult = {
  * again; each run retries only what is still missing. Published hackathons go
  * first, newest first, so a cover a recent import missed is reached before
  * the older ones that are kept as the original on purpose (SVGs, animated or
- * already-small images), which come back on every run.
+ * already-small images), which come back on every run. Hackathons past cover
+ * retention (not HNA approved and ended over 30 days ago) are left out: the
+ * retention cleanup would only delete their thumbnails again
+ * (lib/hackathons/cover-retention.ts).
  *
  * Run by hand (pnpm backfill:cover-thumbnails) and daily by
  * app/api/cron/cleanup-hackathons, which passes a deadline.
@@ -47,7 +51,14 @@ export async function backfillCoverThumbnails(
   const query = db
     .select({ id: hackathons.id, name: hackathons.name, imageUrl: hackathons.imageUrl })
     .from(hackathons)
-    .where(and(isNotNull(hackathons.imageUrl), isNull(hackathons.imageThumbSmallUrl)))
+    .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .where(
+      and(
+        isNotNull(hackathons.imageUrl),
+        isNull(hackathons.imageThumbSmallUrl),
+        or(eq(hackathons.hnaApproved, true), isNull(hackathonDates.endsAt), gte(hackathonDates.endsAt, coverRetentionCutoff()))
+      )
+    )
     .orderBy(sql`${hackathons.publishedAt} is null`, desc(hackathons.publishedAt), hackathons.id);
   const rows = (options.limit ? await query.limit(options.limit) : await query) as Array<{
     id: string;

@@ -2175,6 +2175,19 @@
           "primaryKey": false,
           "notNull": false
         },
+        "hna_approved": {
+          "name": "hna_approved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "hna_approved_at": {
+          "name": "hna_approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source": {
           "name": "source",
           "type": "source_type",

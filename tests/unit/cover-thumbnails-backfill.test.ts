@@ -9,6 +9,7 @@ const { rows, generateCoverThumbnails } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => {
   const chain = {
     from: () => chain,
+    leftJoin: () => chain,
     where: () => chain,
     orderBy: () => chain,
     limit: (count: number) => Promise.resolve(rows.slice(0, count)),
@@ -18,6 +19,8 @@ vi.mock("@/lib/db", () => {
   return { db: { select: () => chain } };
 });
 vi.mock("@/lib/hackathons/cover-thumbnails", () => ({ generateCoverThumbnails }));
+// The real module pulls in the env and UploadThing; only the cutoff is used here.
+vi.mock("@/lib/hackathons/cover-retention", () => ({ coverRetentionCutoff: () => new Date(0) }));
 
 const { backfillCoverThumbnails } = await import("@/lib/hackathons/cover-thumbnails-backfill");
 

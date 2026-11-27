@@ -33,7 +33,12 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const data = await updatePublishedHackathon(id, parsed.data);
+    // hnaApproved is the admins' curation flag, not the organizer's to see.
+    const data: Partial<Awaited<ReturnType<typeof updatePublishedHackathon>>> = await updatePublishedHackathon(
+      id,
+      parsed.data
+    );
+    delete data.hnaApproved;
 
     return NextResponse.json({ data });
   } catch (error) {
