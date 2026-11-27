@@ -39,6 +39,11 @@ export async function editInteractionResponse(interaction: Pick<APIInteraction, 
   });
 }
 
+/* Deletes the message a button is on. */
+export async function deleteInteractionResponse(interaction: Pick<APIInteraction, "application_id" | "token">) {
+  await webhookRest.delete(Routes.webhookMessage(interaction.application_id, interaction.token, "@original"), { auth: false });
+}
+
 export async function ephemeralFollowUp(interaction: Pick<APIInteraction, "application_id" | "token">, content: string) {
   await webhookRest.post(Routes.webhook(interaction.application_id, interaction.token), {
     auth: false,

@@ -24,6 +24,9 @@ export const REVIEW_ACTIONS = [
   "new",
   "dupmerge",
   "skip",
+  // "Skip for now": back of the queue, undecided. Not a decision, so it is
+  // handled by the button handler rather than runReviewAction.
+  "later",
 ] as const;
 export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
 
@@ -338,8 +341,12 @@ function pendingButtons(item: ReviewItemView, appUrl: string) {
  * The full message for one review item. Pending items carry their action
  * buttons; resolved ones lose them, gain a footer saying what happened and
  * who did it, and link to the hackathon when there is one.
+ *
+ * `waiting` is how many other items are queued behind a pending one: the
+ * footer says so, and when there are any a "Skip for now" button sends this
+ * one to the back of the line.
  */
-export function renderReviewMessage(item: ReviewItemView, appUrl: string): ReviewMessageBody {
+export function renderReviewMessage(item: ReviewItemView, appUrl: string, queue?: { waiting: number }): ReviewMessageBody {
   const embed =
     item.kind === "submission" && item.submission
       ? submissionEmbed(item, item.submission, appUrl)
@@ -353,6 +360,8 @@ export function renderReviewMessage(item: ReviewItemView, appUrl: string): Revie
     embed.footer = {
       text: clip(`${item.outcome ?? "Resolved"}${item.resolvedBy ? ` · by ${item.resolvedBy}` : ""}`, 2048),
     };
+  } else if (queue) {
+    embed.footer = { text: queue.waiting ? `${queue.waiting} more waiting after this one` : "Nothing else waiting" };
   }
 
   const components =
@@ -363,6 +372,11 @@ export function renderReviewMessage(item: ReviewItemView, appUrl: string): Revie
       : item.hackathon && item.outcome !== "In progress"
         ? [row([linkButton("View hackathon", `${appUrl}/hackathons/${item.hackathon.slug}`)])]
         : [];
+
+  // Its own row: a submission's first row is already full (Discord allows five).
+  if (item.status === "pending" && queue?.waiting) {
+    components.push(row([button("later", item.id, "Skip for now", "⏭️", ButtonStyle.Secondary)]));
+  }
 
   return { allowed_mentions: { parse: [] }, components, content: "", embeds: [embed] };
 }

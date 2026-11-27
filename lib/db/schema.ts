@@ -723,9 +723,11 @@ export const discordReviewItems = pgTable(
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     channelSnowflake: text("channel_snowflake"),
     messageSnowflake: text("message_snowflake"),
-    /* Resolved somewhere other than its own buttons: the posted message still
-       shows them and is edited by the next drain. */
+    /* The posted message is out of date. Informational only: the channel
+       shows one card at a time, and every drain deletes decided cards and
+       redraws the one on screen whether or not this is set. */
     messageStale: boolean("message_stale").notNull().default(false),
+    /* Its place in line: oldest is shown first. "Skip for now" resets it. */
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
