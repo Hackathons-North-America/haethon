@@ -5,7 +5,8 @@ import { z } from "zod";
 
 import { afterResponse } from "@/lib/after-response";
 import { db } from "@/lib/db";
-import { drainDiscordChannelJobsSafely, enqueueDiscordChannelJobQuery } from "@/lib/discord/channel-jobs";
+import { startDiscordChannelJobs } from "@/lib/discord/channel-job-worker";
+import { enqueueDiscordChannelJobQuery } from "@/lib/discord/channel-jobs";
 import { categoryForHackathon } from "@/lib/discord/channel-rules";
 import {
   type DiscordChannelPreview,
@@ -41,6 +42,7 @@ import {
   replaceCoverThumbnails,
 } from "@/lib/hackathons/cover-thumbnails";
 import { fetchVerifiedImage } from "@/lib/hackathons/image-ingest";
+import { IMPORT_ORIGIN, importCardPayload, importKeysOf, type ImportVia } from "@/lib/hackathons/import-cards";
 import { normalizeLocationPayload } from "@/lib/hackathons/location-normalization";
 import {
   calculateDuplicateScore,
@@ -184,7 +186,14 @@ async function isVerifiedOrganizerForOrganization(userId: string, role: string, 
   return Boolean(membership);
 }
 
-type DuplicateCandidate = { id: string; name: string; slug: string; websiteUrl: string | null; startsAt: Date | null };
+type DuplicateCandidate = {
+  discordChannelDecision: string | null;
+  id: string;
+  name: string;
+  slug: string;
+  websiteUrl: string | null;
+  startsAt: Date | null;
+};
 
 function duplicateCandidatesQuery() {
   // Deliberately unbounded: an import can duplicate a hackathon of any age, and the
@@ -192,6 +201,7 @@ function duplicateCandidatesQuery() {
   // The slugs double as the set a new hackathon's slug must not collide with.
   return db
     .select({
+      discordChannelDecision: hackathons.discordChannelDecision,
       id: hackathons.id,
       name: hackathons.name,
       slug: hackathons.slug,
@@ -429,7 +439,14 @@ const FEED_FIELDS_IN_ORDER: readonly FeedField[] = [
 
 export async function createPublishedHackathon(
   payload: NormalizedHackathonPayload,
-  options?: { revalidateCaches?: boolean; source?: HackathonSource; syncDiscord?: boolean }
+  options?: {
+    /* "approved" when the admin asked for a channel while creating it.
+       Without one the hackathon waits in the channel decision queue. */
+    discordChannelDecision?: "approved" | null;
+    revalidateCaches?: boolean;
+    source?: HackathonSource;
+    syncDiscord?: boolean;
+  }
 ) {
   payload = normalizeLocationPayload(payload);
   // Vetted once at ingest; a dead or non-image URL degrades to the initials
@@ -461,6 +478,7 @@ export async function createPublishedHackathon(
       highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd,
       discordTag: payload.discordTag,
+      discordChannelDecision: options?.discordChannelDecision ?? null,
       // Compiled once here. An explicit feed identity wins because the event
       // URL may point somewhere else (for example MLH linking to Devpost).
       source: compileSourceType(options?.source, payload.sourceUrl, payload.websiteUrl),
@@ -554,14 +572,18 @@ async function mergeIntoHackathon(
   const [existingDates] = await db.select().from(hackathonDates).where(eq(hackathonDates.hackathonId, targetHackathonId)).limit(1);
 
   if (existingDates) {
-    await db
-      .update(hackathonDates)
-      .set({
-        applicationOpensAt: existingDates.applicationOpensAt ?? payload.applicationOpensAt,
-        applicationClosesAt: existingDates.applicationClosesAt ?? payload.applicationClosesAt,
-        acceptanceAt: existingDates.acceptanceAt ?? payload.acceptanceAt,
-      })
-      .where(eq(hackathonDates.id, existingDates.id));
+    // Only the dates the hackathon lacks and the import has. Most events carry
+    // no application dates on either side, and an update that sets nothing is
+    // an error in Drizzle ("No values to set"), which failed the whole merge.
+    const filledDates = {
+      ...(existingDates.applicationOpensAt || !payload.applicationOpensAt ? {} : { applicationOpensAt: payload.applicationOpensAt }),
+      ...(existingDates.applicationClosesAt || !payload.applicationClosesAt ? {} : { applicationClosesAt: payload.applicationClosesAt }),
+      ...(existingDates.acceptanceAt || !payload.acceptanceAt ? {} : { acceptanceAt: payload.acceptanceAt }),
+    };
+
+    if (Object.keys(filledDates).length) {
+      await db.update(hackathonDates).set(filledDates).where(eq(hackathonDates.id, existingDates.id));
+    }
   } else {
     await db.insert(hackathonDates).values({
       hackathonId: targetHackathonId,
@@ -726,6 +748,28 @@ export async function createHackathonSubmission(
   return { submission, publishedHackathonId: null, publishedDirectly: false };
 }
 
+/* The three things a hackathon_submissions row can be, told apart by its
+   payload. Each has its own admin page, and each page asks for its own kind:
+   filtering a "latest 200 of everything" list in the page hid older pending
+   rows once imports had written a few hundred newer ones. */
+export type SubmissionKind = "form" | "fix" | "import";
+
+/* A broken scraped record waiting on /admin/broken. Both sides are coalesced:
+   a missing key is NULL, and "not NULL" would drop the row from every kind. */
+const fixSubmissionCondition = sql`(coalesce(${hackathonSubmissions.payload}->>'importReason', '') <> '' or coalesce(${hackathonSubmissions.payload}->>'needsFix', '') = 'true')`;
+/* A record of /admin/import: a card in its queue, or an import already done. */
+const importSubmissionCondition = sql`coalesce(${hackathonSubmissions.payload}->>'origin', '') = ${IMPORT_ORIGIN}`;
+
+function submissionKindCondition(kind: SubmissionKind) {
+  if (kind === "fix") {
+    return fixSubmissionCondition;
+  }
+
+  return kind === "import"
+    ? sql`(${importSubmissionCondition} and not ${fixSubmissionCondition})`
+    : sql`(not ${importSubmissionCondition} and not ${fixSubmissionCondition})`;
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
@@ -829,6 +873,11 @@ export async function importAdminHackathonFixItems(input: {
   items: AdminHackathonFixImportItem[];
   reviewerUserId: string;
   defer?: Defer;
+  /* The scraper's unattended run: a record whose source URL is already in the
+     fix queue, in any state, is left alone. Without this every daily run
+     would queue the same broken records again, including ones an admin
+     already fixed or rejected. An admin's own upload always queues. */
+  skipKnown?: boolean;
 }) {
   const results: Array<{
     duplicateScore: number;
@@ -839,17 +888,45 @@ export async function importAdminHackathonFixItems(input: {
     reason: string;
     source: string;
     sourceUrl: string;
-    status: "queued" | "auto_merged";
-    submissionId: string;
+    status: "queued" | "auto_merged" | "known";
+    submissionId?: string;
   }> = [];
-  const duplicateCandidates = await listDuplicateCandidates();
+  const derived = input.items.map((item, index) => deriveFixPayload(item, index));
+  const sourceUrls = [...new Set(derived.map((entry) => entry.payload.sourceUrl))];
+  const [duplicateCandidates, knownRows] = await Promise.all([
+    listDuplicateCandidates(),
+    input.skipKnown
+      ? db
+          .select({ sourceUrl: hackathonSubmissions.sourceUrl })
+          .from(hackathonSubmissions)
+          .where(and(inArray(hackathonSubmissions.sourceUrl, sourceUrls), fixSubmissionCondition))
+      : [],
+  ]);
+  const knownSourceUrls = new Set(knownRows.map((row) => row.sourceUrl));
   // Every item's submission row (and any Discord refresh) is written in one
   // round trip after the loop; ids are made here so results can carry them.
   const writes: BatchQuery[] = [];
   let queuedJobs = 0;
 
   for (const [index, item] of input.items.entries()) {
-    const { hasRealStartDate, payload } = deriveFixPayload(item, index);
+    const { hasRealStartDate, payload } = derived[index];
+
+    // A record with no URL of its own gets a stand-in that says nothing about
+    // which event it is, so it can never be recognised as already queued.
+    if (knownSourceUrls.has(payload.sourceUrl) && payload.sourceUrl !== importedFallbackUrl(index)) {
+      results.push({
+        duplicateScore: 0,
+        index,
+        name: payload.name,
+        reason: item.reason,
+        source: item.source ?? "unknown",
+        sourceUrl: payload.sourceUrl,
+        status: "known",
+      });
+      continue;
+    }
+
+    knownSourceUrls.add(payload.sourceUrl);
     // A fabricated stand-in start date must not masquerade as a same-day
     // match, so date-less items are scored on the legacy name+domain path —
     // enough to surface a candidate to the reviewer, never to auto-merge.
@@ -946,16 +1023,18 @@ export async function importAdminHackathonFixItems(input: {
 
   if (queuedJobs) {
     if (input.defer) {
-      input.defer(drainDiscordChannelJobsSafely);
+      input.defer(startDiscordChannelJobs);
     } else {
-      await drainDiscordChannelJobsSafely();
+      await startDiscordChannelJobs();
     }
   }
 
   const queuedCount = results.filter((result) => result.status === "queued").length;
+  const knownCount = results.filter((result) => result.status === "known").length;
 
   return {
-    mergedCount: results.length - queuedCount,
+    knownCount,
+    mergedCount: results.length - queuedCount - knownCount,
     queuedCount,
     results,
     total: results.length,
@@ -977,9 +1056,79 @@ type AdminImportResult = {
   matchedHackathonId?: string;
   matchedName?: string | null;
   name: string;
-  status: "imported" | "duplicate_flagged" | "auto_merged" | "updated";
+  /* "queued": saved as a card for an admin's yes or no on /admin/import.
+     "dismissed": an admin already said no to this event; nothing was written.
+     "duplicate_flagged" carries a submissionId when the row was saved as a
+     card (review "queue"), and none when nothing was written. */
+  status: "imported" | "duplicate_flagged" | "auto_merged" | "updated" | "queued" | "dismissed";
   submissionId?: string;
   updatedFields?: FeedField[];
+};
+
+/* What the import does with a row that needs a person's decision: a row
+   without autoApprove, or a possible duplicate.
+
+   "publish" is an admin deciding right now: the row is published, and a
+   possible duplicate is reported back with nothing written.
+   "queue" is an upload or the scraper's unattended run: the row is saved as a
+   card in the import review queue (lib/hackathons/import-cards.ts). */
+export type ImportReview = "publish" | "queue";
+
+/* The card an import is the decision on. Its row is resolved in the same
+   transaction as the hackathon it becomes, instead of a new submission being
+   recorded. mergeIntoHackathonId is the admin's "merge into the match". */
+type ImportCardDecision = { submissionId: string; mergeIntoHackathonId?: string };
+
+type AdminImportInput = {
+  payloads: AdminHackathonImportPayload[];
+  reviewerUserId: string;
+  ignoreDuplicates?: boolean;
+  defer?: Defer;
+  review?: ImportReview;
+  via?: ImportVia;
+  card?: ImportCardDecision;
+};
+
+/* The cards already holding any of these keys: one still waiting (the row
+   refreshes it) or one an admin said no to (the row is dropped). */
+function importCardsByKeyQuery(keys: string[]) {
+  const keyList = sql.join(
+    keys.map((key) => sql`${key}`),
+    sql`, `
+  );
+
+  return db
+    .select({
+      id: hackathonSubmissions.id,
+      status: hackathonSubmissions.status,
+      payload: hackathonSubmissions.payload,
+      matchedHackathonId: hackathonSubmissions.matchedHackathonId,
+      duplicateScore: hackathonSubmissions.duplicateScore,
+    })
+    .from(hackathonSubmissions)
+    .where(
+      and(
+        inArray(hackathonSubmissions.status, ["pending", "rejected"]),
+        sql`${hackathonSubmissions.payload}->>'origin' = ${IMPORT_ORIGIN}`,
+        sql`exists (
+          select 1
+          from jsonb_array_elements_text(
+            case when jsonb_typeof(${hackathonSubmissions.payload}->'importKeys') = 'array'
+              then ${hackathonSubmissions.payload}->'importKeys' else '[]'::jsonb end
+          ) as card_key
+          where card_key in (${keyList})
+        )`
+      )
+    )
+    .orderBy(hackathonSubmissions.createdAt);
+}
+
+type KnownImportCard = {
+  id: string;
+  status: "pending" | "rejected";
+  edited: boolean;
+  matchedHackathonId: string | null;
+  duplicateScore: number;
 };
 
 /* Runs work that need not hold up the response. The import route passes
@@ -1046,12 +1195,11 @@ async function vetImportedImages(images: Array<{ hackathonId: string; imageUrl: 
   }
 }
 
-export async function importAdminHackathons(input: {
-  payloads: AdminHackathonImportPayload[];
-  reviewerUserId: string;
-  ignoreDuplicates?: boolean;
-  defer?: Defer;
-}) {
+export async function importAdminHackathons(input: AdminImportInput) {
+  if (input.card && input.payloads.length !== 1) {
+    throw new Error("A card decision imports exactly one row.");
+  }
+
   try {
     return await runAdminImport(input);
   } catch (error) {
@@ -1074,13 +1222,10 @@ export async function importAdminHackathons(input: {
    real changes, an auto-merge) take the slower read-modify-write path, and the
    queued writes are flushed before each of those so order is preserved.
    Discord work is queued as jobs and image vetting is deferred. */
-async function runAdminImport(input: {
-  payloads: AdminHackathonImportPayload[];
-  reviewerUserId: string;
-  ignoreDuplicates?: boolean;
-  defer?: Defer;
-}) {
+async function runAdminImport(input: AdminImportInput) {
   const now = new Date();
+  const review = input.review ?? "publish";
+  const card = input.card;
   const rows = input.payloads.map((rawPayload) => {
     const payload = payloadWithValidOrganizationId(rawPayload);
 
@@ -1088,6 +1233,7 @@ async function runAdminImport(input: {
       rawPayload,
       payload,
       externalIds: externalIdsOf(rawPayload),
+      importKeys: importKeysOf(rawPayload),
       feedPayload: payloadForJson(payload),
       series: hackathonSeriesIdentity(payload),
       organizationSlug: !payload.organizationId && payload.organizationName ? slugify(payload.organizationName) : null,
@@ -1096,11 +1242,14 @@ async function runAdminImport(input: {
     };
   });
 
-  // The admin is only asked about a channel for rows that are not
-  // auto-approved, and only Canadian and US events get one.
+  /* Auto-approval publishes a row without asking; it says nothing about a
+     Discord channel, which every hackathon needs an admin's yes for. An admin
+     deciding now is asked about the channel straight away with this preview;
+     for an upload or the scraper it goes with the channel decision posted to
+     the Discord review channel, and the hackathon waits in the channel
+     decision queue on /admin/import. Only Canadian and US events get one. */
   const wantsPreview = rows.some(
     (row) =>
-      row.rawPayload.autoApprove !== true &&
       categoryForHackathon({ country: row.payload.country, endsAt: row.payload.endDate, startsAt: row.payload.startDate, status: row.status })
   );
   // Started now, awaited last: the call to Discord overlaps the database work.
@@ -1122,6 +1271,7 @@ async function runAdminImport(input: {
             hackathonId: hackathonExternalIds.hackathonId,
             lastPayload: hackathonExternalIds.lastPayload,
             name: hackathons.name,
+            discordChannelDecision: hackathons.discordChannelDecision,
             updatedAt: hackathonExternalIds.updatedAt,
           })
           .from(hackathonExternalIds)
@@ -1139,6 +1289,8 @@ async function runAdminImport(input: {
       .where(inArray(hackathonSeries.slug, seriesSlugs))
   );
   const trackedAt = wantsPreview ? read(trackedDiscordChannelsQuery()) : -1;
+  const allImportKeys = review === "queue" ? [...new Set(rows.flatMap((row) => row.importKeys))] : [];
+  const cardsAt = allImportKeys.length ? read(importCardsByKeyQuery(allImportKeys)) : -1;
   const cityAt = new Map<string, number>();
 
   for (const row of rows) {
@@ -1156,11 +1308,18 @@ async function runAdminImport(input: {
      are added as they are decided, so a later row carrying the same id
      updates the earlier one. `order` picks the most recent link when an
      event's ids point at different hackathons. */
-  const linkByExternalId = new Map<string, { hackathonId: string; lastPayload: Record<string, unknown>; name: string; order: number }>();
+  type FeedLink = {
+    discordChannelDecision: string | null;
+    hackathonId: string;
+    lastPayload: Record<string, unknown>;
+    name: string;
+    order: number;
+  };
+  const linkByExternalId = new Map<string, FeedLink>();
 
   for (const link of linkedAt < 0
     ? []
-    : (readResults[linkedAt] as Array<{ externalId: string; hackathonId: string; lastPayload: Record<string, unknown>; name: string; updatedAt: Date }>)) {
+    : (readResults[linkedAt] as Array<Omit<FeedLink, "order"> & { externalId: string; updatedAt: Date }>)) {
     linkByExternalId.set(link.externalId, { ...link, order: link.updatedAt.getTime() });
   }
 
@@ -1175,6 +1334,29 @@ async function runAdminImport(input: {
     ])
   );
   const trackedChannels = trackedAt < 0 ? [] : (readResults[trackedAt] as TrackedDiscordChannel[]);
+  /* The card each key already has. Rows of this request are added as they are
+     queued, so a key repeated in the request lands on one card. */
+  const cardByKey = new Map<string, KnownImportCard>();
+
+  for (const known of cardsAt < 0
+    ? []
+    : (readResults[cardsAt] as Array<{
+        id: string;
+        status: "pending" | "rejected";
+        payload: Record<string, unknown>;
+        matchedHackathonId: string | null;
+        duplicateScore: string | null;
+      }>)) {
+    for (const key of importKeysOf(known.payload)) {
+      cardByKey.set(key, {
+        id: known.id,
+        status: known.status,
+        edited: known.payload.importEdited === true,
+        matchedHackathonId: known.matchedHackathonId,
+        duplicateScore: Number(known.duplicateScore ?? 0),
+      });
+    }
+  }
   const resolvedCity = (cityKey: string | null) => {
     const at = cityKey ? cityAt.get(cityKey) : undefined;
 
@@ -1228,7 +1410,12 @@ async function runAdminImport(input: {
     });
   };
 
-  const queueLink = (hackathonId: string, name: string, row: (typeof rows)[number]) => {
+  const queueLink = (
+    hackathonId: string,
+    name: string,
+    row: (typeof rows)[number],
+    discordChannelDecision: string | null
+  ) => {
     const query = linkExternalIdsQuery(hackathonId, row.externalIds, row.feedPayload);
 
     if (query) {
@@ -1238,7 +1425,7 @@ async function runAdminImport(input: {
     linkOrder += 1;
 
     for (const externalId of row.externalIds) {
-      linkByExternalId.set(externalId, { hackathonId, lastPayload: row.feedPayload, name, order: linkOrder });
+      linkByExternalId.set(externalId, { discordChannelDecision, hackathonId, lastPayload: row.feedPayload, name, order: linkOrder });
     }
   };
 
@@ -1246,6 +1433,54 @@ async function runAdminImport(input: {
     row: (typeof rows)[number],
     values: Pick<typeof hackathonSubmissions.$inferInsert, "approvedHackathonId" | "duplicateScore" | "matchedHackathonId" | "reviewerNotes" | "status">
   ) => {
+    // Tag admin-imported records so the submissions review page can keep them out —
+    // imports are handled entirely on /admin/import, not in the form review queue.
+    const record = {
+      organizationId: row.payload.organizationId ?? null,
+      payload: payloadForJson({ ...row.payload, submitterType: "community", origin: "admin_import" }),
+      normalizedName: row.payload.name,
+      websiteUrl: row.payload.websiteUrl,
+      sourceUrl: row.payload.sourceUrl ?? row.payload.websiteUrl,
+      reviewedByUserId: input.reviewerUserId,
+      reviewedAt: new Date(),
+      ...values,
+    };
+
+    if (card) {
+      // The decision on a queued card: that row is resolved, in the same
+      // transaction as the hackathon. Its keys stay for the record.
+      writes.push({
+        query: db
+          .update(hackathonSubmissions)
+          .set({
+            ...record,
+            payload: { ...record.payload, importKeys: row.importKeys },
+            reviewClaimedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(hackathonSubmissions.id, card.submissionId), eq(hackathonSubmissions.status, "pending"))),
+      });
+
+      return card.submissionId;
+    }
+
+    const id = randomUUID();
+
+    writes.push({
+      query: db.insert(hackathonSubmissions).values({
+        id,
+        submittedByUserId: input.reviewerUserId,
+        submitterType: "community",
+        ...record,
+      }),
+    });
+
+    return id;
+  };
+
+  /* Saves a row as a card for an admin to decide on /admin/import. Nothing is
+     published until then. */
+  const queueCard = (row: (typeof rows)[number], match?: { duplicateScore: number; hackathonId: string }) => {
     const id = randomUUID();
 
     writes.push({
@@ -1254,17 +1489,26 @@ async function runAdminImport(input: {
         submittedByUserId: input.reviewerUserId,
         submitterType: "community",
         organizationId: row.payload.organizationId ?? null,
-        // Tag admin-imported records so the submissions review page can keep them out —
-        // imports are handled entirely on /admin/import, not in the form review queue.
-        payload: payloadForJson({ ...row.payload, submitterType: "community", origin: "admin_import" }),
+        payload: importCardPayload(payloadForJson(row.payload), { via: input.via }),
         normalizedName: row.payload.name,
         websiteUrl: row.payload.websiteUrl,
         sourceUrl: row.payload.sourceUrl ?? row.payload.websiteUrl,
-        reviewedByUserId: input.reviewerUserId,
-        reviewedAt: new Date(),
-        ...values,
+        matchedHackathonId: match?.hackathonId,
+        duplicateScore: (match?.duplicateScore ?? 0).toFixed(2),
+        status: "pending",
+        reviewerNotes: match ? "Possible duplicate: waiting for a decision on the import page." : "Waiting for review on the import page.",
       }),
     });
+
+    for (const key of row.importKeys) {
+      cardByKey.set(key, {
+        id,
+        status: "pending",
+        edited: false,
+        matchedHackathonId: match?.hackathonId ?? null,
+        duplicateScore: match?.duplicateScore ?? 0,
+      });
+    }
 
     return id;
   };
@@ -1288,7 +1532,7 @@ async function runAdminImport(input: {
         committed = true;
       }
 
-      queueLink(linked.hackathonId, linked.name, row);
+      queueLink(linked.hackathonId, linked.name, row, linked.discordChannelDecision);
       let submissionId: string | undefined;
 
       if (updatedFields.length) {
@@ -1300,8 +1544,20 @@ async function runAdminImport(input: {
           duplicateScore: "1.00",
           reviewerNotes: `Updated from the feed (${externalIds.join(", ")}): ${updatedFields.join(", ")}.`,
         });
-        // The channel's name, topic and category follow the event.
-        queueJob({ hackathonId: linked.hackathonId, kind: "refresh" });
+        // The channel's name, topic and category follow the event. Without
+        // an approved channel there is nothing to refresh.
+        if (linked.discordChannelDecision === "approved") {
+          queueJob({ hackathonId: linked.hackathonId, kind: "refresh" });
+        }
+      } else if (card) {
+        // A queued card whose event was published some other way meanwhile.
+        submissionId = queueSubmission(row, {
+          matchedHackathonId: linked.hackathonId,
+          approvedHackathonId: linked.hackathonId,
+          status: "merged",
+          duplicateScore: "1.00",
+          reviewerNotes: `Already imported from the feed (${externalIds.join(", ")}); nothing to change.`,
+        });
       }
 
       const result: AdminImportResult = {
@@ -1319,73 +1575,125 @@ async function runAdminImport(input: {
       };
       results.push(result);
 
-      if (autoApprove) {
-        // A hackathon already in the catalog keeps its channel if it has one.
-        queueJob({ hackathonId: linked.hackathonId, keepExisting: true, kind: "ensure" }, result);
+      continue;
+    }
+
+    /* Already in the review queue: a card still waiting takes the feed's
+       newer version (unless an admin edited it), and an event an admin said
+       no to stays out however often the scraper sends it. */
+    const known = row.importKeys.flatMap((key) => cardByKey.get(key) ?? [])[0];
+
+    if (known) {
+      if (known.status === "pending" && !known.edited) {
+        writes.push({
+          query: db
+            .update(hackathonSubmissions)
+            .set({
+              organizationId: payload.organizationId ?? null,
+              payload: importCardPayload(payloadForJson(payload), { via: input.via }),
+              normalizedName: payload.name,
+              websiteUrl: payload.websiteUrl,
+              sourceUrl: payload.sourceUrl ?? payload.websiteUrl,
+              updatedAt: now,
+            })
+            .where(and(eq(hackathonSubmissions.id, known.id), eq(hackathonSubmissions.status, "pending"))),
+        });
       }
 
+      results.push({
+        duplicateScore: known.duplicateScore,
+        autoApprove,
+        externalId: rawPayload.externalId,
+        index,
+        matchedHackathonId: known.matchedHackathonId ?? undefined,
+        matchedName: duplicateCandidates.find((candidate) => candidate.id === known.matchedHackathonId)?.name ?? null,
+        name: payload.name,
+        status: known.status === "rejected" ? "dismissed" : known.matchedHackathonId ? "duplicate_flagged" : "queued",
+        submissionId: known.id,
+      });
       continue;
     }
 
     // "Import as new anyway" re-submits the same card with ignoreDuplicates so it bypasses
     // the check entirely and publishes (then flows into the normal Discord prompt).
     const duplicate = input.ignoreDuplicates ? null : findBestDuplicateInCandidates(payload, duplicateCandidates);
-    const duplicateScore = Number((duplicate?.score ?? 0).toFixed(2));
+    // An admin's "merge into the match" merges whatever the score; without
+    // one, only a near-certain match is merged.
+    const mergeTargetId = card?.mergeIntoHackathonId ?? (duplicate && duplicate.score >= AUTO_MERGE_SCORE ? duplicate.id : null);
+    const duplicateScore = Number(((mergeTargetId && duplicate?.id !== mergeTargetId ? 0 : duplicate?.score) ?? 0).toFixed(2));
+
+    if (mergeTargetId) {
+      const target = duplicateCandidates.find((candidate) => candidate.id === mergeTargetId);
+      const matchedName = target?.name ?? null;
+      const targetDecision = target?.discordChannelDecision ?? null;
+
+      // Merge the import into the existing hackathon, using its data only to
+      // fill fields the existing record is missing.
+      await flush();
+      await mergeIntoHackathon(mergeTargetId, payload, { syncDiscord: false });
+      committed = true;
+      if (targetDecision === "approved") {
+        queueJob({ hackathonId: mergeTargetId, kind: "refresh" });
+      }
+      // Later imports of this event then match by feed id. The existing
+      // hackathon was not created from this feed (earlier scraper imports
+      // are linked by scripts/backfill-external-ids.ts and take the update
+      // path above), so its values stay and only later feed changes apply.
+      queueLink(mergeTargetId, matchedName ?? payload.name, row, targetDecision);
+
+      const result: AdminImportResult = {
+        duplicateScore,
+        autoApprove,
+        externalId: rawPayload.externalId,
+        hackathonId: mergeTargetId,
+        index,
+        matchedHackathonId: mergeTargetId,
+        matchedName,
+        name: payload.name,
+        status: "auto_merged",
+        submissionId: queueSubmission(row, {
+          matchedHackathonId: mergeTargetId,
+          approvedHackathonId: mergeTargetId,
+          status: "merged",
+          duplicateScore: duplicateScore.toFixed(2),
+          reviewerNotes: card?.mergeIntoHackathonId
+            ? "Merged into the existing hackathon by an admin on the import page."
+            : `Auto-merged into existing hackathon (match ${duplicateScore.toFixed(2)}).`,
+        }),
+      };
+      results.push(result);
+
+      continue;
+    }
 
     if (duplicate) {
-      const matchedName = duplicateCandidates.find((candidate) => candidate.id === duplicate.id)?.name ?? null;
-
-      if (duplicate.score >= AUTO_MERGE_SCORE) {
-        // A near-certain match needs no decision: merge the import into the existing
-        // hackathon, using its data only to fill fields the existing record is missing.
-        await flush();
-        await mergeIntoHackathon(duplicate.id, payload, { syncDiscord: false });
-        committed = true;
-        queueJob({ hackathonId: duplicate.id, kind: "refresh" });
-        // Later imports of this event then match by feed id. The existing
-        // hackathon was not created from this feed (earlier scraper imports
-        // are linked by scripts/backfill-external-ids.ts and take the update
-        // path above), so its values stay and only later feed changes apply.
-        queueLink(duplicate.id, matchedName ?? payload.name, row);
-
-        const result: AdminImportResult = {
-          duplicateScore,
-          autoApprove,
-          externalId: rawPayload.externalId,
-          hackathonId: duplicate.id,
-          index,
-          matchedHackathonId: duplicate.id,
-          matchedName,
-          name: payload.name,
-          status: "auto_merged",
-          submissionId: queueSubmission(row, {
-            matchedHackathonId: duplicate.id,
-            approvedHackathonId: duplicate.id,
-            status: "merged",
-            duplicateScore: duplicateScore.toFixed(2),
-            reviewerNotes: `Auto-merged into existing hackathon (match ${duplicateScore.toFixed(2)}).`,
-          }),
-        };
-        results.push(result);
-
-        if (autoApprove) {
-          queueJob({ hackathonId: duplicate.id, keepExisting: true, kind: "ensure" }, result);
-        }
-
-        continue;
-      }
-
-      // A weaker match is surfaced to the importer immediately instead of parking a
-      // pending submission in the review queue — nothing is written until the admin decides.
+      // A weaker match is a person's call. An admin deciding right now gets it
+      // back with nothing written; an upload or the scraper leaves it as a
+      // card that names the match.
       results.push({
         duplicateScore,
         autoApprove,
         externalId: rawPayload.externalId,
         index,
         matchedHackathonId: duplicate.id,
-        matchedName,
+        matchedName: duplicateCandidates.find((candidate) => candidate.id === duplicate.id)?.name ?? null,
         name: payload.name,
         status: "duplicate_flagged",
+        submissionId: review === "queue" ? queueCard(row, { duplicateScore, hackathonId: duplicate.id }) : undefined,
+      });
+      continue;
+    }
+
+    if (review === "queue" && !autoApprove) {
+      // Not from a feed trusted to publish on its own: an admin says yes or no.
+      results.push({
+        duplicateScore,
+        autoApprove,
+        externalId: rawPayload.externalId,
+        index,
+        name: payload.name,
+        status: "queued",
+        submissionId: queueCard(row),
       });
       continue;
     }
@@ -1492,8 +1800,15 @@ async function runAdminImport(input: {
       query: db.insert(hackathonLocations).values({ hackathonId, ...locationValuesFrom(payload, resolvedCity(row.cityKey)) }),
     });
 
-    duplicateCandidates.unshift({ id: hackathonId, name: payload.name, slug, websiteUrl: payload.websiteUrl, startsAt: payload.startDate });
-    queueLink(hackathonId, payload.name, row);
+    duplicateCandidates.unshift({
+      discordChannelDecision: null,
+      id: hackathonId,
+      name: payload.name,
+      slug,
+      websiteUrl: payload.websiteUrl,
+      startsAt: payload.startDate,
+    });
+    queueLink(hackathonId, payload.name, row, null);
 
     if (payload.imageUrl) {
       newImages.push({ hackathonId, imageUrl: payload.imageUrl });
@@ -1511,24 +1826,19 @@ async function runAdminImport(input: {
     };
     results.push(result);
 
-    if (autoApprove) {
-      // Auto-approved rows skip the admin's channel decision: the channel is
-      // made or reused by the queue, right after the response.
-      queueJob({ hackathonId, kind: "ensure" }, result);
-    } else {
-      // Do not create the Discord channel yet — the admin approves that separately.
-      previews.push({
-        result,
-        event: {
-          country: payload.country,
-          endsAt: payload.endDate,
-          name: payload.name,
-          seriesId: existingSeries?.id ?? null,
-          startsAt: payload.startDate,
-          status: row.status,
-        },
-      });
-    }
+    // No channel yet, auto-approved or not: the preview is what the admin is
+    // asked with, here or in Discord (lib/discord/channel-decisions.ts).
+    previews.push({
+      result,
+      event: {
+        country: payload.country,
+        endsAt: payload.endDate,
+        name: payload.name,
+        seriesId: existingSeries?.id ?? null,
+        startsAt: payload.startDate,
+        status: row.status,
+      },
+    });
   }
 
   /* ---- One round trip of writes ---- */
@@ -1553,7 +1863,7 @@ async function runAdminImport(input: {
   }
 
   if (queuedJobs) {
-    deferred.push(drainDiscordChannelJobsSafely);
+    deferred.push(startDiscordChannelJobs);
   }
 
   for (const task of deferred) {
@@ -1569,6 +1879,8 @@ async function runAdminImport(input: {
     importedCount: results.filter((result) => result.status === "imported").length,
     mergedCount: results.filter((result) => result.status === "auto_merged").length,
     updatedCount: results.filter((result) => result.status === "updated").length,
+    queuedCount: results.filter((result) => result.status === "queued").length,
+    dismissedCount: results.filter((result) => result.status === "dismissed").length,
     results,
     total: results.length,
   };
@@ -1706,7 +2018,9 @@ export async function reviewHackathonSubmission(input: {
 
 export async function listHackathonSubmissions(options?: {
   allowedOrganizationIds?: string[];
+  kind?: SubmissionKind;
   limit?: number;
+  status?: (typeof hackathonSubmissions.$inferSelect)["status"];
   submissionIds?: string[];
 }) {
   if (options?.allowedOrganizationIds && options.allowedOrganizationIds.length === 0) {
@@ -1748,7 +2062,9 @@ export async function listHackathonSubmissions(options?: {
         options?.allowedOrganizationIds
           ? inArray(hackathonSubmissions.organizationId, options.allowedOrganizationIds)
           : undefined,
-        options?.submissionIds ? inArray(hackathonSubmissions.id, options.submissionIds) : undefined
+        options?.submissionIds ? inArray(hackathonSubmissions.id, options.submissionIds) : undefined,
+        options?.kind ? submissionKindCondition(options.kind) : undefined,
+        options?.status ? eq(hackathonSubmissions.status, options.status) : undefined
       )
     )
     .orderBy(desc(hackathonSubmissions.createdAt))

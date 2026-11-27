@@ -1,3 +1,4 @@
+import { HTTPError } from "@discordjs/rest";
 import { desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -8,14 +9,12 @@ import {
   reportHackathonSyncFailure,
   syncHackathonDiscordChannel,
 } from "@/lib/discord/sync";
+import { isRateLimitError } from "@/lib/discord/rest";
 import { env } from "@/lib/env";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 
-/* Discord work is slow (a new channel is seven or eight API calls, and Discord
-   can hold a rate-limited call for the better part of a minute), so admin
-   actions queue it here and answer straight away. The queue is drained after
-   the response with next/server after(); the admin UI polls the job for the
-   channel link or the error.
+/* Admin actions persist jobs here and answer without waiting for Discord.
+   The background worker retries them and the admin UI reads their results.
 
    Jobs run strictly one at a time across every server instance. The sync is
    not safe to run twice at once: two runs could each create a channel for the
@@ -50,6 +49,7 @@ export type DiscordChannelJobView = {
   channelUrl: string | null;
   createdAt: string;
   finishedAt: string | null;
+  nextAttemptAt: string | null;
 };
 
 /* A running job older than this was abandoned (its function instance was
@@ -62,7 +62,19 @@ const DRAIN_BUDGET_MS = 40_000;
 /* Any constant: the transaction-level lock that makes claiming a job atomic. */
 const CLAIM_LOCK_KEY = 4_170_251;
 
-const abandonedBefore = sql`now() - make_interval(secs => ${ABANDONED_AFTER_SECONDS})`;
+const jobLease = sql`make_interval(secs => ${ABANDONED_AFTER_SECONDS})`;
+const abandonedBefore = sql`now() - ${jobLease}`;
+
+// A refresh or a fresh approval can arrive while the previous job is running.
+// Let the earlier job finish retrying before the new one can run for that event.
+const waitingJob = sql`(
+  job.status = 'retrying' or (
+    job.status = 'pending' and not exists (
+      select 1 from discord_channel_jobs earlier
+      where earlier.hackathon_id = job.hackathon_id and earlier.status = 'retrying'
+    )
+  )
+)`;
 
 /**
  * The statement that queues one job, unawaited so it can share a round trip
@@ -97,8 +109,10 @@ export async function enqueueDiscordChannelJob(request: DiscordChannelJobRequest
 }
 
 /**
- * An admin's "create the channel" for one hackathon. Only the checks that can
- * be answered from the database happen here; the Discord work is queued.
+ * An admin's "create the channel" for one hackathon. The approval is stored
+ * (it is what lets the sync make or reuse a channel at all, see
+ * channelDecisionBlock in lib/discord/sync.ts), then the Discord work is
+ * queued. Only the checks that can be answered from the database happen here.
  */
 export async function requestHackathonDiscordChannel(hackathonId: string, requestedByUserId: string) {
   const [row] = await db
@@ -122,13 +136,49 @@ export async function requestHackathonDiscordChannel(hackathonId: string, reques
     return { status: "skipped" as const, reason: "Only Canadian and US hackathons get a Discord channel." };
   }
 
-  const jobId = await enqueueDiscordChannelJob({ hackathonId, kind: "ensure", requestedByUserId });
+  const [, [job]] = await db.batch([
+    db.update(hackathons).set({ discordChannelDecision: "approved" }).where(eq(hackathons.id, hackathonId)),
+    enqueueDiscordChannelJobQuery({ hackathonId, kind: "ensure", requestedByUserId }),
+  ]);
 
-  return { status: "queued" as const, jobId };
+  return { status: "queued" as const, jobId: job.id };
 }
 
-type ClaimedJob = { id: string; hackathonId: string; kind: DiscordChannelJobKind; keepExisting: boolean };
-type FinishedJob = { id: string; result: DiscordChannelJobResult } | { id: string; error: string };
+/**
+ * An admin's "no channel" for one hackathon. Stored, so the hackathon leaves
+ * the decision queue and no sync makes a channel for it later. A channel it
+ * already has is not touched.
+ */
+export async function denyHackathonDiscordChannel(hackathonId: string) {
+  const [row] = await db
+    .update(hackathons)
+    .set({ discordChannelDecision: "denied" })
+    .where(eq(hackathons.id, hackathonId))
+    .returning({ id: hackathons.id });
+
+  return row ? { status: "denied" as const } : { status: "not_found" as const };
+}
+
+type ClaimedJob = { id: string; hackathonId: string; kind: DiscordChannelJobKind; keepExisting: boolean; attempts: number };
+type FinishedJob =
+  | { id: string; result: DiscordChannelJobResult }
+  | { id: string; error: string }
+  | { id: string; retryAfterMs: number; rateLimited: boolean; blocksQueue: boolean };
+
+function finishStatement(finished: FinishedJob) {
+  if ("retryAfterMs" in finished) {
+    return sql`update discord_channel_jobs
+      set status = 'retrying', started_at = null,
+          next_attempt_at = now() + make_interval(secs => ${finished.retryAfterMs / 1000}),
+          attempts = greatest(attempts - ${finished.rateLimited ? 1 : 0}, 0),
+          blocks_queue = ${finished.blocksQueue}
+      where id = ${finished.id}`;
+  }
+
+  return "error" in finished
+    ? sql`update discord_channel_jobs set status = 'failed', error = ${finished.error}, finished_at = now() where id = ${finished.id}`
+    : sql`update discord_channel_jobs set status = 'done', result = ${JSON.stringify(finished.result)}::jsonb, error = null, finished_at = now() where id = ${finished.id}`;
+}
 
 /**
  * Records the job that just finished (if any) and takes the next one, in one
@@ -137,11 +187,7 @@ type FinishedJob = { id: string; result: DiscordChannelJobResult } | { id: strin
  * many requests try to drain the queue.
  */
 async function finishAndClaimNext(finished?: FinishedJob): Promise<ClaimedJob | null> {
-  const finish = !finished
-    ? sql`select 1`
-    : "error" in finished
-      ? sql`update discord_channel_jobs set status = 'failed', error = ${finished.error}, finished_at = now() where id = ${finished.id}`
-      : sql`update discord_channel_jobs set status = 'done', result = ${JSON.stringify(finished.result)}::jsonb, error = null, finished_at = now() where id = ${finished.id}`;
+  const finish = finished ? finishStatement(finished) : sql`select 1`;
 
   const results = await db.batch([
     db.execute(sql`select pg_advisory_xact_lock(${CLAIM_LOCK_KEY})`),
@@ -154,23 +200,50 @@ async function finishAndClaimNext(finished?: FinishedJob): Promise<ClaimedJob | 
       where status = 'running' and started_at < ${abandonedBefore} and attempts >= ${MAX_ATTEMPTS}`),
     db.execute(sql`
       update discord_channel_jobs
-      set status = 'running', started_at = now(), attempts = attempts + 1
+      set status = 'running', started_at = now(), attempts = attempts + 1,
+          next_attempt_at = null, blocks_queue = false
       where id = (
-        select id from discord_channel_jobs
-        where status = 'pending' or (status = 'running' and started_at < ${abandonedBefore})
-        order by created_at, id
+        select job.id from discord_channel_jobs job
+        left join hackathon_dates dates on dates.hackathon_id = job.hackathon_id
+        where (${waitingJob} and (job.next_attempt_at is null or job.next_attempt_at <= now()))
+           or (job.status = 'running' and job.started_at < ${abandonedBefore})
+        order by coalesce(
+          case when dates.application_closes_at > now() then dates.application_closes_at end,
+          case when dates.starts_at > now() then dates.starts_at end
+        ) nulls last, job.created_at, job.id
         limit 1
       )
       and not exists (
-        select 1 from discord_channel_jobs where status = 'running' and started_at >= ${abandonedBefore}
+        select 1 from discord_channel_jobs
+        where (status = 'running' and started_at >= ${abandonedBefore})
+           or (status = 'retrying' and blocks_queue and next_attempt_at > now())
       )
-      returning id, hackathon_id, kind, keep_existing`),
+      returning id, hackathon_id, kind, keep_existing, attempts`),
   ]);
-  const [claimed] = results[3].rows as Array<{ id: string; hackathon_id: string; kind: DiscordChannelJobKind; keep_existing: boolean }>;
+  const [claimed] = results[3].rows as Array<{ id: string; hackathon_id: string; kind: DiscordChannelJobKind; keep_existing: boolean; attempts: number }>;
 
   return claimed
-    ? { id: claimed.id, hackathonId: claimed.hackathon_id, kind: claimed.kind, keepExisting: claimed.keep_existing }
+    ? { id: claimed.id, hackathonId: claimed.hackathon_id, kind: claimed.kind, keepExisting: claimed.keep_existing, attempts: claimed.attempts }
     : null;
+}
+
+/** Seconds until another drain would be useful, or null when all jobs are finished. */
+export async function nextDiscordChannelJobAttempt() {
+  const { rows } = await db.execute(sql`
+    select greatest(1, ceil(extract(epoch from (
+      greatest(ready_at, leased_until, blocked_until) - now()
+    ))))::integer as delay
+    from (
+      select min(coalesce(job.next_attempt_at, now())) as ready_at,
+        max(job.started_at + ${jobLease}) filter (where job.status = 'running') as leased_until,
+        max(job.next_attempt_at) filter (where job.blocks_queue) as blocked_until
+      from discord_channel_jobs job
+      where ${waitingJob} or job.status = 'running'
+    ) wakeup
+    where ready_at is not null
+  `);
+
+  return (rows[0]?.delay as number | undefined) ?? null;
 }
 
 async function runJob(job: ClaimedJob): Promise<FinishedJob> {
@@ -202,10 +275,39 @@ async function runJob(job: ClaimedJob): Promise<FinishedJob> {
 
     return { id: job.id, result };
   } catch (error) {
+    if (isRateLimitError(error)) {
+      return {
+        id: job.id,
+        retryAfterMs: Math.max(1_000, error.retryAfter, error.sublimitTimeout),
+        rateLimited: true,
+        blocksQueue: error.global || error.scope === "global",
+      };
+    }
+
+    if (job.attempts < MAX_ATTEMPTS && isTransientDiscordError(error)) {
+      return {
+        id: job.id,
+        retryAfterMs: 15_000 * 2 ** (job.attempts - 1),
+        rateLimited: false,
+        blocksQueue: false,
+      };
+    }
+
     reportHackathonSyncFailure(job.hackathonId, error);
 
     return { id: job.id, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+const transientNetworkCodes = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EAI_AGAIN", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET"]);
+
+function isTransientDiscordError(error: unknown) {
+  if (error instanceof HTTPError) return error.status >= 500;
+  if (!(error instanceof Error)) return false;
+
+  return error.name === "AbortError" || [error, error.cause].some(
+    (cause) => !!cause && typeof cause === "object" && "code" in cause && transientNetworkCodes.has(String(cause.code))
+  );
 }
 
 /**
@@ -236,19 +338,15 @@ export async function drainDiscordChannelJobs(options?: { budgetMs?: number }) {
     }
 
     unrecorded = await runJob(job);
-    ran += 1;
+
+    if (!("retryAfterMs" in unrecorded)) {
+      ran += 1;
+    }
   }
 }
 
 async function recordFinished(finished: FinishedJob) {
-  await db
-    .update(discordChannelJobs)
-    .set(
-      "error" in finished
-        ? { status: "failed", error: finished.error, finishedAt: new Date() }
-        : { status: "done", result: finished.result, error: null, finishedAt: new Date() }
-    )
-    .where(eq(discordChannelJobs.id, finished.id));
+  await db.execute(finishStatement(finished));
 }
 
 /* drainDiscordChannelJobs for after(): a failure here has no request left to
@@ -274,6 +372,7 @@ const jobColumns = {
   status: discordChannelJobs.status,
   result: discordChannelJobs.result,
   error: discordChannelJobs.error,
+  nextAttemptAt: discordChannelJobs.nextAttemptAt,
   createdAt: discordChannelJobs.createdAt,
   finishedAt: discordChannelJobs.finishedAt,
 };
@@ -285,6 +384,7 @@ type JobRow = {
   status: string;
   result: Record<string, unknown> | null;
   error: string | null;
+  nextAttemptAt: Date | null;
   createdAt: Date;
   finishedAt: Date | null;
 };
@@ -296,12 +396,13 @@ function toView(row: JobRow): DiscordChannelJobView {
     id: row.id,
     hackathonId: row.hackathonId,
     hackathonName: row.hackathonName,
-    status: row.status as DiscordChannelJobView["status"],
+    status: row.status === "retrying" ? "pending" : (row.status as DiscordChannelJobView["status"]),
     result,
     error: row.error,
     channelUrl: channelUrl(result),
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
+    nextAttemptAt: row.nextAttemptAt?.toISOString() ?? null,
   };
 }
 
@@ -330,7 +431,7 @@ export async function listOpenDiscordChannelJobs(limit = 25): Promise<DiscordCha
     .leftJoin(hackathons, eq(hackathons.id, discordChannelJobs.hackathonId))
     .where(
       or(
-        inArray(discordChannelJobs.status, ["pending", "running"]),
+        inArray(discordChannelJobs.status, ["pending", "running", "retrying"]),
         sql`${discordChannelJobs.status} = 'failed' and not exists (
           select 1 from discord_channel_jobs later
           where later.hackathon_id = ${discordChannelJobs.hackathonId} and later.created_at > ${discordChannelJobs.createdAt}

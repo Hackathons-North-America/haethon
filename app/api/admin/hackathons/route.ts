@@ -41,6 +41,9 @@ export async function POST(request: Request) {
     }
 
     const hackathonId = await createPublishedHackathon(payload, {
+      // Ticking "create a channel" (or naming one) is the admin's approval;
+      // otherwise the hackathon waits for a decision on /admin/import.
+      discordChannelDecision: createDiscordChannel || discordChannelId ? "approved" : null,
       syncDiscord: createDiscordChannel && !discordChannelId,
     });
 

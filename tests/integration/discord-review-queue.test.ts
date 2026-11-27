@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /* The review channel queue against a real database: posting once, staying in
@@ -43,24 +43,35 @@ const fakeRest = {
 
 vi.mock("@/lib/discord/rest", () => ({
   discordRest: () => fakeRest,
+  isRateLimitError: () => false,
   isUnknownChannelError: () => false,
 }));
-vi.mock("@/lib/discord/sync", () => ({
+// The channel preview and the tracked-channel query are real (they only read
+// the database); everything that would change a channel is a stub.
+vi.mock("@/lib/discord/sync", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/discord/sync")>()),
   ensureHackathonDiscordChannelOrThrow: vi.fn(async () => ({ reason: "stub", status: "skipped" })),
   reportHackathonSyncFailure: vi.fn(),
   syncHackathonDiscordChannel: vi.fn(async () => ({ reason: "stub", status: "skipped" })),
   syncHackathonDiscordChannelSafely: vi.fn(async () => null),
   guildChannelListingForPreview: vi.fn(async () => null),
-  previewDiscordChannel: vi.fn(() => ({ eligible: false })),
-  trackedDiscordChannelsQuery: vi.fn(),
 }));
 vi.mock("@/lib/hackathons/catalog", () => ({ revalidateHackathonCaches: vi.fn() }));
-vi.mock("@/lib/hackathons/image-ingest", () => ({ verifiedImageUrl: vi.fn(async () => null) }));
+vi.mock("@/lib/hackathons/image-ingest", () => ({
+  fetchVerifiedImage: vi.fn(async () => undefined),
+  verifiedImageUrl: vi.fn(async () => null),
+}));
 
 const { db } = await import("@/lib/db");
-const { discordGuilds, discordReviewItems, hackathonSubmissions, hackathons, users } = await import("@/lib/db/schema");
-const { claimReviewItem, drainDiscordReviewQueue, enqueueSubmissionReviews } = await import("@/lib/discord/review-queue");
+const { discordGuilds, discordReviewItems, hackathonExternalIds, hackathonSubmissions, hackathons, users } = await import("@/lib/db/schema");
+const { claimReviewItem, drainDiscordReviewQueue, enqueueReviewItems, enqueueSubmissionReviews } = await import("@/lib/discord/review-queue");
 const { runReviewAction } = await import("@/lib/discord/review-actions");
+const { importReviewItems } = await import("@/lib/discord/review-items");
+const { waitingWebsiteReviewItems } = await import("@/lib/discord/review-backfill");
+const { importAdminHackathons } = await import("@/lib/hackathons/review-service");
+const { decideImportCard } = await import("@/lib/hackathons/import-queue");
+const { requestHackathonDiscordChannel } = await import("@/lib/discord/channel-jobs");
+const { adminHackathonImportSchema } = await import("@/lib/validations/hackathon");
 
 let adminId: string;
 
@@ -235,5 +246,164 @@ describe("button actions", () => {
       ok: false,
     });
     expect((await itemFor(submissionId)).status).toBe("pending");
+  });
+});
+
+/* ---- The website's import queue, decided in Discord ---- */
+
+const DAY = 24 * 60 * 60 * 1000;
+
+function feedRow(name: string, extra: Record<string, unknown> = {}) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+  return {
+    name,
+    websiteUrl: `https://devpost.com/${slug}`,
+    sourceUrl: `https://devpost.com/${slug}`,
+    source: "devpost",
+    city: "Toronto",
+    region: "Ontario",
+    country: "Canada",
+    startDate: new Date(Date.now() + 20 * DAY).toISOString().slice(0, 10),
+    endDate: new Date(Date.now() + 21 * DAY).toISOString().slice(0, 10),
+    format: "in_person",
+    externalId: `devpost:${slug}`,
+    ...extra,
+  };
+}
+
+/* What the scraper route does: import in review mode, then queue the review items. */
+async function scraperImport(rows: Record<string, unknown>[]) {
+  const parsed = adminHackathonImportSchema.parse({ hackathons: rows });
+  const result = await importAdminHackathons({ payloads: parsed.hackathons, reviewerUserId: adminId, review: "queue", via: "scraper" });
+  await enqueueReviewItems(importReviewItems(parsed.hackathons, result.results));
+
+  return result;
+}
+
+async function channelItemFor(hackathonId: string) {
+  const [item] = await db
+    .select()
+    .from(discordReviewItems)
+    .where(and(eq(discordReviewItems.kind, "channel_decision"), eq(discordReviewItems.hackathonId, hackathonId)));
+
+  return item;
+}
+
+describe("the website's import queue in Discord", () => {
+  it("posts a card as its submission, and a yes in Discord publishes it as /admin/import would", async () => {
+    const result = await scraperImport([feedRow("Maple Feed Hacks")]);
+    const cardId = result.results[0].submissionId!;
+    const item = await itemFor(cardId);
+
+    expect(result.results[0].status).toBe("queued");
+    expect(item).toMatchObject({ kind: "submission", status: "pending" });
+
+    const approved = await runReviewAction({ action: "approve", actor: "james", itemId: item.id });
+
+    expect(approved).toMatchObject({ ok: true, view: { outcome: "Approved", resolvedBy: "@james", status: "resolved" } });
+    const [card] = await db.select().from(hackathonSubmissions).where(eq(hackathonSubmissions.id, cardId));
+    expect(card.status).toBe("approved");
+    // Through the import queue: the feed id is linked, so the next run updates it.
+    const links = await db.select().from(hackathonExternalIds).where(eq(hackathonExternalIds.hackathonId, card.approvedHackathonId!));
+    expect(links.map((link) => link.externalId)).toEqual(["devpost:maple-feed-hacks"]);
+    // Nobody was asked about the channel, so that is posted next.
+    expect(await channelItemFor(card.approvedHackathonId!)).toMatchObject({ status: "pending" });
+  });
+
+  it("remembers a no from Discord when the scraper sends the event again", async () => {
+    const cardId = (await scraperImport([feedRow("Not Really Hacks")])).results[0].submissionId!;
+    const item = await itemFor(cardId);
+
+    expect(await runReviewAction({ action: "reject", actor: "james", itemId: item.id, rejectionReason: "It's a meetup." })).toMatchObject({
+      ok: true,
+    });
+    const [card] = await db.select().from(hackathonSubmissions).where(eq(hackathonSubmissions.id, cardId));
+    expect(card).toMatchObject({ rejectionReason: "It's a meetup.", status: "rejected" });
+
+    const again = await scraperImport([feedRow("Not Really Hacks", { venue: "Somewhere New" })]);
+
+    expect(again.results[0]).toMatchObject({ status: "dismissed", submissionId: cardId });
+    expect(await db.select().from(hackathons)).toHaveLength(0);
+  });
+
+  it("takes the buttons off a card's message once it is decided on /admin/import", async () => {
+    const cardId = (await scraperImport([feedRow("Web Decided Hacks")])).results[0].submissionId!;
+    await drainDiscordReviewQueue();
+
+    await decideImportCard({ action: "reject", reviewerUserId: adminId, submissionId: cardId });
+    await drainDiscordReviewQueue();
+
+    expect(await itemFor(cardId)).toMatchObject({ outcome: "Rejected", resolvedBy: "the website", status: "resolved" });
+  });
+
+  it("merges a possible duplicate, or imports it as new, but never replaces the match", async () => {
+    await scraperImport([feedRow("Embodied Metal Hackathon", { autoApprove: true, source: "mlh", externalId: "mlh:embodied" })]);
+    const lookalike = feedRow("Embodied Metal Robotics Hackathon", { websiteUrl: "https://embodied.example.com", sourceUrl: "https://embodied.example.com" });
+    const flagged = await scraperImport([lookalike]);
+    const item = await itemFor(flagged.results[0].submissionId!);
+
+    expect(flagged.results[0].status).toBe("duplicate_flagged");
+    expect(await runReviewAction({ action: "replace", actor: "james", itemId: item.id })).toMatchObject({ ok: false });
+
+    const merged = await runReviewAction({ action: "merge", actor: "james", itemId: item.id });
+
+    expect(merged).toMatchObject({ ok: true, view: { outcome: "Merged into Embodied Metal Hackathon" } });
+    expect(await db.select().from(hackathons)).toHaveLength(1);
+  });
+
+  it("asks about the channel of an auto-approved event, and stores a no from Discord", async () => {
+    const result = await scraperImport([feedRow("Auto Maple Hacks", { autoApprove: true, source: "luma", externalId: "luma:auto" })]);
+    const hackathonId = result.results[0].hackathonId!;
+    const item = await channelItemFor(hackathonId);
+
+    expect(item).toMatchObject({ status: "pending" });
+    expect(await runReviewAction({ action: "nochannel", actor: "james", itemId: item.id })).toMatchObject({ ok: true });
+
+    const [row] = await db.select({ decision: hackathons.discordChannelDecision }).from(hackathons).where(eq(hackathons.id, hackathonId));
+    expect(row.decision).toBe("denied");
+  });
+
+  it("settles a channel decision made on the website", async () => {
+    const hackathonId = (await scraperImport([feedRow("Web Channel Hacks", { autoApprove: true, source: "luma", externalId: "luma:web" })]))
+      .results[0].hackathonId!;
+
+    await requestHackathonDiscordChannel(hackathonId, adminId);
+    await drainDiscordReviewQueue();
+
+    expect(await channelItemFor(hackathonId)).toMatchObject({ outcome: "Channel approved", resolvedBy: "the website", status: "resolved" });
+  });
+
+  it("approves the same website decision and runs its channel job after a Discord click", async () => {
+    const result = await scraperImport([feedRow("Discord Channel Hacks", { autoApprove: true, source: "luma", externalId: "luma:discord" })]);
+    const hackathonId = result.results[0].hackathonId!;
+    const item = await channelItemFor(hackathonId);
+
+    expect(await runReviewAction({ action: "channel", actor: "james", itemId: item.id })).toMatchObject({
+      ok: true,
+      view: { outcome: "Channel approved" },
+    });
+
+    const [row] = await db.select({ decision: hackathons.discordChannelDecision }).from(hackathons).where(eq(hackathons.id, hackathonId));
+    expect(row.decision).toBe("approved");
+    const { ensureHackathonDiscordChannelOrThrow } = await import("@/lib/discord/sync");
+    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledWith(hackathonId, { keepExisting: false });
+  });
+
+  it("backfills what is waiting on the website, once", async () => {
+    // Published and carded before anything was posted, e.g. a closed prompt.
+    const parsed = adminHackathonImportSchema.parse({
+      hackathons: [feedRow("Quiet Card Hacks"), feedRow("Quiet Channel Hacks", { autoApprove: true, externalId: "luma:quiet" })],
+    });
+    await importAdminHackathons({ payloads: parsed.hackathons, reviewerUserId: adminId, review: "queue", via: "upload" });
+
+    const first = await enqueueReviewItems(await waitingWebsiteReviewItems());
+    const second = await enqueueReviewItems(await waitingWebsiteReviewItems());
+
+    expect([first, second]).toEqual([2, 0]);
+    expect((await db.select({ kind: discordReviewItems.kind }).from(discordReviewItems)).map((row) => row.kind).sort()).toEqual([
+      "channel_decision",
+      "submission",
+    ]);
   });
 });

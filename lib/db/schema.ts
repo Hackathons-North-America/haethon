@@ -186,6 +186,13 @@ export const hackathons = pgTable(
     /* Discord username of one organizer hackers can ping. Required on the
        organizer submission form; null for scraped/community listings. */
     discordTag: varchar("discord_tag", { length: 32 }),
+    /* An admin's answer to "should this hackathon get a Discord channel?":
+       "approved" or "denied". Null means nobody has decided yet, and no
+       channel is made or reused for it until someone does (see
+       lib/discord/channel-decisions.ts). Being published says nothing about
+       the channel: auto-approved scraper events are published without asking,
+       but their channel still waits for an admin. */
+    discordChannelDecision: varchar("discord_channel_decision", { length: 16 }),
     /* "HNA approved" (Hackathons North America): an admin marked this
        hackathon as worth keeping in full. Hackathons without it lose their
        cover image 30 days after they end (lib/hackathons/cover-retention.ts);
@@ -210,6 +217,10 @@ export const hackathons = pgTable(
     index("hackathons_format_idx").on(table.format),
     index("hackathons_name_trgm_idx").using("gin", sql`${table.name} gin_trgm_ops`),
     uniqueIndex("hackathons_name_slug_idx").on(table.name, table.slug),
+    check(
+      "hackathons_discord_channel_decision_check",
+      sql`${table.discordChannelDecision} is null or ${table.discordChannelDecision} in ('approved', 'denied')`
+    ),
   ]
 );
 
@@ -666,6 +677,8 @@ export const discordChannelJobs = pgTable(
     result: jsonb("result").$type<Record<string, unknown>>(),
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    blocksQueue: boolean("blocks_queue").notNull().default(false),
     requestedByUserId: uuid("requested_by_user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     startedAt: timestamp("started_at", { withTimezone: true }),
@@ -676,7 +689,7 @@ export const discordChannelJobs = pgTable(
       .on(table.hackathonId)
       .where(sql`${table.status} = 'pending'`),
     index("discord_channel_jobs_status_created_idx").on(table.status, table.createdAt),
-    check("discord_channel_jobs_status_check", sql`${table.status} in ('pending', 'running', 'done', 'failed')`),
+    check("discord_channel_jobs_status_check", sql`${table.status} in ('pending', 'running', 'retrying', 'done', 'failed')`),
     check("discord_channel_jobs_kind_check", sql`${table.kind} in ('ensure', 'refresh')`),
   ]
 );

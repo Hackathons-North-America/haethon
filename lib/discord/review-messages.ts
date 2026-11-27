@@ -283,15 +283,23 @@ function pendingButtons(item: ReviewItemView, appUrl: string) {
       button("reject", item.id, "Reject", "❌", ButtonStyle.Danger),
     ];
 
+    const needsFix = item.submission?.payload.needsFix === true;
+    // A card from the website's import review queue (an upload or the
+    // scraper): decided as there, so a possible duplicate is merged or
+    // imported as new, never swapped for its match.
+    const importCard = item.submission?.payload.origin === "admin_import" && !needsFix;
+
     if (item.submission?.matchedHackathonId) {
       buttons.push(
         button("merge", item.id, "Merge into match", "🔀", ButtonStyle.Primary),
-        button("replace", item.id, "Replace match", "♻️", ButtonStyle.Secondary)
+        importCard
+          ? button("new", item.id, "Import as new", "🆕", ButtonStyle.Secondary)
+          : button("replace", item.id, "Replace match", "♻️", ButtonStyle.Secondary)
       );
     }
 
-    // Broken scraped imports have their own queue on the website.
-    const queuePath = item.submission?.payload.needsFix === true ? "/admin/broken" : "/admin/submissions";
+    // Broken scraped imports and import cards have their own queues on the website.
+    const queuePath = needsFix ? "/admin/broken" : importCard ? "/admin/import" : "/admin/submissions";
     buttons.push(linkButton("Open queue", `${appUrl}${queuePath}`));
 
     return [row(buttons)];

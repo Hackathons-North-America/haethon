@@ -56,8 +56,8 @@ export const config = {
        Fetched on every catalog visit and re-checked while the tab is open,
        so the proxy would add an invocation to each request.
      - /api/cron/*: authenticated by CRON_SECRET, not by a session.
-     - /api/discord/*: Discord's interaction webhooks, authenticated by their
-       Ed25519 signature, not by a session.
+     - /api/discord/*: Discord's signed interaction webhooks and the Vercel
+       Queue callback, which retrieves its message from the queue service.
      - /hackathons (exactly, not the pages under it): prerendered; per-viewer
        state loads in the browser, so Clerk would only add an invocation (and,
        for an expired token, a redirect round trip) to every visit and prefetch.

@@ -17,8 +17,36 @@ const {
   enqueueDiscordChannelJob,
   getDiscordChannelJobs,
   listOpenDiscordChannelJobs,
+  nextDiscordChannelJobAttempt,
+  denyHackathonDiscordChannel,
   requestHackathonDiscordChannel,
 } = await import("@/lib/discord/channel-jobs");
+const { RateLimitError } = await import("@discordjs/rest");
+
+function rateLimited(retryAfter = 540_000, global = false) {
+  return new RateLimitError({
+    global,
+    hash: "patch-channel",
+    limit: 2,
+    majorParameter: "123",
+    method: "PATCH",
+    retryAfter,
+    route: "/channels/:id",
+    scope: "shared",
+    sublimitTimeout: retryAfter,
+    timeToReset: retryAfter,
+    url: "https://discord.com/api/v10/channels/123",
+  });
+}
+
+async function decisionOf(hackathonId: string) {
+  const [row] = await db
+    .select({ decision: hackathons.discordChannelDecision })
+    .from(hackathons)
+    .where(eq(hackathons.id, hackathonId));
+
+  return row?.decision ?? null;
+}
 const { ensureHackathonDiscordChannelOrThrow, syncHackathonDiscordChannel } = await import("@/lib/discord/sync");
 
 let adminId: string;
@@ -190,6 +218,127 @@ describe("draining the queue", () => {
     await enqueueDiscordChannelJob({ hackathonId: waiting, kind: "ensure" });
 
     expect(await drainDiscordChannelJobs()).toBe(0);
+    expect(await nextDiscordChannelJobAttempt()).toBeGreaterThan(0);
     expect(ensureHackathonDiscordChannelOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("takes the event with the earliest registration deadline first", async () => {
+    const first = await createHackathon("Later Deadline Hacks");
+    const urgent = await createHackathon("Urgent Deadline Hacks");
+    await db.update(hackathonDates)
+      .set({ applicationClosesAt: new Date(Date.now() + 60_000) })
+      .where(eq(hackathonDates.hackathonId, urgent));
+    await enqueueDiscordChannelJob({ hackathonId: first, kind: "ensure" });
+    await enqueueDiscordChannelJob({ hackathonId: urgent, kind: "ensure" });
+
+    await drainDiscordChannelJobs();
+
+    expect(vi.mocked(ensureHackathonDiscordChannelOrThrow).mock.calls.map(([id]) => id)).toEqual([urgent, first]);
+  });
+});
+
+describe("the admin's decision", () => {
+  it("stores an approval with the job it queues", async () => {
+    const hackathonId = await createHackathon("Approved Hacks");
+
+    expect(await decisionOf(hackathonId)).toBeNull();
+    expect(await requestHackathonDiscordChannel(hackathonId, adminId)).toMatchObject({ status: "queued" });
+    expect(await decisionOf(hackathonId)).toBe("approved");
+  });
+
+  it("stores a denial and queues nothing", async () => {
+    const hackathonId = await createHackathon("Denied Hacks");
+
+    expect(await denyHackathonDiscordChannel(hackathonId)).toEqual({ status: "denied" });
+    expect(await decisionOf(hackathonId)).toBe("denied");
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
+    expect(await denyHackathonDiscordChannel("00000000-0000-4000-8000-000000000000")).toEqual({ status: "not_found" });
+  });
+
+  it("does not store an approval for a hackathon outside Canada and the US", async () => {
+    const elsewhere = await createHackathon("Lisbon Hacks", "Portugal");
+
+    await requestHackathonDiscordChannel(elsewhere, adminId);
+
+    expect(await decisionOf(elsewhere)).toBeNull();
+  });
+});
+
+describe("a rate-limited job", () => {
+  it("goes back in the queue without counting the attempt, and the drain moves on", async () => {
+    const limited = await createHackathon("Renamed Twice Hacks");
+    const next = await createHackathon("Next In Line Hacks");
+    const limitedJob = await enqueueDiscordChannelJob({ hackathonId: limited, kind: "refresh" });
+    const nextJob = await enqueueDiscordChannelJob({ hackathonId: next, kind: "refresh" });
+    vi.mocked(syncHackathonDiscordChannel).mockImplementation(async (hackathonId) => {
+      if (hackathonId === limited) {
+        throw rateLimited();
+      }
+
+      return { status: "skipped", reason: "stub" };
+    });
+
+    expect(await drainDiscordChannelJobs()).toBe(1);
+
+    // Tried once in this drain, not again: the same limit would only repeat.
+    expect(vi.mocked(syncHackathonDiscordChannel).mock.calls.map(([id]) => id)).toEqual([limited, next]);
+    const jobs = await getDiscordChannelJobs([limitedJob, nextJob]);
+    expect(jobs.find((job) => job.id === limitedJob)).toMatchObject({ status: "pending", error: null });
+    expect(jobs.find((job) => job.id === nextJob)).toMatchObject({ status: "done" });
+    const [row] = await db.select().from(discordChannelJobs).where(eq(discordChannelJobs.id, limitedJob));
+    expect(row).toMatchObject({ attempts: 0, startedAt: null, status: "retrying" });
+    expect(await nextDiscordChannelJobAttempt()).toBeGreaterThan(500);
+    expect(await drainDiscordChannelJobs()).toBe(0);
+
+    // A later drain, once Discord's limit has passed, runs it.
+    await db.update(discordChannelJobs).set({ nextAttemptAt: new Date(0) }).where(eq(discordChannelJobs.id, limitedJob));
+    vi.mocked(syncHackathonDiscordChannel).mockResolvedValue({ status: "skipped", reason: "stub" });
+    expect(await drainDiscordChannelJobs()).toBe(1);
+    expect((await getDiscordChannelJobs([limitedJob]))[0]).toMatchObject({ status: "done" });
+    expect(await nextDiscordChannelJobAttempt()).toBeNull();
+  });
+
+  it("keeps both jobs when another approval arrives during the first attempt", async () => {
+    const hackathonId = await createHackathon("Approved During A Retry");
+    const first = await enqueueDiscordChannelJob({ hackathonId, kind: "ensure" });
+    vi.mocked(ensureHackathonDiscordChannelOrThrow).mockImplementationOnce(async () => {
+      await requestHackathonDiscordChannel(hackathonId, adminId);
+      throw rateLimited();
+    });
+
+    expect(await drainDiscordChannelJobs()).toBe(0);
+    expect(await nextDiscordChannelJobAttempt()).toBeGreaterThan(500);
+    expect(await db.select().from(discordChannelJobs)).toHaveLength(2);
+
+    await db.update(discordChannelJobs).set({ nextAttemptAt: new Date(0) }).where(eq(discordChannelJobs.id, first));
+    expect(await drainDiscordChannelJobs()).toBe(2);
+  });
+
+  it("waits for a global Discord limit before attempting other jobs", async () => {
+    const first = await createHackathon("First Global Limit Hacks");
+    const next = await createHackathon("Next Global Limit Hacks");
+    const firstJob = await enqueueDiscordChannelJob({ hackathonId: first, kind: "ensure" });
+    await enqueueDiscordChannelJob({ hackathonId: next, kind: "ensure" });
+    vi.mocked(ensureHackathonDiscordChannelOrThrow).mockRejectedValueOnce(rateLimited(540_000, true));
+
+    expect(await drainDiscordChannelJobs()).toBe(0);
+    expect(ensureHackathonDiscordChannelOrThrow).toHaveBeenCalledTimes(1);
+    expect(await nextDiscordChannelJobAttempt()).toBeGreaterThan(500);
+
+    await db.update(discordChannelJobs).set({ nextAttemptAt: new Date(0) }).where(eq(discordChannelJobs.id, firstJob));
+    expect(await drainDiscordChannelJobs()).toBe(2);
+  });
+
+  it("is kept when the drain's time runs out right after it", async () => {
+    const limited = await createHackathon("Out Of Time Hacks");
+    const jobId = await enqueueDiscordChannelJob({ hackathonId: limited, kind: "refresh" });
+    vi.mocked(syncHackathonDiscordChannel).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      throw rateLimited();
+    });
+
+    await drainDiscordChannelJobs({ budgetMs: 10 });
+
+    expect((await getDiscordChannelJobs([jobId]))[0]).toMatchObject({ status: "pending" });
   });
 });

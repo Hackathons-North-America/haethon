@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { hackathonSubmissions, hackathons } from "@/lib/db/schema";
-import { drainDiscordChannelJobsSafely, getDiscordChannelJobs, requestHackathonDiscordChannel } from "@/lib/discord/channel-jobs";
+import { startDiscordChannelJobs } from "@/lib/discord/channel-job-worker";
+import {
+  denyHackathonDiscordChannel,
+  requestHackathonDiscordChannel,
+} from "@/lib/discord/channel-jobs";
 import { issuesText } from "@/lib/discord/form-fields";
 import { approvalCandidate, channelDecisionItem } from "@/lib/discord/review-items";
 import type { ReviewAction, ReviewItemKind, ReviewItemView } from "@/lib/discord/review-messages";
@@ -22,13 +26,17 @@ import {
   mergeImportedDuplicate,
   reviewHackathonSubmission,
 } from "@/lib/hackathons/review-service";
+import { isImportCardPayload } from "@/lib/hackathons/import-cards";
+import { decideImportCard, ImportCardError } from "@/lib/hackathons/import-queue";
 import { findScraperImportReviewerId } from "@/lib/hackathons/scraper-import";
 import { adminHackathonImportPayloadSchema } from "@/lib/validations/hackathon";
 
 const ACTIONS_BY_KIND: Record<ReviewItemKind, ReviewAction[]> = {
   channel_decision: ["channel", "nochannel"],
   import_duplicate: ["new", "dupmerge", "skip"],
-  submission: ["approve", "reject", "merge", "replace"],
+  // "new" is "import as new anyway", offered on an import card that may be a
+  // duplicate, where replacing the match is not offered.
+  submission: ["approve", "reject", "merge", "replace", "new"],
 };
 
 export function actionFitsKind(action: ReviewAction, kind: ReviewItemKind) {
@@ -57,11 +65,85 @@ export async function loadSubmissionForApproval(submissionId: string) {
   return submission ?? null;
 }
 
+/* A card from the website's import review queue: the same decision, through
+   the same code, as its Yes, No, Merge and "Import as new" on /admin/import. */
+async function runImportCardAction(input: ReviewActionInput, submissionId: string, reviewerUserId: string) {
+  if (input.action === "replace") {
+    throw new ReviewActionError("Import cards cannot replace their match. Merge into it, or import as new.");
+  }
+
+  if (input.action === "reject" && (input.rejectionReason?.trim().length ?? 0) < 3) {
+    throw new ReviewActionError("A rejection reason needs at least 3 characters.");
+  }
+
+  try {
+    const decision = await decideImportCard({
+      action: input.action === "new" ? "approve_new" : (input.action as "approve" | "merge" | "reject"),
+      rejectionReason: input.rejectionReason,
+      reviewerUserId,
+      submissionId,
+    });
+
+    if (decision.status === "rejected") {
+      return { hackathonId: null, outcome: `Rejected: ${input.rejectionReason?.trim()}` };
+    }
+
+    const { result } = decision;
+
+    if (result.status === "duplicate_flagged") {
+      // The card stays, now naming its match; the redrawn message offers merge.
+      throw new ReviewActionError(
+        `This looks like ${result.matchedName ?? "an existing hackathon"} (match ${result.duplicateScore.toFixed(2)}). ` +
+          "Merge into the match, or import it as new."
+      );
+    }
+
+    // Published here, so nobody was asked about its channel: that is posted next.
+    if (result.status === "imported" && result.hackathonId && result.discord?.eligible) {
+      const [card] = await db.select({ payload: hackathonSubmissions.payload }).from(hackathonSubmissions).where(eq(hackathonSubmissions.id, submissionId));
+      await enqueueReviewItems([channelDecisionItem(result.hackathonId, card?.payload ?? { name: result.name }, result.discord)]);
+    }
+
+    return {
+      hackathonId: result.hackathonId ?? null,
+      outcome:
+        result.status === "auto_merged"
+          ? `Merged into ${result.matchedName ?? "the match"}`
+          : result.status === "updated"
+            ? "Already imported; updated it"
+            : input.action === "new"
+              ? "Imported as new"
+              : "Approved",
+    };
+  } catch (error) {
+    if (error instanceof ImportCardError) {
+      const fields = error.details && typeof error.details === "object" ? (error.details as { fieldErrors?: Record<string, string[]> }).fieldErrors : undefined;
+      const detail = Object.entries(fields ?? {})
+        .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+        .join("\n");
+
+      throw new ReviewActionError(
+        error.code === "invalid" ? `${error.message} Fix it on /admin/import.${detail ? `\n${detail}` : ""}` : error.message
+      );
+    }
+
+    throw error;
+  }
+}
+
 async function runSubmissionAction(input: ReviewActionInput, submissionId: string | null, reviewerUserId: string) {
   const submission = submissionId ? await loadSubmissionForApproval(submissionId) : null;
 
   if (!submission) {
     throw new ReviewActionError("This submission no longer exists.");
+  }
+
+  if (isImportCardPayload(submission.payload) && submission.payload.needsFix !== true) {
+    return runImportCardAction(input, submission.id, reviewerUserId);
+  }
+
+  if (input.action === "new") {
+    throw new ReviewActionError("That button does not apply to this item.");
   }
 
   if (input.action === "reject") {
@@ -113,12 +195,18 @@ async function runSubmissionAction(input: ReviewActionInput, submissionId: strin
 }
 
 async function runChannelAction(action: ReviewAction, hackathonId: string | null, reviewerUserId: string) {
-  if (action === "nochannel") {
-    return { outcome: "No channel" };
-  }
-
   if (!hackathonId) {
     throw new ReviewActionError("This hackathon was deleted.");
+  }
+
+  if (action === "nochannel") {
+    // Stored, as on the website: no sync makes a channel for it later, and it
+    // leaves the channel decision queue on /admin/import.
+    if ((await denyHackathonDiscordChannel(hackathonId)).status === "not_found") {
+      throw new ReviewActionError("This hackathon was deleted.");
+    }
+
+    return { outcome: "No channel" };
   }
 
   const request = await requestHackathonDiscordChannel(hackathonId, reviewerUserId);
@@ -131,17 +219,8 @@ async function runChannelAction(action: ReviewAction, hackathonId: string | null
     return { outcome: `No channel: ${request.reason}` };
   }
 
-  await drainDiscordChannelJobsSafely();
-  const [job] = await getDiscordChannelJobs([request.jobId]);
-
-  if (job?.status === "failed") {
-    // Left pending so the button can be tried again.
-    throw new ReviewActionError(`The channel could not be created: ${job.error ?? "unknown error"}`);
-  }
-
-  const name = job?.result && "name" in job.result ? `#${String(job.result.name)}` : null;
-
-  return { outcome: job?.status === "done" ? `Channel created${name ? ` (${name})` : ""}` : "Channel queued" };
+  await startDiscordChannelJobs();
+  return { outcome: "Channel approved" };
 }
 
 async function runDuplicateAction(
@@ -179,7 +258,8 @@ async function runDuplicateAction(
     throw new ReviewActionError("The import did not create a hackathon.");
   }
 
-  if (result.status === "imported" && result.autoApprove !== true && result.discord?.eligible) {
+  // Auto-approval publishes without asking; the channel still needs a yes.
+  if (result.status === "imported" && result.discord?.eligible) {
     await enqueueReviewItems([channelDecisionItem(result.hackathonId, parsed.data, result.discord)]);
   }
 

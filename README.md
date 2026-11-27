@@ -285,12 +285,15 @@ to the event website and its Haethon detail page.
 
 Anything waiting on the team is posted to a private `#hackathon-review`
 channel with buttons: pending submissions (✅ Approve, ❌ Reject, and 🔀 Merge
-/ ♻️ Replace when a duplicate matched), the scraper's possible duplicates
-(🆕 Import as new, 🔀 Merge, 🗑️ Skip), and the scraper's new Canadian and US
-hackathons waiting on a channel (✅ Create channel, ❌ No channel). Approving a
-community tip, or a broken import, first opens a pop-up for its dates and
-location. Reviews done on the website update the Discord message, and the
-reverse.
+/ ♻️ Replace when a duplicate matched), cards from the import review queue on
+`/admin/import` (✅ Approve, ❌ Reject, and 🔀 Merge / 🆕 Import as new when a
+duplicate matched), and every Canadian and US hackathon waiting on a channel
+decision (✅ Create channel, ❌ No channel). Approving a community tip, or a
+broken import, first opens a pop-up for its dates and location. Reviews done
+on the website update the Discord message, and the reverse: an import card or
+a channel decision is the same database record in both places. The daily
+`sync-discord` cron also posts anything waiting on the website that was not
+posted yet.
 
 `/add-hackathon hacker` and `/add-hackathon organizer` take the same fields
 as the two tabs of the web form on `/submit`. Organizer mode runs as three
@@ -306,7 +309,7 @@ recorded under a `discord-bot` system account with the sender's Discord name.
    endpoint when you save.
 4. Run `pnpm discord:register-commands` to add `/add-hackathon` to the server.
 5. Optionally run `pnpm discord:post-review-backlog` to post the submissions
-   already waiting (`--dry-run` lists them first).
+   and channel decisions already waiting (`--dry-run` lists them first).
 
 The bot also needs **Embed Links** and **Read Message History**. It creates
 the channel the first time something is posted, hidden from everyone except
@@ -377,7 +380,7 @@ routes:
 
 | Route | Schedule (UTC) | Responsibility |
 | --- | --- | --- |
-| `/api/cron/sync-discord` | Daily at 12:08 | Create, sort, and archive Discord channels |
+| `/api/cron/sync-discord` | Daily at 12:08 | Rename, sort and archive approved Discord channels; post waiting reviews |
 | `/api/cron/cleanup-hackathons` | Daily at 12:12 | Perform stale-event housekeeping |
 
 Vercel automatically supplies `Authorization: Bearer $CRON_SECRET` to configured
@@ -395,9 +398,57 @@ import page sends (`{ "hackathons": [...] }`, at most 250 rows).
   and store the same value as the scraper repository's `HNA_IMPORT_SECRET`
   secret.
 - Imports are recorded under the longest-standing admin account.
-- A possible duplicate is never imported "as new anyway" here. It comes back as
-  `duplicate_flagged` with nothing written; the scraper saves those rows to
-  `duplicates.json` for the admin import page.
+- Only rows a trusted feed marked `autoApprove` are published. Nobody is
+  watching this import, so what needs a person is saved to the review queue on
+  `/admin/import` and reported back:
+
+  | Status | Meaning |
+  | --- | --- |
+  | `queued` | a row without `autoApprove`, saved as a card for a yes or no |
+  | `duplicate_flagged` (with `submissionId`) | a possible duplicate, saved as a card that names its match |
+  | `dismissed` | an event an admin already said no to; nothing is written |
+
+  A row for an event that is already published still updates it, with or
+  without `autoApprove`.
+- A body of `{ "needsReview": [...] }` (the scraper's `needs_review.json`
+  records) goes to the fix queue on `/admin/broken` instead. A record whose
+  source URL is already in that queue, in any state, is skipped.
+
+### Import review queue
+
+Cards waiting on `/admin/import` are pending `hackathon_submissions` rows
+whose payload carries `origin: "admin_import"`
+([`lib/hackathons/import-cards.ts`](lib/hackathons/import-cards.ts)), so the
+queue is the same after a closed tab, on another device and for another admin.
+An upload on that page works the same way as the scraper import: `autoApprove`
+rows are published at once and the rest become cards.
+
+A decision (`POST /api/admin/import-queue/:id`) runs the card through the same
+importer, resolving its row in the transaction that publishes or merges the
+hackathon. A "no" is kept: the event stays out when the scraper sends it
+again, matched by its feed ids, or by name and start day for a row without any.
+
+### Discord channel decisions
+
+`autoApprove` means a row may be published without asking. It never means a
+Discord channel: every hackathon's channel needs an admin's yes, stored in
+`hackathons.discord_channel_decision` (`approved`, `denied`, or null while
+nobody has decided). Every path that could make, reuse or move a channel goes
+through `channelDecisionBlock` in [`lib/discord/sync.ts`](lib/discord/sync.ts):
+the queued channel jobs, the daily sync, and the syncs after an edit, a merge
+or a feed update. A hackathon without an approval is left alone entirely.
+
+Undecided Canadian and US hackathons that are still ahead wait on
+`/admin/import` after the event cards, and in the Discord review channel.
+Approving queues the channel job; "no" is stored and not asked again. Ticking
+"create a channel" on the admin create form, or attaching an existing channel,
+counts as approval. A hackathon that already has a live channel is treated as
+approved (the daily sync backfills this).
+
+Discord calls that would wait out a rate limit longer than 5 seconds fail
+instead (`lib/discord/rest.ts`): a channel can be renamed twice per 10
+minutes, and waiting that out outlived the 60-second functions. The job goes
+back in the queue for a later drain.
 
 ## Deployment
 

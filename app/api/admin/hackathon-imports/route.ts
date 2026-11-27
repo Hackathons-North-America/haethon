@@ -1,6 +1,8 @@
 import { after, NextResponse } from "next/server";
 
 import { requireAdminUserId } from "@/lib/auth";
+import { importReviewItems } from "@/lib/discord/review-items";
+import { enqueueAndDrainSafely } from "@/lib/discord/review-queue";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
 import { importAdminHackathons } from "@/lib/hackathons/review-service";
 import { adminHackathonImportSchema } from "@/lib/validations/hackathon";
@@ -35,6 +37,12 @@ export async function POST(request: Request) {
       payloads: parsed.data.hackathons,
       reviewerUserId: gate.userId,
       ignoreDuplicates: parsed.data.ignoreDuplicates ?? false,
+      // An upload publishes only its auto-approved rows. Every other row, and
+      // any possible duplicate, is saved as a card in the review queue
+      // (lib/hackathons/import-queue.ts), where it waits for a yes or no
+      // however long that takes.
+      review: "queue",
+      via: "upload",
       // Validation, duplicate checks and the writes are done before the
       // response; image vetting and Discord run after it.
       defer: after,
@@ -44,6 +52,14 @@ export async function POST(request: Request) {
     // writes are committed. Channel jobs queued for auto-approved rows
     // invalidate again when they finish in the background.
     revalidateHackathonCaches();
+
+    // The cards and channel decisions this upload left waiting also go to the
+    // team's review channel in Discord; deciding in either place settles both.
+    const reviewItems = importReviewItems(parsed.data.hackathons, result.results);
+
+    if (reviewItems.length) {
+      after(() => enqueueAndDrainSafely(reviewItems));
+    }
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

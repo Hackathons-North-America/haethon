@@ -35,7 +35,9 @@ export async function POST(request: Request) {
       defer: after,
     });
     // Auto-merged items are already resolved; only queued ones belong in the review workspace.
-    const submissionIds = result.results.filter((item) => item.status === "queued").map((item) => item.submissionId);
+    const submissionIds = result.results.flatMap((item) =>
+      item.status === "queued" && item.submissionId ? [item.submissionId] : []
+    );
     after(() => enqueueAndDrainSafely(submissionReviewItems(submissionIds)));
     const importedSubmissions = await listHackathonSubmissions({
       limit: submissionIds.length,
