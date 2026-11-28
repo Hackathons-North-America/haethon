@@ -133,7 +133,7 @@ describe("renderReviewMessage", () => {
     expect(body.components).toEqual([]);
   });
 
-  it("offers create / no channel for a channel decision", () => {
+  it("asks whether a hackathon is HNA approved, with a channel for yes", () => {
     const body = renderReviewMessage(
       {
         hackathon: { name: "MapleHacks", slug: "maplehacks" },
@@ -153,7 +153,9 @@ describe("renderReviewMessage", () => {
       `rv:nochannel:${ITEM_ID}`,
       `${APP}/hackathons/maplehacks`,
     ]);
-    expect(body.embeds[0].description).toContain("Create **#maplehacks-2027** in Canada");
+    expect(body.embeds[0].title).toBe("Is MapleHacks HNA approved?");
+    expect(body.embeds[0].description).toContain("Approving creates **#maplehacks-2027** in Canada");
+    expect(buttons(body).map((button) => button.label)).toEqual(["HNA approved", "Not HNA approved", "View hackathon"]);
   });
 
   it("offers new / merge / skip for a duplicate, without merge once the match is gone", () => {

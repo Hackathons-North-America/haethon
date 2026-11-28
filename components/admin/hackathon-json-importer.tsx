@@ -372,7 +372,7 @@ export function HackathonJsonImporter({
           ? `${waitingCards} ${waitingCards === 1 ? "card is" : "cards are"} waiting for review.`
           : "Nothing is waiting for review.",
         waitingChannels
-          ? `${waitingChannels} ${waitingChannels === 1 ? "hackathon is" : "hackathons are"} waiting for a Discord channel decision.`
+          ? `${waitingChannels} ${waitingChannels === 1 ? "hackathon is" : "hackathons are"} waiting for HNA approval.`
           : "",
         progress.lost.length
           ? `${progress.lost.length} could not be imported or saved, so upload them again: ${progress.lost.slice(0, 5).join(", ")}${progress.lost.length > 5 ? "…" : ""}.`
@@ -528,18 +528,18 @@ export function HackathonJsonImporter({
 
     decidedDiscord.current.add(pendingDiscord.hackathonId);
 
-    // Nothing here waits: denying has no server side at all, and approving
-    // only queues the channel, so the next card is shown straight away.
+    // Nothing here waits: either answer is sent in the background (approving
+    // only queues the channel), so the next card is shown straight away.
     if (action === "approve") {
       void requestChannel(pendingDiscord.hackathonId, pendingDiscord.name);
-      say("success", `Imported. Discord channel #${pendingDiscord.discord.name} is being set up; it is listed below.`);
+      say("success", `Imported and HNA approved. Discord channel #${pendingDiscord.discord.name} is being set up; it is listed below.`);
     } else {
       const { hackathonId, name } = pendingDiscord;
-      say("success", "Discord channel denied. The hackathon stays published without one.");
+      say("success", "Imported, not HNA approved. The hackathon stays published without a Discord channel.");
       void denyChannel(hackathonId).then((ok) => {
         if (!ok) {
-          // Not stored: it comes back in the channel decisions on the next visit.
-          say("error", `The "no channel" for ${name} did not reach the server; it will be asked again.`);
+          // Not stored: it comes back in the HNA approval queue on the next visit.
+          say("error", `The "not HNA approved" for ${name} did not reach the server; it will be asked again.`);
         }
       });
     }
@@ -558,8 +558,8 @@ export function HackathonJsonImporter({
     setMessage(null);
   }
 
-  /* A yes or no on a hackathon waiting for a Discord channel. Approving
-     queues the channel (listed below as it is made); either answer is stored
+  /* A yes or no on whether a hackathon is HNA approved. Approving queues its
+     Discord channel (listed below as it is made); either answer is stored
      and the next one comes up straight away. */
   async function decideChannel(action: "approve" | "deny" | "later") {
     if (!channelCard) {
@@ -581,18 +581,18 @@ export function HackathonJsonImporter({
     if (action === "approve") {
       count("channels");
       void requestChannel(hackathonId, name);
-      say("success", `Discord channel #${channelCard.discord.name} for ${name} is being set up; it is listed below.`);
+      say("success", `${name} is HNA approved. Discord channel #${channelCard.discord.name} is being set up; it is listed below.`);
       return;
     }
 
     count("noChannel");
-    say("success", `No channel for ${name}. It stays published without one.`);
+    say("success", `${name} is not HNA approved. It stays published without a Discord channel.`);
 
     if (!(await denyChannel(hackathonId))) {
       // Not stored: put it back so the decision is not lost.
       setChannelCards((current) => [channelCard, ...current]);
       setTally((current) => ({ ...current, noChannel: current.noChannel - 1 }));
-      say("error", `The "no channel" for ${name} did not reach the server. Try again.`);
+      say("error", `The "not HNA approved" for ${name} did not reach the server. Try again.`);
     }
   }
 
@@ -655,7 +655,7 @@ export function HackathonJsonImporter({
     `${tally.merged} merged`,
     `${tally.updated} updated`,
     `${tally.declined} declined`,
-    ...(tally.channels + tally.noChannel ? [`${tally.channels} channels approved`, `${tally.noChannel} without a channel`] : []),
+    ...(tally.channels + tally.noChannel ? [`${tally.channels} HNA approved`, `${tally.noChannel} not HNA approved`] : []),
   ].join(" · ");
 
   return (
@@ -669,13 +669,13 @@ export function HackathonJsonImporter({
               : card
                 ? "Approve imported card"
                 : channelCard
-                  ? "Approve Discord channel"
+                  ? "HNA approval"
                   : "Scraped hackathons JSON"}
           </h2>
           <p aria-live="polite" className="mt-1 text-sm text-ink/55">
             {uploading && run
               ? `${run.done} of ${run.total} rows done`
-              : `${cards.length} waiting for review · ${channelCards.length} waiting for a channel decision${
+              : `${cards.length} waiting for review · ${channelCards.length} waiting for HNA approval${
                   reviewed ? ` · this visit: ${visitSummary}` : ""
                 }`}
           </p>
@@ -719,14 +719,14 @@ export function HackathonJsonImporter({
           {pendingDiscord && pendingDiscord.discord.action !== "create" ? (
             <div className="order-first flex flex-col rounded-xl border border-pine/20 bg-pine/5 p-4 xl:order-none xl:sticky xl:top-4">
               <div>
-                <p className="text-sm font-semibold text-ink">Create a Discord channel?</p>
+                <p className="text-sm font-semibold text-ink">Is it HNA approved?</p>
                 <p className="mt-2 text-sm leading-6 text-ink/55">
-                  Imported. This qualifies for the{" "}
-                  <span className="font-semibold text-ink">{pendingDiscord.discord.categoryName}</span> category.
-                  Approving will recycle the existing{" "}
+                  Imported. HNA approved hackathons get a Discord channel in the{" "}
+                  <span className="font-semibold text-ink">{pendingDiscord.discord.categoryName}</span> category:
+                  this one would recycle the existing{" "}
                   <span className="font-semibold text-ink">#{pendingDiscord.discord.existingChannelName}</span>{" "}
-                  channel named <span className="font-semibold text-ink">#{pendingDiscord.discord.name}</span> and
-                  place it there. Deny keeps the hackathon published without a channel.
+                  channel as <span className="font-semibold text-ink">#{pendingDiscord.discord.name}</span>. Not
+                  approved keeps the hackathon published without a channel.
                 </p>
               </div>
               <div className="mt-5 grid gap-3">
@@ -736,7 +736,7 @@ export function HackathonJsonImporter({
                   type="button"
                 >
                   <Check aria-hidden="true" className="size-4" />
-                  Approve channel
+                  HNA approved
                 </button>
                 <button
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger disabled:opacity-50"
@@ -744,7 +744,7 @@ export function HackathonJsonImporter({
                   type="button"
                 >
                   <X aria-hidden="true" className="size-4" />
-                  Deny channel
+                  Not HNA approved
                 </button>
               </div>
             </div>
@@ -849,12 +849,12 @@ export function HackathonJsonImporter({
       {channelCard && !uploading ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,42rem)_18rem] xl:items-start xl:justify-between">
           <div className="space-y-4">
-            <p className="text-sm text-ink/55">Published, waiting for a Discord channel decision</p>
+            <p className="text-sm text-ink/55">Published, waiting for HNA approval</p>
             <HackathonCardPreview compact payload={channelCard.payload} previewId={`channel-preview-${channelCard.hackathonId}`} />
           </div>
           <div className="order-first flex flex-col rounded-xl border border-pine/20 bg-pine/5 p-4 xl:order-none xl:sticky xl:top-4">
             <div>
-              <p className="text-sm font-semibold text-ink">Create a Discord channel?</p>
+              <p className="text-sm font-semibold text-ink">Is it HNA approved?</p>
               <p className="mt-2 text-sm leading-6 text-ink/55">
                 {channelCard.discord.action === "recycle" ? (
                   <>
@@ -867,8 +867,8 @@ export function HackathonJsonImporter({
                     Approving creates <span className="font-semibold text-ink">#{channelCard.discord.name}</span>
                   </>
                 )}{" "}
-                in <span className="font-semibold text-ink">{channelCard.discord.categoryName}</span>. No keeps the
-                hackathon published without a channel, and it is not asked again.
+                in <span className="font-semibold text-ink">{channelCard.discord.categoryName}</span>. Not approved
+                keeps the hackathon published without a channel, and it is not asked again.
               </p>
             </div>
             <div className="mt-5 grid gap-3">
@@ -879,7 +879,7 @@ export function HackathonJsonImporter({
                 type="button"
               >
                 <Check aria-hidden="true" className="size-4" />
-                Approve channel
+                HNA approved
               </button>
               <LaterButton disabled={busy || channelCards.length < 2} onClick={() => void decideChannel("later")} />
               <button
@@ -889,7 +889,7 @@ export function HackathonJsonImporter({
                 type="button"
               >
                 <X aria-hidden="true" className="size-4" />
-                No channel
+                Not HNA approved
               </button>
             </div>
           </div>
@@ -903,14 +903,13 @@ export function HackathonJsonImporter({
       {pendingDiscord && pendingDiscord.discord.action === "create" ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="w-full max-w-2xl rounded-2xl border border-pine/20 bg-surface p-8 shadow-2xl sm:p-12">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">New Discord channel</p>
-            <h2 className="mt-3 text-3xl font-semibold text-ink">Create a Discord channel?</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">HNA approval</p>
+            <h2 className="mt-3 text-3xl font-semibold text-ink">Is it HNA approved?</h2>
             <p className="mt-4 text-base leading-7 text-ink/55">
-              Imported. This qualifies for the{" "}
-              <span className="font-semibold text-ink">{pendingDiscord.discord.categoryName}</span> category.
-              Approving will create a new channel named{" "}
-              <span className="font-semibold text-ink">#{pendingDiscord.discord.name}</span> and place it there.
-              Deny keeps the hackathon published without a channel.
+              Imported. HNA approved hackathons get a Discord channel: this one would get a new channel named{" "}
+              <span className="font-semibold text-ink">#{pendingDiscord.discord.name}</span> in the{" "}
+              <span className="font-semibold text-ink">{pendingDiscord.discord.categoryName}</span> category. Not
+              approved keeps the hackathon published without a channel.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
@@ -919,7 +918,7 @@ export function HackathonJsonImporter({
                 type="button"
               >
                 <Check aria-hidden="true" className="size-5" />
-                Approve channel
+                HNA approved
               </button>
               <button
                 className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full border border-danger px-4 text-base font-semibold text-danger disabled:opacity-50"
@@ -927,7 +926,7 @@ export function HackathonJsonImporter({
                 type="button"
               >
                 <X aria-hidden="true" className="size-5" />
-                Deny channel
+                Not HNA approved
               </button>
             </div>
           </div>

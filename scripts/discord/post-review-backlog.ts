@@ -38,7 +38,7 @@ async function main() {
 
   const channels = await listChannelDecisionCards();
 
-  console.log(`${pending.length} pending submission(s), ${channels.length} hackathon(s) waiting for a channel decision.`);
+  console.log(`${pending.length} pending submission(s), ${channels.length} hackathon(s) waiting for HNA approval.`);
 
   if (dryRun) {
     pending.forEach((submission) => console.log(`- ${submission.name}`));

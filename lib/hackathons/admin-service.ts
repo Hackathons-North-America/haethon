@@ -25,6 +25,7 @@ import type { HackathonSource } from "@/lib/hackathons/source-provenance";
 import { deriveHackathonStatus } from "@/lib/hackathons/utils";
 import { orderAdminHackathonRows } from "@/lib/hackathons/admin-ordering";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
+import { hnaApprovalValues } from "@/lib/hackathons/hna-approval";
 import { ensureHackathonSeries } from "@/lib/hackathons/series";
 import { adminHackathonUpdateSchema } from "@/lib/validations/hackathon";
 
@@ -160,11 +161,15 @@ export async function setHackathonSource(hackathonId: string, source: HackathonS
 }
 
 /**
- * Sets or clears "HNA approved". Approved hackathons keep their cover image
- * for good; the rest lose it 30 days after they end
- * (lib/hackathons/cover-retention.ts). hnaApprovedAt records the approval and
- * is cleared with it. Writing the current value again is a no-op, so the
- * timestamp keeps the original approval.
+ * Sets or clears "HNA approved" from the website's edit dialog. It is the
+ * same answer as the Discord review card's (lib/hackathons/hna-approval.ts):
+ * approved hackathons keep their cover image for good (the rest lose it 30
+ * days after they end, lib/hackathons/cover-retention.ts), and a Canadian or
+ * US one gets its Discord channel from the sync that follows the save.
+ * Clearing it stores "not HNA approved", so it is not asked about again; a
+ * channel it already has is left alone. hnaApprovedAt records the approval
+ * and is cleared with it. Writing the current value again is a no-op, so the
+ * timestamp keeps the original approval and an untouched box decides nothing.
  *
  * Approving an ended hackathon whose thumbnails were held back by retention
  * makes them now (after the response). A cover the cleanup already deleted is
@@ -174,7 +179,7 @@ export async function setHackathonHnaApproved(hackathonId: string, approved: boo
   const now = new Date();
   const [changed] = await db
     .update(hackathons)
-    .set({ hnaApproved: approved, hnaApprovedAt: approved ? now : null, updatedAt: now })
+    .set({ ...hnaApprovalValues(approved), updatedAt: now })
     .where(and(eq(hackathons.id, hackathonId), ne(hackathons.hnaApproved, approved)))
     .returning({ imageUrl: hackathons.imageUrl, imageThumbSmallUrl: hackathons.imageThumbSmallUrl });
 

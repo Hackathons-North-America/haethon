@@ -258,17 +258,18 @@ describe("uploading JSON", () => {
   });
 });
 
-describe("Discord channel decisions", () => {
+describe("HNA approval decisions", () => {
   it("come up once the event cards are done", async () => {
     respond = () => ({ body: { data: { status: "rejected" } } });
     await mount([card("c1", "First Hack")], [channelCard("h1", "Maple Hacks")]);
 
-    expect(text()).toContain("1 waiting for review · 1 waiting for a channel decision");
-    expect(text()).not.toContain("Create a Discord channel?");
+    expect(text()).toContain("1 waiting for review · 1 waiting for HNA approval");
+    expect(text()).not.toContain("Is it HNA approved?");
 
     await click("No");
 
-    expect(text()).toContain("Approve Discord channel");
+    expect(text()).toContain("HNA approval");
+    expect(text()).toContain("Is it HNA approved?");
     expect(text()).toContain("Maple Hacks");
     expect(text()).toContain("Approving creates #jan-16-maple-hacks in Canada Hackathons");
   });
@@ -280,10 +281,10 @@ describe("Discord channel decisions", () => {
         : { body: { data: { jobs: [] } } };
     await mount([], [channelCard("h1", "Maple Hacks"), channelCard("h2", "Birch Hacks", "recycle")]);
 
-    await click("Approve channel");
+    await click("HNA approved");
 
     expect(calls[0]).toEqual({ body: { action: "approve" }, method: "POST", url: "/api/admin/hackathons/h1/discord-channel" });
-    expect(text()).toContain("1 channels approved");
+    expect(text()).toContain("1 HNA approved");
     expect(text()).toContain("Birch Hacks");
     expect(text()).toContain("recycles the existing #maple-hacks channel");
   });
@@ -293,17 +294,17 @@ describe("Discord channel decisions", () => {
     respond = () => (ok ? { body: { data: { status: "denied" } } } : { body: { error: "down" }, status: 500 });
     await mount([], [channelCard("h1", "Maple Hacks"), channelCard("h2", "Birch Hacks")]);
 
-    await click("No channel");
+    await click("Not HNA approved");
 
     expect(calls[0]).toEqual({ body: { action: "deny" }, method: "POST", url: "/api/admin/hackathons/h1/discord-channel" });
-    expect(text()).toContain("1 without a channel");
+    expect(text()).toContain("1 not HNA approved");
     expect(text()).toContain("Birch Hacks");
 
     ok = false;
-    await click("No channel");
+    await click("Not HNA approved");
 
     expect(text()).toContain("did not reach the server");
-    expect(text()).toContain("1 waiting for a channel decision");
+    expect(text()).toContain("1 waiting for HNA approval");
     expect(text()).toContain("Birch Hacks");
   });
 
@@ -329,7 +330,7 @@ describe("Discord channel decisions", () => {
     await mount([card("c1", "First Hack")]);
 
     await click("Yes");
-    await click("Deny channel");
+    await click("Not HNA approved");
 
     expect(calls.map((call) => [call.url, call.body])).toEqual([
       ["/api/admin/import-queue/c1", { action: "approve" }],

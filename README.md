@@ -287,11 +287,12 @@ Anything waiting on the team is posted to a private `#hackathon-review`
 channel with buttons: pending submissions (✅ Approve, ❌ Reject, and 🔀 Merge
 / ♻️ Replace when a duplicate matched), cards from the import review queue on
 `/admin/import` (✅ Approve, ❌ Reject, and 🔀 Merge / 🆕 Import as new when a
-duplicate matched), and every Canadian and US hackathon waiting on a channel
-decision (✅ Create channel, ❌ No channel). Approving a community tip, or a
+duplicate matched), and every Canadian and US hackathon waiting on its HNA
+approval (✅ HNA approved, which gives it a Discord channel, ❌ Not HNA
+approved). Approving a community tip, or a
 broken import, first opens a pop-up for its dates and location. Reviews done
 on the website update the Discord message, and the reverse: an import card or
-a channel decision is the same database record in both places. The daily
+an HNA approval is the same database record in both places. The daily
 `sync-discord` cron also posts anything waiting on the website that was not
 posted yet.
 
@@ -309,7 +310,7 @@ recorded under a `discord-bot` system account with the sender's Discord name.
    endpoint when you save.
 4. Run `pnpm discord:register-commands` to add `/add-hackathon` to the server.
 5. Optionally run `pnpm discord:post-review-backlog` to post the submissions
-   and channel decisions already waiting (`--dry-run` lists them first).
+   and HNA approvals already waiting (`--dry-run` lists them first).
 
 The bot also needs **Embed Links** and **Read Message History**. It creates
 the channel the first time something is posted, hidden from everyone except
@@ -428,22 +429,47 @@ importer, resolving its row in the transaction that publishes or merges the
 hackathon. A "no" is kept: the event stays out when the scraper sends it
 again, matched by its feed ids, or by name and start day for a row without any.
 
-### Discord channel decisions
+### HNA approval and Discord channels
 
 `autoApprove` means a row may be published without asking. It never means a
-Discord channel: every hackathon's channel needs an admin's yes, stored in
-`hackathons.discord_channel_decision` (`approved`, `denied`, or null while
-nobody has decided). Every path that could make, reuse or move a channel goes
-through `channelDecisionBlock` in [`lib/discord/sync.ts`](lib/discord/sync.ts):
-the queued channel jobs, the daily sync, and the syncs after an edit, a merge
-or a feed update. A hackathon without an approval is left alone entirely.
+Discord channel. A Canadian or US hackathon gets a channel only if it is
+**HNA approved**. That is one answer stored in two columns, always written
+together by [`lib/hackathons/hna-approval.ts`](lib/hackathons/hna-approval.ts):
+`hackathons.hna_approved` (which also keeps the cover, see
+[`docs/cover-retention.md`](docs/cover-retention.md)) and
+`hackathons.discord_channel_decision` (`approved`, `denied` for "not HNA
+approved", or null while nobody has decided). Every path that could make,
+reuse or move a channel goes through `channelDecisionBlock` in
+[`lib/discord/sync.ts`](lib/discord/sync.ts): the queued channel jobs, the
+daily sync, and the syncs after an edit, a merge or a feed update. A hackathon
+without approval is left alone entirely.
 
 Undecided Canadian and US hackathons that are still ahead wait on
-`/admin/import` after the event cards, and in the Discord review channel.
-Approving queues the channel job; "no" is stored and not asked again. Ticking
-"create a channel" on the admin create form, or attaching an existing channel,
-counts as approval. A hackathon that already has a live channel is treated as
-approved (the daily sync backfills this).
+`/admin/import` after the event cards, and in the Discord review channel
+("Is it HNA approved?"). Approving queues the channel job; "not approved" is
+stored and not asked again. The **HNA approved** box in the admin edit dialog,
+ticking "create a channel" on the admin create form, and attaching an existing
+channel all count as approval. A hackathon that already has a live channel is
+treated as approved (the daily sync backfills this).
+
+The yearly cycle:
+
+1. **The event ends.** The daily sync moves its channel into
+   `past-hackathons-h1/h2-YYYY`. An HNA-approved hackathon's channel is never
+   deleted by the 30-day cleanup, so it waits there.
+2. **It comes back.** The next edition is imported as a new hackathon in the
+   same series. If the series' latest decided edition was HNA approved, the new
+   one inherits that, with no card. A "not approved" is not inherited, so that
+   series is asked about again. The import queues the channel job, and the
+   daily sync also catches what the import missed.
+3. **The channel returns.** The sync moves the series' channel back to the
+   Canadian or US category and renames it to the new start date
+   (`mar-14-hack-name`; a name an admin pinned is kept). It posts and pins a
+   fresh intro with the new dates, location and links
+   ([`lib/discord/channel-intro.ts`](lib/discord/channel-intro.ts)), and
+   unpins the bot's old one. A series' channel always follows its newest
+   approved edition, and no channel is ever created for an event that has
+   already ended.
 
 Discord calls that would wait out a rate limit longer than 5 seconds fail
 instead (`lib/discord/rest.ts`): a channel can be renamed twice per 10

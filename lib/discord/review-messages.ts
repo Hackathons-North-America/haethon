@@ -19,6 +19,8 @@ export const REVIEW_ACTIONS = [
   "reject",
   "merge",
   "replace",
+  // The HNA approval card's yes and no. The ids predate the card asking about
+  // HNA approval and are kept so cards already posted still work.
   "channel",
   "nochannel",
   "new",
@@ -173,11 +175,11 @@ function outcomeColor(outcome: string | null) {
     return REVIEW_COLORS.neutral;
   }
 
-  if (/^(approved|merged|imported|channel|replaced)/i.test(outcome)) {
+  if (/^(approved|merged|imported|channel|replaced|hna approved)/i.test(outcome)) {
     return REVIEW_COLORS.approved;
   }
 
-  if (/^rejected/i.test(outcome)) {
+  if (/^(rejected|not hna approved)/i.test(outcome)) {
     return REVIEW_COLORS.rejected;
   }
 
@@ -244,19 +246,22 @@ function submissionEmbed(item: ReviewItemView, submission: ReviewSubmissionView,
   };
 }
 
+/* "Is this hackathon HNA approved?" for a published Canadian or US event.
+   Yes makes it HNA approved and gives it a Discord channel; no records that
+   it isn't, so it gets no channel and is not asked about again. */
 function channelDecisionEmbed(item: ReviewItemView): APIEmbed {
   const payload = item.payload ?? {};
   const preview = (payload.discord ?? {}) as { action?: string; categoryName?: string; existingChannelName?: string | null; name?: string };
   const plan =
     preview.action === "recycle" && preview.existingChannelName
-      ? `Reuse **#${preview.existingChannelName}** in ${preview.categoryName ?? "its category"}`
-      : `Create **#${preview.name ?? "a channel"}** in ${preview.categoryName ?? "its category"}`;
+      ? `reuses **#${preview.existingChannelName}** in ${preview.categoryName ?? "its category"}`
+      : `creates **#${preview.name ?? "a channel"}** in ${preview.categoryName ?? "its category"}`;
 
   return {
     color: item.status === "pending" ? REVIEW_COLORS.pending : outcomeColor(item.outcome),
-    description: `Imported by the scraper and already published. Should it get a Discord channel?\n${plan}`,
+    description: `Imported and already published. Is it HNA approved?\nApproving ${plan}. Not approved means no Discord channel.`,
     fields: [field("Dates", dateRangeText(payload)), field("Location", locationText(payload))],
-    title: clip(`Channel for ${str(payload, "name") || "an imported hackathon"}?`, 256),
+    title: clip(`Is ${str(payload, "name") || "this hackathon"} HNA approved?`, 256),
     url: str(payload, "websiteUrl") || undefined,
   };
 }
@@ -310,8 +315,8 @@ function pendingButtons(item: ReviewItemView, appUrl: string) {
 
   if (item.kind === "channel_decision") {
     const buttons = [
-      button("channel", item.id, "Create channel", "✅", ButtonStyle.Success),
-      button("nochannel", item.id, "No channel", "❌", ButtonStyle.Danger),
+      button("channel", item.id, "HNA approved", "✅", ButtonStyle.Success),
+      button("nochannel", item.id, "Not HNA approved", "❌", ButtonStyle.Danger),
     ];
 
     if (item.hackathon) {

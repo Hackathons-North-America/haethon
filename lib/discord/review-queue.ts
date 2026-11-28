@@ -253,16 +253,17 @@ export async function reconcileReviewItems() {
           updated_at = now(), message_stale = i.message_snowflake is not null
       where i.kind = 'channel_decision' and i.status = 'pending'
         and exists (select 1 from discord_channels c where c.hackathon_id = i.hackathon_id)`),
-    // Decided on the website's channel queue (hackathons.discord_channel_decision).
+    // Decided somewhere else: the website's queue or its HNA approved box, or
+    // carried over from the series' previous edition (lib/hackathons/hna-approval.ts).
     db.execute(sql`
       update discord_review_items i
       set status = 'resolved',
-          outcome = case h.discord_channel_decision when 'denied' then 'No channel' else 'Channel approved' end,
+          outcome = case h.discord_channel_decision when 'denied' then 'Not HNA approved' else 'HNA approved' end,
           resolved_by = 'the website', resolved_at = now(), updated_at = now(),
           message_stale = i.message_snowflake is not null
       from hackathons h
       where i.kind = 'channel_decision' and i.status = 'pending'
-        and h.id = i.hackathon_id and h.discord_channel_decision is not null`),
+        and h.id = i.hackathon_id and (h.discord_channel_decision is not null or h.hna_approved)`),
     db.execute(sql`
       update discord_review_items
       set status = 'pending', outcome = null, resolved_by = null, resolved_at = null, updated_at = now(),
