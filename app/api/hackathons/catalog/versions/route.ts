@@ -4,10 +4,12 @@ import { catalogVersionsBody, respondWithCatalogFile } from "@/lib/hackathons/ca
    /hackathons tab fetches this every minute and re-downloads only the files
    it holds an older version of (lib/hackathons/catalog-client.ts), so staying
    current costs almost nothing while nothing changes. Regenerated as often as
-   the votes file, from the same cached data the files are made from. Static
-   and outside Clerk's proxy like them (see ../route.ts). */
+   the votes file (every 10 minutes, see ../votes/route.ts), from the same
+   data the files are made from; the CDN answers the checks in between, and a
+   catalog write still reaches it at once through the catalog's cache tag.
+   Static and outside Clerk's proxy like them (see ../route.ts). */
 export const dynamic = "force-static";
-export const revalidate = 60;
+export const revalidate = 600;
 
 export function GET() {
   return respondWithCatalogFile("catalog-versions-file", catalogVersionsBody, {

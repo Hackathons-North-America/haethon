@@ -11,21 +11,30 @@ import { config } from "@/proxy";
 
 /* Next's own matcher compiler: exported at runtime, absent from its types. */
 const { getMiddlewareMatchers } = pageStaticInfo as unknown as {
-  getMiddlewareMatchers: (matcher: readonly string[], nextConfig: { basePath: string }) => { regexp: string }[];
+  getMiddlewareMatchers: (
+    matcher: typeof config.matcher,
+    nextConfig: { basePath: string }
+  ) => { regexp: string; has?: { type: string; key: string }[] }[];
 };
 
 /* Compiled exactly the way `next build` compiles them, so this asserts on the
    routing table Vercel receives rather than on a hand-rolled approximation. */
-const matchers = getMiddlewareMatchers(config.matcher, { basePath: "" }).map((matcher) => new RegExp(matcher.regexp));
+const matchers = getMiddlewareMatchers(config.matcher, { basePath: "" }).map((matcher) => ({
+  regexp: new RegExp(matcher.regexp),
+  has: matcher.has ?? [],
+}));
 
-function runsProxy(pathname: string) {
-  return matchers.some((regexp) => regexp.test(pathname));
+/* `headers` are lower-case names present on the request. */
+function runsProxy(pathname: string, headers: string[] = []) {
+  return matchers.some(
+    ({ regexp, has }) =>
+      regexp.test(pathname) && has.every((condition) => condition.type === "header" && headers.includes(condition.key))
+  );
 }
 
 describe("proxy matcher", () => {
   it.each([
     "/",
-    "/hackathons/some-hackathon",
     "/my",
     "/account",
     "/account/settings",
@@ -51,6 +60,8 @@ describe("proxy matcher", () => {
   it.each([
     "/hackathons",
     "/hackathons/",
+    "/hackathons/some-hackathon",
+    "/hackathons/some-hackathon/",
     "/about",
     "/corporate",
     "/discord",
@@ -74,6 +85,16 @@ describe("proxy matcher", () => {
     expect(runsProxy(pathname)).toBe(false);
   });
 
+  /* Client-side navigation to a hackathon inside the app is intercepted by
+     the side panel, which reads the session; only document requests for the
+     static full page skip the proxy. */
+  it.each(["/hackathons/some-hackathon", "/hackathons/some-hackathon/"])(
+    "runs Clerk on the RSC request for %s",
+    (pathname) => {
+      expect(runsProxy(pathname, ["rsc"])).toBe(true);
+    }
+  );
+
   /* The exclusions are anchored, so a protected route that merely shares a
      prefix with an excluded one still goes through auth. */
   it.each([
@@ -92,6 +113,7 @@ describe("proxy matcher", () => {
     "/api/discordant",
     "/api/discord",
     "/hackathons-archive",
+    "/hackathons/some-hackathon/edit",
     "/api/hackathons/catalogs",
     "/api/hackathons/catalog-admin",
   ])("still runs Clerk on the look-alike %s", (pathname) => {

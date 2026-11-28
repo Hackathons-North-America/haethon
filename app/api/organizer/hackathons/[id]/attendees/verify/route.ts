@@ -39,7 +39,7 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     // Trust-tier upgrades surface on the shared profile page.
-    revalidatePublicProfiles();
+    revalidatePublicProfiles(parsed.data.userIds);
 
     return NextResponse.json({
       data: {

@@ -54,6 +54,7 @@ async function getHackathon(slug: string) {
       acceptanceAt: hackathonDates.acceptanceAt,
       tagNames: tagNamesSql,
       discordChannelLink: discordLinkSql,
+      ...voteFieldsSql(null),
     })
     .from(hackathons)
     .leftJoin(organizations, eq(organizations.id, hackathons.organizationId))
@@ -68,9 +69,16 @@ async function getHackathon(slug: string) {
     return null;
   }
 
-  const { tagNames, discordChannelLink, ...hackathon } = row;
+  const { tagNames, discordChannelLink, upvotes, downvotes, viewerVote, ...hackathon } = row;
 
-  return { hackathon, tagRows: tagNames.map((name) => ({ name })), discordChannelLink };
+  return {
+    hackathon,
+    tagRows: tagNames.map((name) => ({ name })),
+    discordChannelLink,
+    /* Public totals as of this cache entry (no viewer vote), for the static
+       full page; signed-in viewers get live ones through card-state. */
+    publicVotes: voteStateFromRow({ upvotes, downvotes, viewerVote }),
+  };
 }
 
 export type HackathonDetail = NonNullable<Awaited<ReturnType<typeof getHackathon>>>["hackathon"];
@@ -90,9 +98,9 @@ function reviveHackathonDates(hackathon: HackathonDetail): HackathonDetail {
 }
 
 /* Everything on the detail view that isn't user-specific — the hackathon row,
-   its tags, and the Discord link — cached across requests per slug so popular
+   its tags, the Discord link and the public vote totals — cached across requests per slug so popular
    hackathons stop re-querying identical public data on every view. */
-const getCachedHackathonPageData = unstable_cache(getHackathon, ["hackathon-detail"], {
+const getCachedHackathonPageData = unstable_cache(getHackathon, ["hackathon-detail", "public-votes"], {
   revalidate: 600,
   tags: ["hackathon-detail"],
 });

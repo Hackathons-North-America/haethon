@@ -53,7 +53,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       isSaved: userHackathons.isSaved,
     });
 
-  revalidatePublicProfiles();
+  revalidatePublicProfiles([userContext.userId]);
 
   return NextResponse.json({ data: tracked });
 }
@@ -73,7 +73,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     .delete(userHackathons)
     .where(and(eq(userHackathons.userId, userContext.userId), eq(userHackathons.hackathonId, id)));
 
-  revalidatePublicProfiles();
+  revalidatePublicProfiles([userContext.userId]);
 
   return NextResponse.json({ data: { hackathonId: id } });
 }

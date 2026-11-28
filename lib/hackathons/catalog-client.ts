@@ -23,7 +23,7 @@ import type { ViewerCardState } from "@/lib/hackathons/viewer-card-state";
      visitor who only browses the first page never pays for it. A card drawn
      before they arrive shows a placeholder where its blurb goes, filled in
      when they land.
-   - votes: the vote totals, regenerated every minute rather than every ten.
+   - votes: the vote totals, regenerated on their own 10-minute schedule.
      Until they arrive a card shows no score, and a "Top voted" search waits
      for them (they are a few KB, so it's rarely long).
 
@@ -72,8 +72,9 @@ export type CatalogVersionsResponse = Record<CatalogFileName, string | null>;
 
 export type CatalogFileName = "catalog" | "descriptions" | "votes";
 
-/* How often an open tab asks for …/versions while it is visible (the file is
-   regenerated as often). Coming back to the tab asks at once, unless it was
+/* How often an open tab asks for …/versions while it is visible. The file
+   is regenerated every 10 minutes, or at once after a catalog write, and the
+   CDN answers the checks in between. Coming back to the tab asks at once, unless it was
    asked in the last 30 seconds. */
 export const CATALOG_RECHECK_MS = 60 * 1000;
 const RECHECK_ON_RETURN_MS = 30 * 1000;

@@ -15,7 +15,7 @@ import {
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
 import { loadProfilePageData, type ProfilePageData } from "@/lib/profile/profile-page-data";
-import { PUBLIC_PROFILE_CACHE_TAG } from "@/lib/profile/public-profile-cache";
+import { publicProfileCacheTag } from "@/lib/profile/public-profile-cache";
 import { sanitizeSkills } from "@/lib/profile/skills";
 import { isProfileUsername } from "@/lib/profile/username";
 
@@ -25,8 +25,8 @@ import { isProfileUsername } from "@/lib/profile/username";
 
    Freshness is unchanged from the previous per-request rendering, which read
    the same data through unstable_cache: every profile-affecting write calls
-   revalidatePublicProfiles(), whose tag is recorded on these pages too, and
-   the ten-minute window is the backstop. */
+   revalidatePublicProfiles() with the users it changed, whose tags are
+   recorded on these pages too, and the ten-minute window is the backstop. */
 export const revalidate = 600;
 
 /* No profiles are built at deploy time; each is generated on its first visit. */
@@ -68,23 +68,48 @@ async function loadSharedProfile(username: string) {
   return row ?? null;
 }
 
-/* Everything on this page that isn't viewer-specific — the profile row plus
-   the whole hackathon-history fan-out — cached across requests per username,
-   so a shared profile link stops re-running four join-heavy queries on every
-   view. */
-const getCachedPublicProfile = unstable_cache(
+/* A username never changes owner (usernames are permanent), so its user id
+   is cached without a tag. */
+const getCachedProfileUserId = unstable_cache(
   async (username: string) => {
-    const profile = await loadSharedProfile(username);
-
-    if (!profile) {
+    if (!isProfileUsername(username)) {
       return null;
     }
 
-    return { profile, profileData: await loadProfilePageData(profile.userId) };
+    const [row] = await db.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
+
+    return row?.id ?? null;
   },
-  [PUBLIC_PROFILE_CACHE_TAG],
-  { revalidate: 600, tags: [PUBLIC_PROFILE_CACHE_TAG] }
+  ["public-profile-user-id"],
+  { revalidate: 600 }
 );
+
+/* Everything on this page that isn't viewer-specific — the profile row plus
+   the whole hackathon-history fan-out — cached across requests per username,
+   so a shared profile link stops re-running four join-heavy queries on every
+   view. Tagged with the owner's id, which is why the id is looked up first:
+   another user's writes leave this profile's cache alone. */
+async function getCachedPublicProfile(username: string) {
+  const userId = await getCachedProfileUserId(username);
+
+  if (!userId) {
+    return null;
+  }
+
+  return unstable_cache(
+    async () => {
+      const profile = await loadSharedProfile(username);
+
+      if (!profile) {
+        return null;
+      }
+
+      return { profile, profileData: await loadProfilePageData(profile.userId) };
+    },
+    ["public-profile", username],
+    { revalidate: 600, tags: [publicProfileCacheTag(userId)] }
+  )();
+}
 
 /* unstable_cache round-trips through JSON, so pinned items' Date columns come
    back as ISO strings on a cache hit; revive them for the components. */

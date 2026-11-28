@@ -99,7 +99,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   // Status, pin, and award changes all feed the shared profile page.
-  revalidatePublicProfiles();
+  revalidatePublicProfiles([userContext.userId]);
 
   return NextResponse.json({ data: updated });
 }

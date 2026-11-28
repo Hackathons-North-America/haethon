@@ -217,9 +217,9 @@ export function getPublicCatalogSnapshot(): Promise<CatalogSnapshotEntry[]> {
 /**
  * Live vote totals for every listed hackathon that has any votes, as
  * [upvotes, downvotes] by id. Served as its own static file
- * (app/api/hackathons/catalog/votes), which is regenerated every minute: the
- * snapshot's totals are up to ten minutes old, and a regeneration of that
- * file costs one small query by primary key instead of the whole catalog.
+ * (app/api/hackathons/catalog/votes), which is regenerated on its own
+ * 10-minute schedule: a regeneration of that file costs one small query by
+ * primary key instead of the whole catalog.
  */
 export async function getPublicCatalogVoteTotals(): Promise<Record<string, [number, number]>> {
   const [snapshot, rows] = await Promise.all([

@@ -111,7 +111,7 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   // New attendance days surface on the shared profile page.
-  revalidatePublicProfiles();
+  revalidatePublicProfiles([userContext.userId]);
 
   return NextResponse.json({
     data: {

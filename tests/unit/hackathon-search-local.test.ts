@@ -37,7 +37,7 @@ vi.mock("@/components/hackathon-card", async () => {
   };
 });
 
-type Listener = (states: Record<string, ViewerCardState>) => void;
+type Listener = (states: Record<string, ViewerCardState>, signedIn: boolean) => void;
 
 function fakeViewerCards() {
   const listeners = new Set<Listener>();
@@ -53,7 +53,7 @@ function fakeViewerCards() {
   return {
     hydration,
     requests,
-    answer: (states: Record<string, ViewerCardState>) => listeners.forEach((listener) => listener(states)),
+    answer: (states: Record<string, ViewerCardState>) => listeners.forEach((listener) => listener(states, true)),
   };
 }
 
