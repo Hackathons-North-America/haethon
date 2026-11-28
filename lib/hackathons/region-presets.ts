@@ -1,6 +1,6 @@
 import type { HackathonSearchFilters } from "@/lib/hackathons/search-filters";
 
-export type RegionPresetId = "north-america" | "international" | "online";
+export type RegionPresetId = "united-states" | "canada" | "international" | "online";
 
 // Countries counted as "International" — major European and Asian markets plus
 // the destinations that reliably host large hackathons (Singapore, Switzerland, UAE...).
@@ -43,8 +43,6 @@ const internationalCountries = [
   "New Zealand",
 ];
 
-const northAmericaCountries = ["Canada", "United States"];
-
 export type RegionPreset = {
   id: RegionPresetId;
   label: string;
@@ -53,11 +51,18 @@ export type RegionPreset = {
 };
 
 export const regionPresets: RegionPreset[] = [
+  // The US and Canada are separate tabs so each country can be browsed on its own.
   {
-    id: "north-america",
-    label: "North America",
-    emoji: "🌎",
-    filters: { countries: northAmericaCountries, format: "in_person" },
+    id: "united-states",
+    label: "USA",
+    emoji: "🇺🇸",
+    filters: { countries: ["United States"], format: "in_person" },
+  },
+  {
+    id: "canada",
+    label: "Canada",
+    emoji: "🇨🇦",
+    filters: { countries: ["Canada"], format: "in_person" },
   },
   {
     id: "international",

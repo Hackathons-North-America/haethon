@@ -51,13 +51,12 @@ import type {
 const countryListboxId = "hackathon-country-options";
 const locationPopoverId = "hackathon-location-popover";
 const datePopoverId = "hackathon-date-popover";
-const formatPopoverId = "hackathon-format-popover";
 const featurePopoverId = "hackathon-feature-popover";
 const sortPopoverId = "hackathon-sort-popover";
 const moreFiltersId = "hackathon-more-filters";
 const SEARCH_PAGE_SIZE = 30;
 
-type OpenPopover = "location" | "date" | "format" | "features" | "sort" | null;
+type OpenPopover = "location" | "date" | "features" | "sort" | null;
 type LocationMode = "country" | "near_me";
 
 /* The user's position for the distance filter (and, via countryCode, the
@@ -66,12 +65,6 @@ type LocationMode = "country" | "near_me";
    geolocation API when the user asks for it — that path has no country of its
    own, so countryCode stays null and the boost no-ops. */
 type UserOrigin = GeoPoint & { label: string | null; precise: boolean; countryCode?: string | null };
-
-const formatOptions: { label: string; value: HackathonFormatFilter; detail: string }[] = [
-  { label: "Any format", value: "any", detail: "Show online and in person events" },
-  { label: "Online", value: "online", detail: "Remote hackathons you can join anywhere" },
-  { label: "In person", value: "in_person", detail: "Venue based hackathons and local events" },
-];
 
 function hasActiveFilters({
   beginnerFriendly,
@@ -272,12 +265,11 @@ export function HackathonSearch({
   /* Which sub-panel the merged Location popover shows. Resets to "country" every
      time the popover opens (see the Location button's onClick). */
   const [locationMode, setLocationMode] = useState<LocationMode>("country");
-  /* Name and Format live in a secondary row that stays hidden until the
-     visitor opens it. Start expanded when either arrives pre-set (from the
-     URL) so the active filter is never invisible. */
-  const [moreFiltersOpen, setMoreFiltersOpen] = useState(
-    () => Boolean(initialFilters.name.trim()) || initialFilters.format !== "any"
-  );
+  /* Name lives in a secondary row that stays hidden until the visitor opens
+     it. Start expanded when it arrives pre-set (from the URL) so the active
+     filter is never invisible. Format has no field of its own: the region
+     tabs set it. */
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(() => Boolean(initialFilters.name.trim()));
   const filterFormRef = useRef<HTMLFormElement>(null);
   const countrySearchRef = useRef<HTMLInputElement>(null);
   const countryRowRef = useRef<HTMLDivElement>(null);
@@ -589,7 +581,6 @@ export function HackathonSearch({
     ));
 
   const selectedDateLabel = datePeriodOptions.find((option) => option.value === datePeriod)?.label ?? "Any date";
-  const selectedFormatLabel = formatOptions.find((option) => option.value === format)?.label ?? "Any format";
   const selectedDistanceLabel =
     distanceKm === "any"
       ? "Any distance"
@@ -1396,7 +1387,7 @@ export function HackathonSearch({
             </div>
             </div>
 
-            {/* Secondary row: search by name + format, revealed by the More
+            {/* Secondary row: search by name, revealed by the More
                 toggle and separated by a hairline instead of a second card. */}
             {moreFiltersOpen ? (
               <>
@@ -1415,69 +1406,6 @@ export function HackathonSearch({
                     value={name}
                   />
                 </label>
-
-                <span aria-hidden="true" className="hidden h-8 w-px shrink-0 self-center bg-ink/10 transition-opacity duration-200 group-hover/bar:opacity-0 md:block" />
-
-                <div className="relative min-h-16 min-w-0 flex-1">
-                  <input name="format" type="hidden" value={format} />
-                  <SegmentPill show={openPopover === "format"} switched={popoverSwitched} />
-                  <button
-                    aria-controls={formatPopoverId}
-                    aria-expanded={openPopover === "format"}
-                    aria-label="Format"
-                    className={`relative flex min-h-16 w-full min-w-0 flex-col justify-center rounded-full px-7 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                      openPopover === "format" ? "" : "hover:bg-paper"
-                    }`}
-                    onClick={() => setOpenPopover((current) => (current === "format" ? null : "format"))}
-                    type="button"
-                  >
-                    <span className="block text-xs font-semibold leading-4 text-ink">
-                      Format
-                    </span>
-                    <span className="mt-0.5 block truncate text-sm leading-5 text-ink/55">{selectedFormatLabel}</span>
-                  </button>
-                  <SearchPopover
-                    className="absolute left-0 top-[calc(100%+0.75rem)] z-50 w-full min-w-[19rem] border border-ink/10 bg-surface p-4 md:w-[24rem]"
-                    id={formatPopoverId}
-                    show={openPopover === "format"}
-                    switched={popoverSwitched}
-                  >
-                    <div className="grid gap-2">
-                      {formatOptions.map((option) => {
-                        const selected = format === option.value;
-
-                        return (
-                          <button
-                            aria-pressed={selected}
-                            className={`flex min-h-[4.25rem] items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine/35 ${
-                              selected
-                                ? "border-pine/35 bg-pine/5"
-                                : "border-ink/10 bg-surface hover:border-ink/20 hover:bg-paper"
-                            }`}
-                            key={option.value}
-                            onClick={() => {
-                              setFormat(option.value);
-                              setOpenPopover(null);
-                            }}
-                            type="button"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-ink">{option.label}</span>
-                              <span className="mt-0.5 block truncate text-xs text-ink/55">{option.detail}</span>
-                            </span>
-                            <span
-                              className={`grid size-6 shrink-0 place-items-center rounded-full border ${
-                                selected ? "border-pine bg-pine text-paper" : "border-ink/15 text-transparent"
-                              }`}
-                            >
-                              <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </SearchPopover>
-                </div>
                 </div>
               </>
             ) : null}

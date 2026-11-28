@@ -206,10 +206,14 @@ describe("HackathonSearch with the local catalog", () => {
     await act(async () => render());
 
     // Synchronous: no awaiting between the click and the assertion.
-    act(() => button(container, "North America").click());
+    act(() => button(container, "USA").click());
 
-    expect(shownNames(container)).toEqual(["Toronto Hacks", "Boston Hacks"]);
+    expect(shownNames(container)).toEqual(["Boston Hacks"]);
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+
+    act(() => button(container, "Canada").click());
+
+    expect(shownNames(container)).toEqual(["Toronto Hacks"]);
 
     act(() => button(container, "Online").click());
 
@@ -263,15 +267,20 @@ describe("HackathonSearch with the local catalog", () => {
       announceHackathonStatus("boston", "attending");
     });
 
-    act(() => button(container, "North America").click());
+    act(() => button(container, "USA").click());
 
-    expect(container).toHaveTextContent("Toronto Hacks stage=applied up=7");
     expect(container).toHaveTextContent("Boston Hacks stage=attending up=1");
-    // Toronto is known; Boston's votes aren't, so only it is asked about.
+    // Boston's votes aren't known yet, so it is asked about.
     expect(viewer.requests).toEqual([["boston"]]);
 
-    act(() => button(container, "North America").click());
-    act(() => button(container, "North America").click());
+    act(() => button(container, "Canada").click());
+
+    // Toronto is already known, so nothing new is asked.
+    expect(container).toHaveTextContent("Toronto Hacks stage=applied up=7");
+    expect(viewer.requests).toEqual([["boston"]]);
+
+    act(() => button(container, "Canada").click());
+    act(() => button(container, "USA").click());
 
     // Not asked twice.
     expect(viewer.requests).toEqual([["boston"], ["remote"]]);
@@ -282,7 +291,7 @@ describe("HackathonSearch with the local catalog", () => {
     await act(async () => render());
     expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(CATALOG_DESCRIPTIONS_URL);
 
-    act(() => button(container, "North America").click());
+    act(() => button(container, "Canada").click());
     expect(fetchMock.mock.calls.map(([url]) => url)).toContain(CATALOG_DESCRIPTIONS_URL);
   });
 
@@ -295,10 +304,9 @@ describe("HackathonSearch with the local catalog", () => {
     await loadCatalogSnapshot();
     await act(async () => render());
 
-    act(() => button(container, "North America").click());
+    act(() => button(container, "Canada").click());
 
     expect(container).toHaveTextContent("Toronto Hacks stage=none up=? blurb=pending");
-    expect(container).toHaveTextContent("Boston Hacks stage=none up=? blurb=pending");
 
     await act(async () => {
       sendSideFiles();
@@ -307,6 +315,8 @@ describe("HackathonSearch with the local catalog", () => {
     });
 
     expect(container).toHaveTextContent("Toronto Hacks stage=none up=4 blurb=Six-a-side");
+
+    act(() => button(container, "USA").click());
     expect(container).toHaveTextContent("Boston Hacks stage=none up=1 blurb=none");
   });
 
@@ -319,7 +329,7 @@ describe("HackathonSearch with the local catalog", () => {
     await loadCatalogSnapshot();
     await act(async () => render(undefined, "top"));
 
-    act(() => button(container, "North America").click());
+    act(() => button(container, "USA").click());
     // Not ranked yet: the grid still shows the page's own cards while it searches.
     expect(shownNames(container)).toEqual(["Toronto Hacks", "Remote Jam", "Boston Hacks"]);
     expect(container.querySelector('[aria-label="Searching hackathons"]')).not.toBeNull();
@@ -329,7 +339,11 @@ describe("HackathonSearch with the local catalog", () => {
       await vi.waitFor(() => expect(peekCatalogSnapshot()?.votes).not.toBeNull());
     });
 
-    expect(shownNames(container)).toEqual(["Boston Hacks", "Toronto Hacks"]);
+    expect(shownNames(container)).toEqual(["Boston Hacks"]);
+
+    // Clearing the tab ranks the whole catalog by votes: Boston (9) beats Toronto (1).
+    act(() => button(container, "USA").click());
+    expect(shownNames(container)).toEqual(["Boston Hacks", "Toronto Hacks", "Remote Jam"]);
     expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain(expect.stringMatching(/^\/api\/hackathons\?/));
   });
 });
