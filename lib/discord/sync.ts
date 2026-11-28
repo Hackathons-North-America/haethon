@@ -1,7 +1,7 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { REST } from "@discordjs/rest";
 import * as Sentry from "@sentry/nextjs";
-import { ChannelType, Routes } from "discord-api-types/v10";
+import { ChannelType, Routes, type APIUser, type RESTGetAPIChannelMessagesPinsResult } from "discord-api-types/v10";
 
 import { db } from "@/lib/db";
 import {
@@ -12,8 +12,10 @@ import {
   type DiscordCategoryKey,
   hackathonChannelMatchKey,
   insertionIndexByDate,
+  isArchiveCategoryName,
   pastCategoryDiscordName,
 } from "@/lib/discord/channel-rules";
+import { channelIntroMessage } from "@/lib/discord/channel-intro";
 import {
   discordChannelRetentionCutoff,
   isDiscordChannelPastRetention,
@@ -35,6 +37,7 @@ import {
   hackathonSeries,
 } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { alignHnaApprovalQueries, hnaApprovalValues, inheritHnaApprovalQuery } from "@/lib/hackathons/hna-approval";
 import { assignHackathonSeries } from "@/lib/hackathons/series";
 
 type DiscordGuild = {
@@ -54,23 +57,52 @@ export type DiscordChannel = {
 
 type MappedChannel = {
   channelSnowflake: string;
+  /* The edition the channel was last synced for. A different one taking it
+     over is a returning event, which gets a fresh intro message. */
+  hackathonId: string | null;
   nameOverride: string | null;
   recordId: string;
 };
 
 type SyncTarget = {
   applicationUrl: string | null;
+  city: string | null;
   country: string | null;
-  /* hackathons.discord_channel_decision: only "approved" gets a channel. */
+  /* hackathons.discord_channel_decision: only "approved" (HNA approved) gets a channel. */
   discordChannelDecision: string | null;
   endsAt: Date | null;
+  format: string;
   hackathonId: string;
   name: string;
+  region: string | null;
   seriesId: string;
+  shortDescription: string | null;
   slug: string;
   startsAt: Date | null;
   status: string;
+  venue: string | null;
   websiteUrl: string | null;
+};
+
+/* The columns every sync reads for its targets: the channel's name, topic and
+   category come from them, and so does the pinned intro message. */
+const syncTargetColumns = {
+  applicationUrl: hackathons.applicationUrl,
+  city: hackathonLocations.city,
+  country: hackathonLocations.country,
+  discordChannelDecision: hackathons.discordChannelDecision,
+  endsAt: hackathonDates.endsAt,
+  format: hackathons.format,
+  hackathonId: hackathons.id,
+  name: hackathons.name,
+  region: hackathonLocations.region,
+  seriesId: hackathons.seriesId,
+  shortDescription: hackathons.shortDescription,
+  slug: hackathons.slug,
+  startsAt: hackathonDates.startsAt,
+  status: hackathons.status,
+  venue: hackathons.venue,
+  websiteUrl: hackathons.websiteUrl,
 };
 
 type SyncContext = {
@@ -87,16 +119,20 @@ type SyncContext = {
 const SYNC_CONCURRENCY = 4;
 
 const INELIGIBLE_REASON = "Only Canadian and US hackathons are synced to Discord.";
-const UNDECIDED_REASON = "Waiting for an admin to approve a Discord channel for this hackathon.";
-const DENIED_REASON = "An admin declined a Discord channel for this hackathon.";
+const UNDECIDED_REASON = "Waiting for an admin to say whether this hackathon is HNA approved.";
+const DENIED_REASON = "An admin marked this hackathon as not HNA approved, so it has no Discord channel.";
+const ENDED_REASON = "This hackathon ended before it got a Discord channel.";
+const NEWER_EDITION_REASON = "A newer edition of this hackathon has the series' Discord channel.";
 
 /* Why a hackathon gets no channel work at all, or null when it may have one.
    This is the one gate every path to a channel goes through: the queued jobs,
    the daily sync, and the syncs after an edit, a merge or a feed update. Only
-   an admin's approval (lib/discord/channel-decisions.ts) creates a channel,
-   or points an existing series channel at a new edition. A hackathon without
-   approval is left alone entirely, so another edition's channel is never
-   moved or removed on its account. */
+   HNA approval creates a channel or points an existing series channel at a
+   new edition: an admin's answer (lib/discord/channel-decisions.ts, or the
+   website's HNA approved box), or the previous edition's carried over
+   (lib/hackathons/hna-approval.ts). A hackathon without it is left alone
+   entirely, so another edition's channel is never moved or removed on its
+   account. */
 function channelDecisionBlock(decision: string | null) {
   if (decision === "approved") {
     return null;
@@ -172,33 +208,45 @@ export function reportHackathonSyncFailure(hackathonId: string, error: unknown) 
   Sentry.captureException(error, { extra: { hackathonId } });
 }
 
+/* The bot's earlier pins in a channel, newest first. Pins someone else made
+   (a hand-pinned announcement) are never touched. */
+async function botPinnedMessageIds(rest: REST, channelSnowflake: string) {
+  const [bot, pins] = await Promise.all([
+    rest.get(Routes.user("@me")) as Promise<APIUser>,
+    rest.get(Routes.channelMessagesPins(channelSnowflake)) as Promise<RESTGetAPIChannelMessagesPinsResult>,
+  ]);
+
+  return pins.items.filter((pin) => pin.message.author.id === bot.id).map((pin) => pin.message.id);
+}
+
 /**
- * Posts the hackathon's links as the first message in a freshly created channel
- * and pins it. Best-effort: the channel already exists and is tracked, so a
- * send/pin failure (e.g. missing Send Messages / Manage Messages permission)
- * must never fail the sync — it is reported and the sync moves on.
+ * Posts the hackathon's intro (name, dates, location, website, blurb and its
+ * hna.dev link; lib/discord/channel-intro.ts) and pins it: in a freshly
+ * created channel, and again when the series' channel comes back from the
+ * archive for a new edition (`replacePins`). Then the bot's older pins are
+ * unpinned, so the pin always describes the edition the channel is for.
+ *
+ * Best-effort: the channel already exists and is tracked, so a send or pin
+ * failure (e.g. missing Send Messages / Manage Messages / Read Message
+ * History) must never fail the sync. It is reported and the sync moves on.
  */
-async function postAndPinChannelLinks(
-  rest: REST,
-  channelSnowflake: string,
-  target: Pick<SyncTarget, "hackathonId" | "slug" | "websiteUrl">
-) {
-  const lines = [];
-
-  if (target.websiteUrl) {
-    lines.push(target.websiteUrl);
-  }
-
-  lines.push(`${env.NEXT_PUBLIC_APP_URL}/hackathons/${target.slug}`);
-
+async function postAndPinChannelIntro(rest: REST, channelSnowflake: string, target: SyncTarget, replacePins: boolean) {
   try {
+    const earlier = replacePins ? await botPinnedMessageIds(rest, channelSnowflake) : [];
     const message = (await rest.post(Routes.channelMessages(channelSnowflake), {
-      body: { content: lines.join("\n") },
+      body: {
+        allowed_mentions: { parse: [] },
+        content: channelIntroMessage({ ...target, appUrl: env.NEXT_PUBLIC_APP_URL }),
+      },
     })) as { id: string };
 
     await rest.put(Routes.channelMessagesPin(channelSnowflake, message.id));
+
+    for (const messageId of earlier) {
+      await rest.delete(Routes.channelMessagesPin(channelSnowflake, messageId));
+    }
   } catch (error) {
-    console.error("Unable to post the pinned links message in a new Discord channel.", {
+    console.error("Unable to post the pinned intro message in a Discord channel.", {
       channelSnowflake,
       error,
       hackathonId: target.hackathonId,
@@ -309,8 +357,8 @@ export async function assignExistingDiscordChannel(hackathonId: string, channelS
     )
     .limit(1);
 
-  // An admin attaching a channel by hand is an admin approving one.
-  await db.update(hackathons).set({ discordChannelDecision: "approved" }).where(eq(hackathons.id, hackathon.id));
+  // An admin attaching a channel by hand is an admin approving it for HNA.
+  await db.update(hackathons).set(hnaApprovalValues(true)).where(eq(hackathons.id, hackathon.id));
 
   if (current?.channelSnowflake === channelSnowflake) {
     await db
@@ -551,6 +599,7 @@ async function adoptRetiredChannel(ctx: SyncContext, target: SyncTarget, parentI
   const orphans = await db
     .select({
       channelSnowflake: discordChannels.channelSnowflake,
+      hackathonId: discordChannels.hackathonId,
       name: discordChannels.name,
       nameOverride: discordChannels.nameOverride,
       recordId: discordChannels.id,
@@ -570,6 +619,7 @@ async function adoptRetiredChannel(ctx: SyncContext, target: SyncTarget, parentI
     if (claimed) {
       const mapped: MappedChannel = {
         channelSnowflake: match.channelSnowflake,
+        hackathonId: match.hackathonId,
         nameOverride: match.nameOverride,
         recordId: match.recordId,
       };
@@ -602,6 +652,7 @@ async function adoptRetiredChannel(ctx: SyncContext, target: SyncTarget, parentI
 
   const mapped: MappedChannel = {
     channelSnowflake: candidate.id,
+    hackathonId: null,
     nameOverride: null,
     recordId: inserted.id,
   };
@@ -671,6 +722,16 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
     return { status: "skipped" as const, reason: INELIGIBLE_REASON };
   }
 
+  const active = category === "canada" || category === "us";
+
+  // A channel is only ever made for an event still to come. One that ended
+  // keeps the channel it had (refiled into the archive below), but an
+  // approval that arrives afterwards, such as an old keeper ticked HNA
+  // approved for its cover, never opens a new channel in the archive.
+  if (!active && !ctx.channelsBySeries.has(target.seriesId)) {
+    return { status: "skipped" as const, reason: ENDED_REASON };
+  }
+
   const parentId = await ctx.directory.resolveCategoryId(category);
   const mapped =
     ctx.channelsBySeries.get(target.seriesId) ?? (await adoptRetiredChannel(ctx, target, parentId));
@@ -696,6 +757,10 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
   // Date ordering is applied only when a channel is created or refiled into a
   // different category; manual rearranging is otherwise left alone.
   let needsDatePlacement = false;
+  // The series' channel coming back for a new edition: out of the archive
+  // (or the "deleted" parking category), or taken over from an earlier
+  // edition. Its pinned intro is replaced with this edition's.
+  let revived = false;
 
   if (channelSnowflake) {
     let existing = await ctx.directory.getChannel(channelSnowflake);
@@ -706,6 +771,13 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
       // Either way the same record is kept, with its series link and any pin.
       existing = await findAdoptableUntrackedChannel(ctx.directory, hackathonChannelMatchKey(target.name), parentId);
       channelSnowflake = existing?.id;
+    }
+
+    if (existing && channelSnowflake && active) {
+      const parentName = existing.parent_id ? (await ctx.directory.getChannel(existing.parent_id))?.name ?? "" : "";
+      const archived = isArchiveCategoryName(parentName) || parentName.trim().toLowerCase() === DELETED_CATEGORY_NAME;
+      const newEdition = mapped?.hackathonId != null && mapped.hackathonId !== target.hackathonId;
+      revived = archived || newEdition;
     }
 
     if (!existing || !channelSnowflake) {
@@ -741,6 +813,11 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
     }
   }
 
+  // Its tracked channel was deleted on Discord: not replaced once it ended.
+  if (!channelSnowflake && !active) {
+    return { status: "skipped" as const, reason: ENDED_REASON };
+  }
+
   if (!channelSnowflake) {
     const created = (await ctx.rest.post(Routes.guildChannels(ctx.guildSnowflake), {
       body: {
@@ -768,6 +845,7 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
       })
       .where(eq(discordChannels.id, mapped.recordId));
     mapped.channelSnowflake = channelSnowflake;
+    mapped.hackathonId = target.hackathonId;
   } else {
     const [inserted] = await db
       .insert(discordChannels)
@@ -780,13 +858,18 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
         seriesId: target.seriesId,
       })
       .returning({ id: discordChannels.id });
-    ctx.channelsBySeries.set(target.seriesId, { channelSnowflake, nameOverride: null, recordId: inserted.id });
+    ctx.channelsBySeries.set(target.seriesId, {
+      channelSnowflake,
+      hackathonId: target.hackathonId,
+      nameOverride: null,
+      recordId: inserted.id,
+    });
   }
 
   ctx.touchedSnowflakes.add(channelSnowflake);
 
-  if (action === "created") {
-    await postAndPinChannelLinks(ctx.rest, channelSnowflake, target);
+  if (action === "created" || revived) {
+    await postAndPinChannelIntro(ctx.rest, channelSnowflake, target, action !== "created");
   }
 
   // After the DB write, so concurrent lanes placing siblings can already see
@@ -815,6 +898,36 @@ async function syncTargetWithContext(ctx: SyncContext, target: SyncTarget) {
   };
 }
 
+/* Whether another HNA-approved edition of the series starts later than this
+   one (an undated edition counts as the oldest, as in the daily sync's
+   newestFirst). */
+async function hasNewerApprovedEdition(seriesId: string, hackathonId: string, startsAt: Date | null) {
+  const [newer] = await db
+    .select({ id: hackathons.id })
+    .from(hackathons)
+    .innerJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+    .where(
+      and(
+        eq(hackathons.seriesId, seriesId),
+        ne(hackathons.id, hackathonId),
+        eq(hackathons.discordChannelDecision, "approved"),
+        isNotNull(hackathons.publishedAt),
+        startsAt ? gt(hackathonDates.startsAt, startsAt) : isNotNull(hackathonDates.startsAt)
+      )
+    )
+    .limit(1);
+
+  return Boolean(newer);
+}
+
+/* Newest edition first: by start date, undated last, then the id so the
+   order is the same on every run. */
+function newestFirst(a: Pick<SyncTarget, "hackathonId" | "startsAt">, b: Pick<SyncTarget, "hackathonId" | "startsAt">) {
+  const start = (target: Pick<SyncTarget, "startsAt">) => target.startsAt?.getTime() ?? Number.MIN_SAFE_INTEGER;
+
+  return start(b) - start(a) || a.hackathonId.localeCompare(b.hackathonId);
+}
+
 export async function syncHackathonDiscordChannel(hackathonId: string) {
   const rest = discordRest();
 
@@ -824,18 +937,9 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
 
   const [row] = await db
     .select({
-      applicationUrl: hackathons.applicationUrl,
-      country: hackathonLocations.country,
-      discordChannelDecision: hackathons.discordChannelDecision,
-      endsAt: hackathonDates.endsAt,
-      hackathonId: hackathons.id,
+      ...syncTargetColumns,
+      hnaApproved: hackathons.hnaApproved,
       isRecurring: hackathonSeries.isRecurring,
-      name: hackathons.name,
-      seriesId: hackathons.seriesId,
-      slug: hackathons.slug,
-      startsAt: hackathonDates.startsAt,
-      status: hackathons.status,
-      websiteUrl: hackathons.websiteUrl,
     })
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
@@ -856,6 +960,7 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
 
   const pastRetention = isDiscordChannelPastRetention({
     endsAt: row.endsAt,
+    hnaApproved: row.hnaApproved,
     isRecurring: row.isRecurring ?? false,
   });
 
@@ -869,9 +974,16 @@ export async function syncHackathonDiscordChannel(hackathonId: string) {
       websiteUrl: row.websiteUrl ?? "",
     }));
 
+  // The series shares one channel, and it follows the newest approved
+  // edition. Syncing an older one would drag it back into the archive.
+  if (await hasNewerApprovedEdition(seriesId, row.hackathonId, row.startsAt)) {
+    return { status: "skipped" as const, reason: NEWER_EDITION_REASON };
+  }
+
   const [mapped] = await db
     .select({
       channelSnowflake: discordChannels.channelSnowflake,
+      hackathonId: discordChannels.hackathonId,
       nameOverride: discordChannels.nameOverride,
       recordId: discordChannels.id,
     })
@@ -1286,7 +1398,7 @@ async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T
 export function approveHackathonsWithChannelsQuery() {
   return db
     .update(hackathons)
-    .set({ discordChannelDecision: "approved" })
+    .set(hnaApprovalValues(true))
     .where(
       and(
         isNull(hackathons.discordChannelDecision),
@@ -1303,26 +1415,17 @@ export async function syncPublishedHackathonDiscordChannels() {
   const rest = discordRest();
   const retentionCutoff = discordChannelRetentionCutoff(new Date());
 
-  await approveHackathonsWithChannelsQuery();
+  // In order: a channel means HNA approved, the two flags agree, and an
+  // upcoming edition inherits its series' approval. Together they keep the
+  // rules true without one-off backfills (lib/hackathons/hna-approval.ts).
+  await db.batch([approveHackathonsWithChannelsQuery(), ...alignHnaApprovalQueries(), inheritHnaApprovalQuery()]);
 
   // One query loads every published hackathon with its location and dates. The
   // left joins can fan out when a hackathon has multiple location or date rows,
   // so keep only the first row per hackathon (matching the old per-hackathon
   // limit(1) semantics).
   const rows = await db
-    .select({
-      applicationUrl: hackathons.applicationUrl,
-      country: hackathonLocations.country,
-      discordChannelDecision: hackathons.discordChannelDecision,
-      endsAt: hackathonDates.endsAt,
-      hackathonId: hackathons.id,
-      name: hackathons.name,
-      seriesId: hackathons.seriesId,
-      slug: hackathons.slug,
-      startsAt: hackathonDates.startsAt,
-      status: hackathons.status,
-      websiteUrl: hackathons.websiteUrl,
-    })
+    .select(syncTargetColumns)
     .from(hackathons)
     .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
     .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
@@ -1338,6 +1441,8 @@ export async function syncPublishedHackathonDiscordChannels() {
         )`,
         or(
           eq(hackathonSeries.isRecurring, true),
+          // HNA-approved channels stay in the archive for the next edition.
+          eq(hackathons.hnaApproved, true),
           isNull(hackathonDates.endsAt),
           gte(hackathonDates.endsAt, retentionCutoff)
         )
@@ -1414,6 +1519,7 @@ export async function syncPublishedHackathonDiscordChannels() {
     const mappedRows = await db
       .select({
         channelSnowflake: discordChannels.channelSnowflake,
+        hackathonId: discordChannels.hackathonId,
         nameOverride: discordChannels.nameOverride,
         recordId: discordChannels.id,
         seriesId: discordChannels.seriesId,
@@ -1427,6 +1533,7 @@ export async function syncPublishedHackathonDiscordChannels() {
           mappedRow.seriesId as string,
           {
             channelSnowflake: mappedRow.channelSnowflake,
+            hackathonId: mappedRow.hackathonId,
             nameOverride: mappedRow.nameOverride,
             recordId: mappedRow.recordId,
           },
@@ -1439,33 +1546,33 @@ export async function syncPublishedHackathonDiscordChannels() {
       touchedSnowflakes,
     };
 
-    // Group by series so the shared per-series channel is only ever touched by
-    // one lane at a time; the pool then runs the series groups concurrently.
-    const groups = new Map<string, SyncTarget[]>();
+    // A series shares one channel, and it follows the newest approved
+    // edition: last year's moved it into the archive, this year's brings it
+    // back. Syncing both would move it twice a day, so the older editions are
+    // left out. The pool runs the series concurrently.
+    const newestBySeries = new Map<string, SyncTarget>();
 
     for (const target of ready) {
-      const group = groups.get(target.seriesId);
+      const newest = newestBySeries.get(target.seriesId);
 
-      if (group) {
-        group.push(target);
-      } else {
-        groups.set(target.seriesId, [target]);
+      if (!newest || newestFirst(target, newest) < 0) {
+        newestBySeries.set(target.seriesId, target);
       }
     }
 
-    await runWithConcurrency([...groups.values()], SYNC_CONCURRENCY, async (group) => {
-      for (const target of group) {
-        try {
-          const result = await syncTargetWithContext(ctx, target);
+    skipped += ready.length - newestBySeries.size;
 
-          if (result.status === "synced") {
-            synced += 1;
-          } else {
-            skipped += 1;
-          }
-        } catch (error) {
-          recordFailure(target.hackathonId, error);
+    await runWithConcurrency([...newestBySeries.values()], SYNC_CONCURRENCY, async (target) => {
+      try {
+        const result = await syncTargetWithContext(ctx, target);
+
+        if (result.status === "synced") {
+          synced += 1;
+        } else {
+          skipped += 1;
         }
+      } catch (error) {
+        recordFailure(target.hackathonId, error);
       }
     });
   }
@@ -1554,8 +1661,10 @@ export async function syncPublishedHackathonDiscordChannels() {
 
 /**
  * Deletes Discord channels for non-recurring hackathons more than 30 days
- * after their end date. Only the Discord channel and its mapping are removed;
- * the hackathon and all related database records are retained.
+ * after their end date, unless the hackathon is HNA approved: its channel
+ * stays in the archive so the next edition can bring it back. Only the
+ * Discord channel and its mapping are removed; the hackathon and all related
+ * database records are retained.
  */
 export async function deleteExpiredHackathonDiscordChannels(now = new Date()) {
   const rest = discordRest();
@@ -1585,6 +1694,8 @@ export async function deleteExpiredHackathonDiscordChannels(now = new Date()) {
       and(
         eq(discordGuilds.guildSnowflake, env.DISCORD_GUILD_ID),
         lt(hackathonDates.endsAt, cutoff),
+        // An HNA-approved event's channel waits in the archive for its next edition.
+        eq(hackathons.hnaApproved, false),
         or(isNull(hackathons.seriesId), eq(hackathonSeries.isRecurring, false))
       )
     );

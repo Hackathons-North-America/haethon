@@ -52,6 +52,7 @@ import {
   slugify,
 } from "@/lib/hackathons/utils";
 import type { CommunitySubmissionInput, HackathonSubmissionInput, NormalizedHackathonPayload } from "@/lib/hackathons/utils";
+import { hnaApprovalValues, inheritHnaApprovalQuery } from "@/lib/hackathons/hna-approval";
 import { ensureHackathonSeries, hackathonSeriesIdentity } from "@/lib/hackathons/series";
 import { compileSourceType } from "@/lib/hackathons/source-badges";
 import type { HackathonSource } from "@/lib/hackathons/source-provenance";
@@ -440,8 +441,10 @@ const FEED_FIELDS_IN_ORDER: readonly FeedField[] = [
 export async function createPublishedHackathon(
   payload: NormalizedHackathonPayload,
   options?: {
-    /* "approved" when the admin asked for a channel while creating it.
-       Without one the hackathon waits in the channel decision queue. */
+    /* "approved" when the admin asked for a channel while creating it,
+       which makes it HNA approved. Without one it is HNA approved only if
+       the series' previous edition was (inheritHnaApprovalQuery); otherwise
+       a Canadian or US one waits in the HNA approval queue. */
     discordChannelDecision?: "approved" | null;
     revalidateCaches?: boolean;
     source?: HackathonSource;
@@ -478,7 +481,7 @@ export async function createPublishedHackathon(
       highSchoolersOnly: payload.highSchoolersOnly,
       prizeAmountUsd: payload.prizeAmountUsd,
       discordTag: payload.discordTag,
-      discordChannelDecision: options?.discordChannelDecision ?? null,
+      ...(options?.discordChannelDecision === "approved" ? hnaApprovalValues(true) : {}),
       // Compiled once here. An explicit feed identity wins because the event
       // URL may point somewhere else (for example MLH linking to Devpost).
       source: compileSourceType(options?.source, payload.sourceUrl, payload.websiteUrl),
@@ -501,6 +504,14 @@ export async function createPublishedHackathon(
     hackathonId: created.id,
     ...(await hackathonLocationValues(payload)),
   });
+
+  // A returning event: last edition's HNA approval carries over, so the sync
+  // below moves the series' channel back out of the archive. Callers that
+  // skip the sync create Devpost activity stubs (past, online), which are
+  // never a returning edition.
+  if (options?.discordChannelDecision !== "approved" && options?.syncDiscord !== false) {
+    await inheritHnaApprovalQuery([created.id]);
+  }
 
   // The bulk import flow passes syncDiscord: false so the channel is created only
   // after the admin explicitly approves it in a second step (see importAdminHackathons).
@@ -1844,14 +1855,35 @@ async function runAdminImport(input: AdminImportInput) {
   /* ---- One round trip of writes ---- */
   await flush();
 
+  // Returning events. A new row whose series' previous edition was HNA
+  // approved is approved too, and its channel (that edition's, brought back
+  // from the archive) is queued straight away. It gets no preview, so nobody
+  // is asked about it, here or in Discord.
+  const newHackathonIds = previews.flatMap((preview) => (preview.result.hackathonId ? [preview.result.hackathonId] : []));
+  const inherited = new Set(
+    newHackathonIds.length ? (await inheritHnaApprovalQuery(newHackathonIds)).map((row) => row.id) : []
+  );
+
+  if (inherited.size) {
+    for (const preview of previews) {
+      if (preview.result.hackathonId && inherited.has(preview.result.hackathonId)) {
+        queueJob({ hackathonId: preview.result.hackathonId, kind: "ensure" }, preview.result);
+      }
+    }
+
+    await flush();
+  }
+
   if (results.some((result) => result.status === "imported") || feedUpdates > 0) {
     revalidateHackathonCaches();
   }
 
-  if (previews.length) {
+  const asked = previews.filter((preview) => !preview.result.hackathonId || !inherited.has(preview.result.hackathonId));
+
+  if (asked.length) {
     const listing = await guildListing;
 
-    for (const preview of previews) {
+    for (const preview of asked) {
       preview.result.discord = previewDiscordChannel(preview.event, trackedChannels, listing);
     }
   }

@@ -477,7 +477,7 @@ describe("the website's import queue in Discord", () => {
     await requestHackathonDiscordChannel(hackathonId, adminId);
     await drainDiscordReviewQueue();
 
-    expect(await channelItemFor(hackathonId)).toMatchObject({ outcome: "Channel approved", resolvedBy: "the website", status: "resolved" });
+    expect(await channelItemFor(hackathonId)).toMatchObject({ outcome: "HNA approved", resolvedBy: "the website", status: "resolved" });
   });
 
   it("approves the same website decision and runs its channel job after a Discord click", async () => {
@@ -487,7 +487,7 @@ describe("the website's import queue in Discord", () => {
 
     expect(await runReviewAction({ action: "channel", actor: "james", itemId: item.id })).toMatchObject({
       ok: true,
-      view: { outcome: "Channel approved" },
+      view: { outcome: "HNA approved · channel on its way" },
     });
 
     const [row] = await db.select({ decision: hackathons.discordChannelDecision }).from(hackathons).where(eq(hackathons.id, hackathonId));

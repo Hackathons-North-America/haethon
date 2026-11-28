@@ -470,8 +470,10 @@ export function HackathonEditDialog({
                   HNA approved
                 </label>
                 <p id={`${item.id}-hnaApproved-note`} className="mt-1 text-xs leading-5 text-ink/55">
-                  Keeps the cover image after the event. Unapproved hackathons lose it 30 days after they end; every
-                  other detail stays. Only admins see this.
+                  Canadian and US hackathons get a Discord channel, and next year&apos;s edition inherits the approval.
+                  It also keeps the cover image after the event; unapproved hackathons lose it 30 days after they end.
+                  Unticking marks it not approved: no new channel, and an existing one is left alone. Only admins see
+                  this.
                 </p>
               </div>
             </div>

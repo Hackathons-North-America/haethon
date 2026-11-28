@@ -200,13 +200,13 @@ async function runChannelAction(action: ReviewAction, hackathonId: string | null
   }
 
   if (action === "nochannel") {
-    // Stored, as on the website: no sync makes a channel for it later, and it
-    // leaves the channel decision queue on /admin/import.
+    // "Not HNA approved". Stored, as on the website: no sync makes a channel
+    // for it later, and it leaves the queue on /admin/import.
     if ((await denyHackathonDiscordChannel(hackathonId)).status === "not_found") {
       throw new ReviewActionError("This hackathon was deleted.");
     }
 
-    return { outcome: "No channel" };
+    return { outcome: "Not HNA approved · no channel" };
   }
 
   const request = await requestHackathonDiscordChannel(hackathonId, reviewerUserId);
@@ -220,7 +220,7 @@ async function runChannelAction(action: ReviewAction, hackathonId: string | null
   }
 
   await startDiscordChannelJobs();
-  return { outcome: "Channel approved" };
+  return { outcome: "HNA approved · channel on its way" };
 }
 
 async function runDuplicateAction(

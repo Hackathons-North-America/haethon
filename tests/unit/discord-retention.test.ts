@@ -46,3 +46,19 @@ describe("Discord channel retention", () => {
     expect(isDiscordChannelPastRetention({ endsAt: null, isRecurring: false }, now)).toBe(false);
   });
 });
+
+describe("Discord channel retention for HNA-approved hackathons", () => {
+  const now = new Date("2026-07-18T12:00:00.000Z");
+
+  it("keeps an HNA-approved channel in the archive for the next edition", () => {
+    expect(
+      isDiscordChannelPastRetention({ endsAt: new Date("2025-01-01T00:00:00.000Z"), hnaApproved: true, isRecurring: false }, now)
+    ).toBe(false);
+  });
+
+  it("still expires an unapproved, non-recurring one", () => {
+    expect(
+      isDiscordChannelPastRetention({ endsAt: new Date("2025-01-01T00:00:00.000Z"), hnaApproved: false, isRecurring: false }, now)
+    ).toBe(true);
+  });
+});

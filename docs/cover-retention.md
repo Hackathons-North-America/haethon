@@ -50,9 +50,15 @@ Code: `lib/hackathons/cover-retention.ts`.
 
 ### Approving
 
+HNA approval is also what gives a Canadian or US hackathon its Discord channel
+(README, "HNA approval and Discord channels"). The Discord review card's
+**HNA approved** answer, the `/admin/import` queue and the edit dialog all
+set the same flags. A returning edition inherits its series' approval.
+
 In `/admin/hackathons`, use **Edit**, then **HNA approved**, then save. The
 card shows an "HNA approved" mark. `hna_approved_at` records the first
-approval, and un-approving clears it. Approving an expired hackathon whose
+approval, and un-approving clears it and records "not HNA approved", so that
+hackathon gets no new channel. Approving an expired hackathon whose
 thumbnails were held back makes them right away. A cover the cleanup already
 deleted is gone. Re-enter an image URL to restore one.
 

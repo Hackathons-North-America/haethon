@@ -32,12 +32,13 @@ vi.mock("@/lib/hackathons/image-ingest", () => ({
 }));
 
 const { db } = await import("@/lib/db");
-const { discordChannelJobs, discordChannels, discordGuilds, hackathonDates, hackathonLocations, hackathons, users } = await import(
-  "@/lib/db/schema"
-);
+const { discordChannelJobs, discordChannels, discordGuilds, hackathonDates, hackathonLocations, hackathons, hackathonSeries, users } =
+  await import("@/lib/db/schema");
 const { approveHackathonsWithChannelsQuery, syncHackathonDiscordChannel, syncPublishedHackathonDiscordChannels } = await import(
   "@/lib/discord/sync"
 );
+const { alignHnaApprovalQueries, inheritHnaApprovalQuery } = await import("@/lib/hackathons/hna-approval");
+const { setHackathonHnaApproved } = await import("@/lib/hackathons/admin-service");
 const { listChannelDecisionCards } = await import("@/lib/discord/channel-decisions");
 const { denyHackathonDiscordChannel, requestHackathonDiscordChannel } = await import("@/lib/discord/channel-jobs");
 const { importAdminHackathons } = await import("@/lib/hackathons/review-service");
@@ -48,14 +49,24 @@ let adminId: string;
 
 async function createHackathon(
   name: string,
-  options: { country?: string; decision?: "approved" | "denied" | null; inDays?: number; published?: boolean } = {}
+  options: {
+    country?: string;
+    decision?: "approved" | "denied" | null;
+    hnaApproved?: boolean;
+    inDays?: number;
+    published?: boolean;
+    seriesId?: string;
+    slug?: string;
+  } = {}
 ) {
   const startsAt = new Date(Date.now() + (options.inDays ?? 30) * DAY);
   const [hackathon] = await db
     .insert(hackathons)
     .values({
       name,
-      slug: name.toLowerCase().replace(/\s+/g, "-"),
+      slug: options.slug ?? name.toLowerCase().replace(/\s+/g, "-"),
+      seriesId: options.seriesId ?? null,
+      hnaApproved: options.hnaApproved ?? false,
       status: startsAt < new Date() ? "completed" : "upcoming",
       publishedAt: options.published === false ? null : new Date(),
       discordChannelDecision: options.decision ?? null,
@@ -71,6 +82,24 @@ async function decisionOf(hackathonId: string) {
   const [row] = await db.select({ decision: hackathons.discordChannelDecision }).from(hackathons).where(eq(hackathons.id, hackathonId));
 
   return row.decision;
+}
+
+async function approvalOf(hackathonId: string) {
+  const [row] = await db
+    .select({ approvedAt: hackathons.hnaApprovedAt, decision: hackathons.discordChannelDecision, hnaApproved: hackathons.hnaApproved })
+    .from(hackathons)
+    .where(eq(hackathons.id, hackathonId));
+
+  return row;
+}
+
+async function createSeries(name: string) {
+  const [series] = await db
+    .insert(hackathonSeries)
+    .values({ name, slug: name.toLowerCase().replace(/\s+/g, "-") })
+    .returning({ id: hackathonSeries.id });
+
+  return series.id;
 }
 
 async function attachChannel(hackathonId: string, snowflake: string, category = "canada") {
@@ -98,7 +127,7 @@ describe("the gate in the sync", () => {
 
     expect(await syncHackathonDiscordChannel(hackathonId)).toEqual({
       status: "skipped",
-      reason: "Waiting for an admin to approve a Discord channel for this hackathon.",
+      reason: "Waiting for an admin to say whether this hackathon is HNA approved.",
     });
     expect(discordCalls).toEqual([]);
   });
@@ -108,7 +137,7 @@ describe("the gate in the sync", () => {
 
     expect(await syncHackathonDiscordChannel(hackathonId)).toMatchObject({
       status: "skipped",
-      reason: "An admin declined a Discord channel for this hackathon.",
+      reason: "An admin marked this hackathon as not HNA approved, so it has no Discord channel.",
     });
     expect(discordCalls).toEqual([]);
   });
@@ -206,5 +235,125 @@ describe("the channel decision queue", () => {
     expect(await db.select().from(discordChannelJobs)).toHaveLength(0);
     expect(discordCalls).toEqual([]);
     expect((await listChannelDecisionCards()).map((card) => card.payload.name)).toEqual(["Scraped Maple Hacks"]);
+  });
+});
+
+describe("HNA approval is the channel decision", () => {
+  it("stores both flags on a yes, and clears them on a no", async () => {
+    const yes = await createHackathon("Yes Hacks");
+    const no = await createHackathon("No Hacks", { hnaApproved: true });
+
+    await requestHackathonDiscordChannel(yes, adminId);
+    await denyHackathonDiscordChannel(no);
+
+    expect(await approvalOf(yes)).toMatchObject({ decision: "approved", hnaApproved: true });
+    expect((await approvalOf(yes)).approvedAt).toBeInstanceOf(Date);
+    expect(await approvalOf(no)).toEqual({ approvedAt: null, decision: "denied", hnaApproved: false });
+  });
+
+  it("treats the website's HNA approved box as the same answer", async () => {
+    const ticked = await createHackathon("Ticked Hacks");
+    const unticked = await createHackathon("Unticked Hacks", { decision: "approved", hnaApproved: true });
+    const untouched = await createHackathon("Untouched Hacks");
+
+    await setHackathonHnaApproved(ticked, true);
+    await setHackathonHnaApproved(unticked, false);
+    // Saving the dialog with the box as it was decides nothing.
+    await setHackathonHnaApproved(untouched, false);
+
+    expect(await approvalOf(ticked)).toMatchObject({ decision: "approved", hnaApproved: true });
+    expect(await approvalOf(unticked)).toMatchObject({ decision: "denied", hnaApproved: false });
+    expect(await approvalOf(untouched)).toMatchObject({ decision: null, hnaApproved: false });
+    expect((await listChannelDecisionCards()).map((card) => card.hackathonId)).toEqual([untouched]);
+  });
+
+  it("brings older rows into line, leaving a contradiction alone", async () => {
+    const channelOnly = await createHackathon("Channel Only", { decision: "approved" });
+    const hnaOnly = await createHackathon("HNA Only", { hnaApproved: true });
+    const contradiction = await createHackathon("Both Ways", { decision: "denied", hnaApproved: true });
+
+    await db.batch([...alignHnaApprovalQueries()]);
+
+    expect(await approvalOf(channelOnly)).toMatchObject({ decision: "approved", hnaApproved: true });
+    expect(await approvalOf(hnaOnly)).toMatchObject({ decision: "approved", hnaApproved: true });
+    expect(await approvalOf(contradiction)).toMatchObject({ decision: "denied", hnaApproved: true });
+  });
+});
+
+describe("a returning edition", () => {
+  it("inherits last edition's HNA approval, but not a no, and never for a past edition", async () => {
+    const approvedSeries = await createSeries("Maple Hacks");
+    const deniedSeries = await createSeries("Birch Hacks");
+    await createHackathon("Maple Hacks 2026", { decision: "approved", hnaApproved: true, inDays: -300, seriesId: approvedSeries });
+    const maple = await createHackathon("Maple Hacks 2027", { inDays: 60, seriesId: approvedSeries });
+    const oldMaple = await createHackathon("Maple Hacks 2025", { inDays: -700, seriesId: approvedSeries });
+    await createHackathon("Birch Hacks 2026", { decision: "denied", inDays: -300, seriesId: deniedSeries });
+    const birch = await createHackathon("Birch Hacks 2027", { inDays: 60, seriesId: deniedSeries });
+
+    expect((await inheritHnaApprovalQuery()).map((row) => row.id)).toEqual([maple]);
+    expect(await approvalOf(maple)).toMatchObject({ decision: "approved", hnaApproved: true });
+    expect(await decisionOf(oldMaple)).toBeNull();
+    expect(await decisionOf(birch)).toBeNull();
+  });
+
+  it("is imported approved, with its channel queued and nothing asked", async () => {
+    const parsed = adminHackathonImportSchema.parse({
+      hackathons: [
+        {
+          name: "Pine Hacks",
+          websiteUrl: "https://pinehacks.ca",
+          sourceUrl: "https://luma.com/pine-2027",
+          source: "luma",
+          city: "Toronto",
+          country: "Canada",
+          startDate: new Date(Date.now() + 40 * DAY).toISOString().slice(0, 10),
+          endDate: new Date(Date.now() + 41 * DAY).toISOString().slice(0, 10),
+          format: "in_person",
+          autoApprove: true,
+          externalId: "luma:pine-2027",
+        },
+      ],
+    });
+    // Last year's edition, in the series the import files the new one under.
+    const first = await importAdminHackathons({
+      payloads: [{ ...parsed.hackathons[0], externalId: "luma:pine-2026", sourceUrl: "https://luma.com/pine-2026", startDate: new Date(Date.now() - 300 * DAY), endDate: new Date(Date.now() - 299 * DAY) }],
+      reviewerUserId: adminId,
+    });
+    await db.update(hackathons).set({ discordChannelDecision: "approved", hnaApproved: true }).where(eq(hackathons.id, first.results[0].hackathonId!));
+
+    const result = await importAdminHackathons({ payloads: parsed.hackathons, reviewerUserId: adminId, review: "queue", via: "scraper" });
+    const [row] = result.results;
+
+    expect(row).toMatchObject({ status: "imported", discordSync: { status: "queued" } });
+    expect(row.discord).toBeUndefined();
+    expect(await approvalOf(row.hackathonId!)).toMatchObject({ decision: "approved", hnaApproved: true });
+    expect(await db.select({ hackathonId: discordChannelJobs.hackathonId }).from(discordChannelJobs)).toEqual([
+      { hackathonId: row.hackathonId },
+    ]);
+    expect(await listChannelDecisionCards()).toEqual([]);
+  });
+
+  it("takes the series' channel from older editions, which then leave it alone", async () => {
+    const seriesId = await createSeries("Cedar Hacks");
+    const old = await createHackathon("Cedar Hacks 2026", { decision: "approved", hnaApproved: true, inDays: -300, seriesId });
+    await createHackathon("Cedar Hacks 2027", { decision: "approved", hnaApproved: true, inDays: 60, seriesId });
+
+    expect(await syncHackathonDiscordChannel(old)).toEqual({
+      status: "skipped",
+      reason: "A newer edition of this hackathon has the series' Discord channel.",
+    });
+  });
+});
+
+describe("an ended hackathon", () => {
+  it("never gets a new channel, even once approved", async () => {
+    const seriesId = await createSeries("Spruce Hacks");
+    const ended = await createHackathon("Spruce Hacks 2025", { decision: "approved", hnaApproved: true, inDays: -400, seriesId });
+
+    expect(await syncHackathonDiscordChannel(ended)).toEqual({
+      status: "skipped",
+      reason: "This hackathon ended before it got a Discord channel.",
+    });
+    expect(discordCalls.filter((call) => call.method !== "GET")).toEqual([]);
   });
 });

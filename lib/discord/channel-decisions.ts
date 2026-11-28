@@ -11,11 +11,14 @@ import {
   trackedDiscordChannelsQuery,
 } from "@/lib/discord/sync";
 
-/* The channel decision queue: published Canadian and US hackathons nobody has
-   said yes or no to a Discord channel for (hackathons.discord_channel_decision
-   is null). Every hackathon goes through it, however it was published: an
-   auto-approved scraper event is published without asking, but its channel
-   still waits here. The yes or no itself is the existing route,
+/* The HNA approval queue: published Canadian and US hackathons nobody has
+   said is or isn't HNA approved (hackathons.discord_channel_decision is null
+   and hna_approved is false; lib/hackathons/hna-approval.ts). HNA approved
+   means a Discord channel; not approved means none. Every hackathon goes
+   through it, however it was published: an auto-approved scraper event is
+   published without asking, but its approval still waits here. A returning
+   edition of an approved series never does: it inherits the approval when it
+   is imported. The yes or no itself is the existing route,
    POST /api/admin/hackathons/:id/discord-channel, which stores it.
 
    Only events still ahead or under way are listed. One that ended while
@@ -63,6 +66,7 @@ export async function listChannelDecisionCards(limit = 300): Promise<ChannelDeci
       .where(
         and(
           isNull(hackathons.discordChannelDecision),
+          eq(hackathons.hnaApproved, false),
           isNotNull(hackathons.publishedAt),
           inArray(hackathons.status, ["upcoming", "live"]),
           inArray(hackathonLocations.country, NORTH_AMERICA),

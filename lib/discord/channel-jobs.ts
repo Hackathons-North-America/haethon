@@ -12,6 +12,7 @@ import {
 import { isRateLimitError } from "@/lib/discord/rest";
 import { env } from "@/lib/env";
 import { revalidateHackathonCaches } from "@/lib/hackathons/catalog";
+import { hnaApprovalValues } from "@/lib/hackathons/hna-approval";
 
 /* Admin actions persist jobs here and answer without waiting for Discord.
    The background worker retries them and the admin UI reads their results.
@@ -109,10 +110,12 @@ export async function enqueueDiscordChannelJob(request: DiscordChannelJobRequest
 }
 
 /**
- * An admin's "create the channel" for one hackathon. The approval is stored
- * (it is what lets the sync make or reuse a channel at all, see
- * channelDecisionBlock in lib/discord/sync.ts), then the Discord work is
- * queued. Only the checks that can be answered from the database happen here.
+ * An admin's "HNA approved" for a Canadian or US hackathon, from the Discord
+ * review card or the website's channel queue. The approval is stored (both
+ * flags, see lib/hackathons/hna-approval.ts; it is what lets the sync make or
+ * reuse a channel at all, see channelDecisionBlock in lib/discord/sync.ts),
+ * then the Discord work is queued. Only the checks that can be answered from
+ * the database happen here.
  */
 export async function requestHackathonDiscordChannel(hackathonId: string, requestedByUserId: string) {
   const [row] = await db
@@ -137,7 +140,7 @@ export async function requestHackathonDiscordChannel(hackathonId: string, reques
   }
 
   const [, [job]] = await db.batch([
-    db.update(hackathons).set({ discordChannelDecision: "approved" }).where(eq(hackathons.id, hackathonId)),
+    db.update(hackathons).set(hnaApprovalValues(true)).where(eq(hackathons.id, hackathonId)),
     enqueueDiscordChannelJobQuery({ hackathonId, kind: "ensure", requestedByUserId }),
   ]);
 
@@ -145,14 +148,14 @@ export async function requestHackathonDiscordChannel(hackathonId: string, reques
 }
 
 /**
- * An admin's "no channel" for one hackathon. Stored, so the hackathon leaves
- * the decision queue and no sync makes a channel for it later. A channel it
- * already has is not touched.
+ * An admin's "not HNA approved" for one hackathon. Stored, so the hackathon
+ * leaves the decision queue and no sync makes a channel for it later. A
+ * channel it already has is not touched.
  */
 export async function denyHackathonDiscordChannel(hackathonId: string) {
   const [row] = await db
     .update(hackathons)
-    .set({ discordChannelDecision: "denied" })
+    .set(hnaApprovalValues(false))
     .where(eq(hackathons.id, hackathonId))
     .returning({ id: hackathons.id });
 
