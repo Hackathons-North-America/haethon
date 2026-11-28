@@ -80,6 +80,41 @@ function AdminHackathonCard({
     save(isRecurring);
   }
 
+  const hnaApproved = item.hnaApproved === true;
+  /* The approval the server last confirmed; a failed toggle snaps back to it. */
+  const confirmedHnaApprovedRef = useRef(hnaApproved);
+
+  /* Same one-click pattern as the recurring toggle. Approving a Canadian or US
+     hackathon also gets its Discord channel (the route runs the sync). */
+  const { save: saveHnaApproved } = useLatestSave<boolean, AdminHackathonListItem>(
+    (approved) =>
+      sendRequest<AdminHackathonListItem>(`/api/admin/hackathons/${item.id}/hna-approved`, {
+        method: "PATCH",
+        json: { hnaApproved: approved },
+      }),
+    {
+      onSuccess: (saved, _value, { latest }) => {
+        confirmedHnaApprovedRef.current = saved.hnaApproved === true;
+
+        if (latest) {
+          onPatch(item.id, { hnaApproved: saved.hnaApproved === true });
+        }
+      },
+      onError: (error, value) => {
+        onPatch(item.id, { hnaApproved: confirmedHnaApprovedRef.current });
+        reportBackgroundFailure(error, {
+          message: `Couldn't update HNA approval for ${item.name}.`,
+          retry: () => setHnaApproved(value),
+        });
+      },
+    }
+  );
+
+  function setHnaApproved(approved: boolean) {
+    onPatch(item.id, { hnaApproved: approved });
+    saveHnaApproved(approved);
+  }
+
   return (
     <div className="min-w-0">
       <HackathonCard
@@ -88,12 +123,6 @@ function AdminHackathonCard({
         }}
         preview
       />
-      {item.hnaApproved ? (
-        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-pine">
-          <BadgeCheck aria-hidden="true" className="size-4" />
-          HNA approved
-        </p>
-      ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
@@ -115,6 +144,22 @@ function AdminHackathonCard({
         >
           <Repeat aria-hidden="true" className="size-4" />
           {item.isRecurring ? "Repeats yearly" : "Not repeating"}
+        </button>
+        <button
+          aria-pressed={hnaApproved}
+          className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
+            hnaApproved ? "border-pine bg-pine text-paper" : "border-ink/20 text-ink/70"
+          }`}
+          onClick={() => setHnaApproved(!hnaApproved)}
+          title={
+            hnaApproved
+              ? "HNA approved: keeps the cover and Discord channel. Click to unapprove."
+              : "Not HNA approved. Click to approve (Canadian and US hackathons also get a Discord channel)."
+          }
+          type="button"
+        >
+          <BadgeCheck aria-hidden="true" className="size-4" />
+          HNA approved
         </button>
         <button
           className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger"

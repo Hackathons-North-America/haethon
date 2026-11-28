@@ -430,6 +430,10 @@ export const adminHackathonRecurringSchema = z.object({
   isRecurring: z.boolean(),
 });
 
+export const adminHackathonHnaApprovedSchema = z.object({
+  hnaApproved: z.boolean(),
+});
+
 // All profile fields are clearable: an empty string wipes the stored value
 // (the previous optional-only fields made saved links impossible to delete).
 export const profileUpdateSchema = z.object({
