@@ -209,6 +209,9 @@ export function DevpostImportDialog({
     }
 
     setVerifiedHandle(handle);
+    // The verified badge on the page behind the dialog (and any other copy of
+    // this dialog, which reads initialState) is server-rendered: refresh it.
+    router.refresh();
   }
 
   async function runScan() {

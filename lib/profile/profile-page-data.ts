@@ -27,7 +27,22 @@ export type PinnedProfileItem = {
   devpostUrl: string | null;
 };
 
+/** All-time counts. yearActivity only spans the last three years and
+    attendedRows is capped, so neither can stand in for these. */
+export type ProfileTotals = {
+  /** Distinct hackathons with a recorded attendance day or a win. */
+  hackathonsAttended: number;
+  /**
+   * Distinct hackathons won: a result with a placement or award, or a
+   * tracked hackathon marked "won". Same rule as the pinned Winner badge.
+   */
+  wins: number;
+  /** Distinct calendar days with attendance, across all hackathons. */
+  daysHacked: number;
+};
+
 export type ProfilePageData = {
+  totals: ProfileTotals;
   pinnedItems: PinnedProfileItem[];
   yearActivity: YearActivity[];
   latestAttended: LatestAttended;
@@ -42,14 +57,29 @@ function startOfWeek(date: Date) {
   return value;
 }
 
-function activityWeeksForYear(attendance: { attendedOn: Date }[], year: number) {
-  const attendanceByWeek = new Map<string, number>();
+/** Calendar days, so two hackathons on the same day count once. */
+function distinctDays(attendance: { attendedOn: Date }[]) {
+  const days = new Map<string, Date>();
 
   for (const row of attendance) {
-    if (row.attendedOn.getFullYear() !== year) {
+    days.set(dateToInputValue(row.attendedOn), row.attendedOn);
+  }
+
+  return [...days.values()];
+}
+
+/**
+ * One cell per week touching the calendar year (the first week can start in
+ * late December of the year before), counting distinct days hacked.
+ */
+function activityWeeksForYear(days: Date[], year: number) {
+  const attendanceByWeek = new Map<string, number>();
+
+  for (const day of days) {
+    if (day.getFullYear() !== year) {
       continue;
     }
-    const key = dateToInputValue(startOfWeek(row.attendedOn));
+    const key = dateToInputValue(startOfWeek(day));
     attendanceByWeek.set(key, (attendanceByWeek.get(key) ?? 0) + 1);
   }
 
@@ -68,20 +98,28 @@ function activityWeeksForYear(attendance: { attendedOn: Date }[], year: number) 
 
 function buildYearActivity(
   attendance: { hackathonId: string; attendedOn: Date }[],
-  winDatesByYear: Map<number, number>,
+  wonHackathons: Map<string, { year: number }>,
   years: number[]
 ): YearActivity[] {
   return years.map((year) => {
     const yearAttendance = attendance.filter((row) => row.attendedOn.getFullYear() === year);
+    const yearDays = distinctDays(yearAttendance);
+    const yearWins = [...wonHackathons].filter(([, win]) => win.year === year).map(([hackathonId]) => hackathonId);
 
+    // Same rules as the all-time totals, scoped to one year.
     return {
       year,
-      weeks: activityWeeksForYear(yearAttendance, year),
-      totalDays: yearAttendance.length,
-      hackathonsAttended: new Set(yearAttendance.map((row) => row.hackathonId)).size,
-      wins: winDatesByYear.get(year) ?? 0,
+      weeks: activityWeeksForYear(yearDays, year),
+      totalDays: yearDays.length,
+      hackathonsAttended: new Set([...yearAttendance.map((row) => row.hackathonId), ...yearWins]).size,
+      wins: yearWins.length,
     };
   });
+}
+
+/** "San Francisco, California"; the country only when nothing finer is known. */
+function formatRowLocation(location: { city: string | null; region: string | null; country: string | null }) {
+  return [location.city, location.region].filter(Boolean).join(", ") || location.country || "Location TBD";
 }
 
 function formatLatestDate(value: Date | null) {
@@ -100,7 +138,7 @@ function formatLatestDate(value: Date | null) {
  * and therefore what a visitor can see — is defined.
  */
 export async function loadProfilePageData(userId: string): Promise<ProfilePageData> {
-  const [winRows, pinnedSelfReported, attendanceRows] = await Promise.all([
+  const [winRows, statusWinRows, pinnedSelfReported, attendanceRows] = await Promise.all([
     db
       .select({
         id: hackathonResults.id,
@@ -113,10 +151,14 @@ export async function loadProfilePageData(userId: string): Promise<ProfilePageDa
         startsAt: hackathonDates.startsAt,
         endsAt: hackathonDates.endsAt,
         devpostUrl: userHackathons.devpostUrl,
+        city: hackathonLocations.city,
+        region: hackathonLocations.region,
+        country: hackathonLocations.country,
       })
       .from(hackathonResults)
       .innerJoin(hackathons, eq(hackathons.id, hackathonResults.hackathonId))
       .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+      .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
       .leftJoin(userHackathons, and(eq(userHackathons.hackathonId, hackathons.id), eq(userHackathons.userId, userId)))
       .where(
         and(
@@ -125,6 +167,23 @@ export async function loadProfilePageData(userId: string): Promise<ProfilePageDa
         )
       )
       .orderBy(desc(hackathonResults.createdAt)),
+    // Tracked hackathons the user marked "won": the other half of the Winner
+    // rule (pinned ones show as Winner cards below).
+    db
+      .select({
+        hackathonId: hackathons.id,
+        updatedAt: userHackathons.updatedAt,
+        hackathonName: hackathons.name,
+        startsAt: hackathonDates.startsAt,
+        city: hackathonLocations.city,
+        region: hackathonLocations.region,
+        country: hackathonLocations.country,
+      })
+      .from(userHackathons)
+      .innerJoin(hackathons, eq(hackathons.id, userHackathons.hackathonId))
+      .leftJoin(hackathonDates, eq(hackathonDates.hackathonId, hackathons.id))
+      .leftJoin(hackathonLocations, eq(hackathonLocations.hackathonId, hackathons.id))
+      .where(and(eq(userHackathons.userId, userId), eq(userHackathons.applicationStatus, "won"))),
     db
       .select({
         id: userHackathons.id,
@@ -165,77 +224,102 @@ export async function loadProfilePageData(userId: string): Promise<ProfilePageDa
 
   const wins = winRows.slice(0, 8);
   const attendance = attendanceRows.map(({ hackathonId, attendedOn }) => ({ hackathonId, attendedOn }));
-  const attendedByHackathon = new Map<
-    string,
-    {
-      id: string;
-      hackathonName: string;
-      city: string | null;
-      region: string | null;
-      country: string | null;
-      startsAt: Date | null;
-      attendedDays: number;
-      sources: AttendanceSource[];
-    }
-  >();
+
+  type HistoryEntry = {
+    id: string;
+    hackathonName: string;
+    city: string | null;
+    region: string | null;
+    country: string | null;
+    startsAt: Date | null;
+    /** Latest attendance day, else the hackathon's start; orders the table. */
+    sortDate: Date;
+    sources: AttendanceSource[];
+  };
+
+  // Every hackathon on the profile, attended or won. Attendance rows arrive
+  // newest day first, so the first row per hackathon carries its latest day.
+  const history = new Map<string, HistoryEntry>();
 
   for (const row of attendanceRows) {
-    const existing = attendedByHackathon.get(row.hackathonId);
+    const existing = history.get(row.hackathonId);
 
     if (existing) {
-      existing.attendedDays += 1;
       existing.sources.push(row.source);
       continue;
     }
 
-    attendedByHackathon.set(row.hackathonId, {
+    history.set(row.hackathonId, {
       id: row.hackathonId,
       hackathonName: row.hackathonName,
       city: row.city,
       region: row.region,
       country: row.country,
       startsAt: row.startsAt,
-      attendedDays: 1,
+      sortDate: row.attendedOn,
       sources: [row.source],
     });
   }
 
-  const attendedHackathons = [...attendedByHackathon.values()].slice(0, 8);
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear, currentYear - 1, currentYear - 2];
+  // Taken before wins join the map, so it is always an attended hackathon.
+  const latestAttendedHackathon = history.values().next().value;
 
-  const winDatesByYear = new Map<number, number>();
-  const seenWinIds = new Set<string>();
-  for (const win of winRows) {
-    if (seenWinIds.has(win.id)) {
-      continue;
+  // A hackathon counts as won once, however many awards it recorded. The
+  // year is the event's, falling back to when the win was recorded.
+  const wonHackathons = new Map<string, { year: number }>();
+  const winSources = [
+    ...winRows.map((win) => ({ ...win, recordedAt: win.createdAt })),
+    ...statusWinRows.map((win) => ({ ...win, recordedAt: win.updatedAt })),
+  ];
+
+  for (const win of winSources) {
+    if (!wonHackathons.has(win.hackathonId)) {
+      wonHackathons.set(win.hackathonId, { year: (win.startsAt ?? win.recordedAt).getFullYear() });
     }
-    seenWinIds.add(win.id);
-    const winYear = (win.startsAt ?? win.createdAt).getFullYear();
-    winDatesByYear.set(winYear, (winDatesByYear.get(winYear) ?? 0) + 1);
+
+    // Wins without attendance days still belong in Hackathons attended.
+    if (!history.has(win.hackathonId)) {
+      history.set(win.hackathonId, {
+        id: win.hackathonId,
+        hackathonName: win.hackathonName,
+        city: win.city,
+        region: win.region,
+        country: win.country,
+        startsAt: win.startsAt,
+        sortDate: win.startsAt ?? win.recordedAt,
+        sources: [],
+      });
+    }
   }
 
-  const yearActivity = buildYearActivity(attendance, winDatesByYear, years);
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear - 1, currentYear - 2];
+  const yearActivity = buildYearActivity(attendance, wonHackathons, years);
 
-  const latestAttendedOn = attendance.reduce<Date | null>(
-    (latest, row) => (!latest || row.attendedOn > latest ? row.attendedOn : latest),
-    null
-  );
-  const latestAttended: LatestAttended = attendedHackathons[0]
-    ? { name: attendedHackathons[0].hackathonName, dateLabel: formatLatestDate(latestAttendedOn) }
-    : null;
+  const totals: ProfileTotals = {
+    hackathonsAttended: history.size,
+    wins: wonHackathons.size,
+    daysHacked: distinctDays(attendance).length,
+  };
 
-  // Rows for the Notion-style attended table. A hackathon is a "Winner" when the
-  // user has a recorded win for it, taking visual priority over the trust tier.
-  const wonHackathonIds = new Set(winRows.map((win) => win.hackathonId));
-  const attendedRows: AttendedHackathonRow[] = attendedHackathons.map((hackathon) => ({
-    id: hackathon.id,
-    name: hackathon.hackathonName,
-    date: hackathon.startsAt ? dateToInputValue(hackathon.startsAt) : null,
-    location: [hackathon.city, hackathon.region, hackathon.country].filter(Boolean).join(", ") || "Location TBD",
-    tier: deriveAttendanceTrustTier(hackathon.sources ?? []),
-    isWinner: wonHackathonIds.has(hackathon.id),
-  }));
+  const latestAttended: LatestAttended = latestAttendedHackathon
+    ? { name: latestAttendedHackathon.hackathonName, dateLabel: formatLatestDate(latestAttendedHackathon.sortDate) }
+      : null;
+
+  // Rows for the Notion-style attended table, newest first. A hackathon is a
+  // "Winner" by the same rule as the wins total, taking visual priority over
+  // the trust tier.
+  const attendedRows: AttendedHackathonRow[] = [...history.values()]
+    .sort((first, second) => second.sortDate.getTime() - first.sortDate.getTime())
+    .slice(0, 8)
+    .map((hackathon) => ({
+      id: hackathon.id,
+      name: hackathon.hackathonName,
+      date: hackathon.startsAt ? dateToInputValue(hackathon.startsAt) : null,
+      location: formatRowLocation(hackathon),
+      tier: deriveAttendanceTrustTier(hackathon.sources),
+      isWinner: wonHackathons.has(hackathon.id),
+    }));
 
   const pinnedItems: PinnedProfileItem[] = [
     ...wins.map((win) => ({
@@ -264,5 +348,5 @@ export async function loadProfilePageData(userId: string): Promise<ProfilePageDa
     })),
   ].slice(0, 6);
 
-  return { pinnedItems, yearActivity, latestAttended, attendedRows };
+  return { totals, pinnedItems, yearActivity, latestAttended, attendedRows };
 }

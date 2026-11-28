@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import { BadgeCheck, CalendarDays, ChevronRight, FileText, MapPin, Trophy } from "lucide-react";
+import { useId, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { HackathonCheckinForm } from "@/components/hackathon-checkin-form";
+import { ProfileStatusPill } from "@/components/profile/profile-primitives";
 import type { AttendanceTrustTier } from "@/lib/hackathons/attendance-rules";
 
 export type AttendedHackathonRow = {
@@ -15,44 +16,85 @@ export type AttendedHackathonRow = {
   isWinner: boolean;
 };
 
-function StatusCell({ tier, isWinner }: { tier: AttendanceTrustTier | null; isWinner: boolean }) {
+function StatusPill({ tier, isWinner }: { tier: AttendanceTrustTier | null; isWinner: boolean }) {
   if (isWinner) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-[#D4A72C]/15 px-2 py-0.5 text-xs font-semibold text-[#9a7b1f] dark:text-[#e8c76b]">
-        <Trophy aria-hidden="true" className="size-3" />
-        Winner
-      </span>
-    );
+    return <ProfileStatusPill status="winner" />;
   }
 
-  if (tier === "verified") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-pine/25 bg-pine/5 px-2 py-0.5 text-xs font-semibold text-pine">
-        <BadgeCheck aria-hidden="true" className="size-3" />
-        Verified
-      </span>
-    );
-  }
-
-  if (tier === "self_reported") {
-    return (
-      <span className="rounded-full border border-ink/10 px-2 py-0.5 text-xs font-semibold text-ink/55">
-        Self reported
-      </span>
-    );
-  }
-
-  return <span className="text-sm text-ink/40">-</span>;
+  return tier ? <ProfileStatusPill status={tier} /> : null;
 }
 
-// Column headers mirror the Notion database layout: a muted label preceded by a
-// small icon, sitting above a divider that separates it from the rows.
-const columns = [
-  { label: "Hackathon", icon: FileText },
-  { label: "Date", icon: CalendarDays },
-  { label: "Location", icon: MapPin },
-  { label: "Status", icon: BadgeCheck },
-];
+/** Row dates arrive as YYYY-MM-DD (date-only, UTC); show them as "Mar 2026". */
+function formatRowDate(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00Z`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+}
+
+// Fixed desktop column widths, so every row's date, location, status and
+// chevron line up whatever a row contains.
+const dateColumnClassName = "w-[4.75rem] shrink-0";
+const locationColumnClassName = "w-44 shrink-0";
+const statusColumnClassName = "w-[6.5rem] shrink-0";
+
+/**
+ * Separated by a leading dot that sits in the gap before each item. The list
+ * is shifted left by one gap inside an overflow-hidden wrapper, so the dot of
+ * whichever item starts a line is clipped: a dot only ever appears between
+ * two items on the same line, never dangling at a line's end.
+ */
+const dottedListClassName = "-ml-3 flex flex-wrap gap-y-1";
+const dottedItemClassName =
+  "relative min-w-0 pl-3 before:absolute before:left-1 before:text-ink/35 before:content-['·']";
+
+/**
+ * Name, then date and location. On phones the status pill leads the meta
+ * line so long names keep the full width; from sm up every field has its
+ * own fixed-width column.
+ */
+function RowSummary({ row }: { row: AttendedHackathonRow }) {
+  const date = formatRowDate(row.date);
+
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+      <span className="min-w-0 truncate font-medium text-ink sm:flex-1">{row.name}</span>
+
+      {/* Phones: one wrapping meta line. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink/55 sm:hidden">
+        <StatusPill isWinner={row.isWinner} tier={row.tier} />
+        <span className="min-w-0 max-w-full overflow-hidden">
+          <span className={dottedListClassName}>
+            {date ? (
+              <span className={`${dottedItemClassName} shrink-0 tabular-nums`}>
+                <time dateTime={row.date ?? undefined}>{date}</time>
+              </span>
+            ) : null}
+            <span className={`${dottedItemClassName} truncate`}>{row.location}</span>
+          </span>
+        </span>
+      </span>
+
+      {/* sm and up: fixed columns, kept even when a value is missing. */}
+      <span className={`hidden text-sm tabular-nums text-ink/55 sm:block ${dateColumnClassName}`}>
+        {date ? <time dateTime={row.date ?? undefined}>{date}</time> : null}
+      </span>
+      <span className={`hidden truncate text-sm text-ink/55 sm:block ${locationColumnClassName}`} title={row.location}>
+        {row.location}
+      </span>
+      <span className={`hidden sm:flex ${statusColumnClassName}`}>
+        <StatusPill isWinner={row.isWinner} tier={row.tier} />
+      </span>
+    </span>
+  );
+}
 
 export function AttendedHackathonsTable({
   rows,
@@ -65,74 +107,55 @@ export function AttendedHackathonsTable({
   emptyText?: string;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const idPrefix = useId();
 
   if (!rows.length) {
     return <p className="text-sm text-ink/55">{emptyText}</p>;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-ink/10">
-            {columns.map((column) => (
-              <th className="py-2 pr-4 text-sm font-normal text-ink/50" key={column.label} scope="col">
-                <span className="flex items-center gap-1.5">
-                  <column.icon aria-hidden="true" className="size-3.5" />
-                  {column.label}
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            // Verified attendance is settled, so only self-reported rows expand
-            // to reveal the organizer check-in form.
-            const expandable = !readOnly && row.tier !== "verified";
-            const isOpen = expandedId === row.id;
+    <ul className="divide-y divide-ink/10 overflow-hidden rounded-2xl border border-ink/10 bg-surface">
+      {rows.map((row) => {
+        // Verified attendance is settled, so only self-reported rows expand
+        // to reveal the organizer check-in form.
+        const expandable = !readOnly && row.tier !== "verified";
+        const isOpen = expandedId === row.id;
+        const panelId = `${idPrefix}-checkin-${row.id}`;
 
-            return (
-              <Fragment key={row.id}>
-                <tr
-                  className={`border-b border-ink/[0.06] ${
-                    expandable ? "cursor-pointer hover:bg-ink/[0.03]" : ""
-                  }`}
-                  onClick={expandable ? () => setExpandedId(isOpen ? null : row.id) : undefined}
-                >
-                  <td className="py-3 pr-4">
-                    <span className="flex items-center gap-2 font-semibold text-ink">
-                      {expandable ? (
-                        <ChevronRight
-                          aria-hidden="true"
-                          className={`size-3.5 shrink-0 text-ink/40 transition-transform ${
-                            isOpen ? "rotate-90" : ""
-                          }`}
-                        />
-                      ) : (
-                        <span aria-hidden="true" className="size-3.5 shrink-0" />
-                      )}
-                      {row.name}
-                    </span>
-                  </td>
-                  <td className="py-3 pr-4 text-sm text-ink/60">{row.date ?? "-"}</td>
-                  <td className="py-3 pr-4 text-sm text-ink/60">{row.location}</td>
-                  <td className="py-3">
-                    <StatusCell isWinner={row.isWinner} tier={row.tier} />
-                  </td>
-                </tr>
-                {expandable && isOpen ? (
-                  <tr className="border-b border-ink/[0.06]">
-                    <td className="pb-4" colSpan={columns.length}>
-                      <HackathonCheckinForm hackathonId={row.id} />
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+        if (!expandable) {
+          return (
+            <li className="flex min-h-14 items-center gap-3 px-4 py-3 sm:px-5" key={row.id}>
+              <RowSummary row={row} />
+              {/* Holds the chevron's slot so columns match expandable rows. */}
+              {readOnly ? null : <span aria-hidden="true" className="size-4 shrink-0" />}
+            </li>
+          );
+        }
+
+        return (
+          <li key={row.id}>
+            <button
+              aria-controls={isOpen ? panelId : undefined}
+              aria-expanded={isOpen}
+              className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-ink/[0.03] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pine sm:px-5"
+              onClick={() => setExpandedId(isOpen ? null : row.id)}
+              type="button"
+            >
+              <RowSummary row={row} />
+              <ChevronDown
+                aria-hidden="true"
+                className={`size-4 shrink-0 text-ink/40 transition-transform ${isOpen ? "rotate-180" : ""}`}
+              />
+              <span className="sr-only">{isOpen ? "Hide check-in" : "Verify attendance"}</span>
+            </button>
+            {isOpen ? (
+              <div className="border-t border-ink/10 bg-paper/60 px-4 pb-4 sm:px-5" id={panelId}>
+                <HackathonCheckinForm hackathonId={row.id} />
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

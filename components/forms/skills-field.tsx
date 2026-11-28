@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Search } from "lucide-react";
 
 import { SKILL_LANGUAGES } from "@/lib/profile/skills";
@@ -25,6 +25,9 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
   const [query, setQuery] = useState("");
   const selected = useMemo(() => new Set(value), [value]);
   const normalizedQuery = query.trim().toLowerCase();
+  const listRef = useRef<HTMLDivElement>(null);
+  // True while more pills sit below the scroll edge; drives the bottom fade.
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
 
   // For each language, work out what to show for the current search. A language
   // group appears if its name matches (then all frameworks show) or if any of
@@ -45,6 +48,14 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
       group !== null
     );
   }, [normalizedQuery]);
+
+  function updateScrollHint() {
+    const list = listRef.current;
+    setHasMoreBelow(Boolean(list && list.scrollTop + list.clientHeight < list.scrollHeight - 1));
+  }
+
+  // Filtering changes the list's height, so re-check after every search.
+  useEffect(updateScrollHint, [groups]);
 
   function toggle(skill: string) {
     onChange(selected.has(skill) ? value.filter((item) => item !== skill) : [...value, skill]);
@@ -90,11 +101,18 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
         </span>
       </div>
 
-      <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
-        {groups.length ? (
-          groups.map(({ language, frameworks }) => (
-            <div key={language.name}>
-              <div className="flex flex-wrap items-center gap-2">
+      {/* Every row is a 2rem pill plus a 0.5rem gap (groups use the same
+          gap), a 2.5rem pitch. 18.25rem = 1rem top padding + 7 rows, minus
+          half a gap: the scroll edge falls between rows, never through one. */}
+      <div className="relative">
+        <div
+          className="max-h-[18.25rem] space-y-2 overflow-y-auto rounded-xl border border-ink/10 bg-ink/[0.02] p-4"
+          onScroll={updateScrollHint}
+          ref={listRef}
+        >
+          {groups.length ? (
+            groups.map(({ language, frameworks }) => (
+              <div className="flex flex-wrap items-center gap-2" key={language.name}>
                 <Pill skill={language.name} isLanguage />
                 <span aria-hidden="true" className="text-ink/25">
                   ·
@@ -103,11 +121,17 @@ export function SkillsField({ value, onChange }: SkillsFieldProps) {
                   <Pill key={framework} skill={framework} />
                 ))}
               </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-ink/55">No languages or frameworks match “{query}”.</p>
-        )}
+            ))
+          ) : (
+            <p className="text-sm text-ink/55">No languages or frameworks match “{query}”.</p>
+          )}
+        </div>
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-px bottom-px h-8 rounded-b-xl bg-gradient-to-t from-surface to-transparent transition-opacity ${
+            hasMoreBelow ? "opacity-100" : "opacity-0"
+          }`}
+        />
       </div>
     </div>
   );

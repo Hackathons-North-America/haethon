@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { BadgeCheck, Pencil, Repeat, Trash2 } from "lucide-react";
 
 import type { AdminHackathonListItem } from "@/components/admin/hackathon-admin-item";
@@ -80,52 +80,117 @@ function AdminHackathonCard({
     save(isRecurring);
   }
 
+  const hnaApproved = item.hnaApproved === true;
+  /* The approval the server last confirmed; a failed toggle snaps back to it. */
+  const confirmedHnaApprovedRef = useRef(hnaApproved);
+
+  /* Same one-click pattern as the recurring toggle. Approving a Canadian or US
+     hackathon also gets its Discord channel (the route runs the sync). */
+  const { save: saveHnaApproved } = useLatestSave<boolean, AdminHackathonListItem>(
+    (approved) =>
+      sendRequest<AdminHackathonListItem>(`/api/admin/hackathons/${item.id}/hna-approved`, {
+        method: "PATCH",
+        json: { hnaApproved: approved },
+      }),
+    {
+      onSuccess: (saved, _value, { latest }) => {
+        confirmedHnaApprovedRef.current = saved.hnaApproved === true;
+
+        if (latest) {
+          onPatch(item.id, { hnaApproved: saved.hnaApproved === true });
+        }
+      },
+      onError: (error, value) => {
+        onPatch(item.id, { hnaApproved: confirmedHnaApprovedRef.current });
+        reportBackgroundFailure(error, {
+          message: `Couldn't update HNA approval for ${item.name}.`,
+          retry: () => setHnaApproved(value),
+        });
+      },
+    }
+  );
+
+  function setHnaApproved(approved: boolean) {
+    onPatch(item.id, { hnaApproved: approved });
+    saveHnaApproved(approved);
+  }
+
   return (
     <div className="min-w-0">
       <HackathonCard
+        cornerAction={
+          <div className="flex items-center gap-1">
+            <CardIconAction label="Edit" onClick={() => onEdit(item)}>
+              <Pencil aria-hidden="true" className="size-4" />
+            </CardIconAction>
+            <CardIconAction
+              label={item.isRecurring ? "Repeats yearly" : "Not repeating"}
+              onClick={() => setRecurring(!item.isRecurring)}
+              pressed={item.isRecurring}
+            >
+              <Repeat aria-hidden="true" className="size-4" />
+            </CardIconAction>
+            <CardIconAction
+              label={hnaApproved ? "HNA approved" : "Not HNA approved"}
+              onClick={() => setHnaApproved(!hnaApproved)}
+              pressed={hnaApproved}
+            >
+              <BadgeCheck aria-hidden="true" className="size-4" />
+            </CardIconAction>
+            <CardIconAction label="Delete" onClick={() => onDelete(item)} tone="danger">
+              <Trash2 aria-hidden="true" className="size-4" />
+            </CardIconAction>
+          </div>
+        }
         hackathon={{
           ...previewPayloadToCard(itemToPreviewPayload(item), item.id),
         }}
         preview
       />
-      {item.hnaApproved ? (
-        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-pine">
-          <BadgeCheck aria-hidden="true" className="size-4" />
-          HNA approved
-        </p>
-      ) : null}
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full bg-pine px-4 text-sm font-semibold text-paper hover:bg-pine/90 disabled:opacity-50"
-          onClick={() => onEdit(item)}
-          type="button"
-        >
-          <Pencil aria-hidden="true" className="size-4" />
-          Edit
-        </button>
-        <button
-          aria-pressed={item.isRecurring}
-          className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold ${
-            item.isRecurring
-              ? "border-pine bg-pine text-paper"
-              : "border-ink/20 text-ink/70"
-          }`}
-          onClick={() => setRecurring(!item.isRecurring)}
-          type="button"
-        >
-          <Repeat aria-hidden="true" className="size-4" />
-          {item.isRecurring ? "Repeats yearly" : "Not repeating"}
-        </button>
-        <button
-          className="inline-flex min-h-10 items-center gap-2 rounded-full border border-danger px-4 text-sm font-semibold text-danger"
-          onClick={() => onDelete(item)}
-          type="button"
-        >
-          <Trash2 aria-hidden="true" className="size-4" />
-          Delete
-        </button>
-      </div>
     </div>
+  );
+}
+
+/* An icon-only action in the card's footer, where the public card has its
+   votes and More info. Its name shows in a small label above it on hover or
+   keyboard focus; screen readers get the same text from aria-label. Toggles
+   (repeating, HNA approved) fill in when on, and their label names the
+   current state. */
+function CardIconAction({
+  children,
+  label,
+  onClick,
+  pressed,
+  tone = "default",
+}: {
+  children: ReactNode;
+  label: string;
+  onClick: () => void;
+  pressed?: boolean;
+  tone?: "default" | "danger";
+}) {
+  const stateClassName = pressed
+    ? "bg-pine text-paper hover:bg-pine/90"
+    : tone === "danger"
+      ? "text-ink/55 hover:bg-danger/10 hover:text-danger"
+      : "text-ink/55 hover:bg-ink/[0.07] hover:text-ink";
+
+  return (
+    <button
+      aria-label={label}
+      aria-pressed={pressed}
+      className={`group/action relative grid size-8 place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine ${stateClassName}`}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[11px] font-medium leading-none text-paper opacity-0 shadow-sm transition-opacity delay-0 duration-150 group-hover/action:opacity-100 group-hover/action:delay-150 group-focus-visible/action:opacity-100 motion-reduce:transition-none"
+      >
+        {label}
+      </span>
+    </button>
   );
 }
 

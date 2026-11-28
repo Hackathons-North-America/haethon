@@ -6,12 +6,14 @@ import { cache } from "react";
 
 import { AttendedHackathonsTable } from "@/components/attended-hackathons-table";
 import { ProfileActivity } from "@/components/profile-activity";
+import { ProfileHeader } from "@/components/profile/profile-header";
 import {
   buildProfileLinks,
   ProfilePinnedSection,
+  ProfileSection,
   ProfileSkillsSection,
-  ProfileSocialsSection,
 } from "@/components/profile/profile-sections";
+import { ProfileStats } from "@/components/profile/profile-stats";
 import { db } from "@/lib/db";
 import { userProfiles, users } from "@/lib/db/schema";
 import { loadProfilePageData, type ProfilePageData } from "@/lib/profile/profile-page-data";
@@ -50,6 +52,7 @@ async function loadSharedProfile(username: string) {
       userId: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
+      username: users.username,
       bio: userProfiles.bio,
       school: userProfiles.school,
       skills: userProfiles.skills,
@@ -161,42 +164,44 @@ export default async function SharedProfilePage({ params }: PageProps) {
   const links = buildProfileLinks(profile);
   const skills = sanitizeSkills(profile.skills ?? []);
 
+  const attendedCount = profileData.totals?.hackathonsAttended ?? profileData.attendedRows.length;
+  const attendedAside =
+    attendedCount > profileData.attendedRows.length
+      ? `Latest ${profileData.attendedRows.length} of ${attendedCount}`
+      : undefined;
+
   return (
     <main className="min-h-screen bg-paper text-ink">
-      <div className="px-5 pb-16 pt-28 sm:px-8 sm:pt-32 lg:px-12">
-        <div className="mx-auto w-full max-w-[840px] space-y-10">
-          <section className="py-8 sm:py-14">
-            <h1 className="text-[clamp(3rem,8vw,4.75rem)] font-medium leading-[0.92] tracking-tight text-ink">
-              {displayName ? <>Hi, I&apos;m {displayName}</> : "Hacker profile"}
-            </h1>
-            {profile.school ? (
-              <p className="mt-5 text-xl font-medium leading-snug text-ink sm:text-2xl">{profile.school}</p>
-            ) : null}
-            {profile.bio ? (
-              <p className="mt-8 max-w-xl text-base leading-7 text-ink/55 sm:text-lg">{profile.bio}</p>
-            ) : null}
+      <div className="px-4 pb-16 pt-10 sm:px-8 sm:pt-16 lg:px-12">
+        <div className="mx-auto w-full max-w-[760px] space-y-10">
+          <div className="space-y-6">
+            <ProfileHeader
+              bio={profile.bio}
+              links={links}
+              name={displayName}
+              school={profile.school}
+              username={profile.username}
+            />
+            <ProfileStats data={profileData} />
+          </div>
 
-            <ProfileSocialsSection emptyText="No social profiles yet." links={links} />
-            <ProfileSkillsSection emptyText="No skills listed yet." skills={skills} />
-          </section>
+          {/* Visitors don't need empty-state copy: sections with nothing to
+              show are left out. */}
+          {profileData.pinnedItems.length > 0 ? (
+            <ProfilePinnedSection empty={null} items={profileData.pinnedItems} />
+          ) : null}
 
-          <ProfilePinnedSection
-            empty={<p className="text-sm text-ink/55">No pinned wins or events yet.</p>}
-            items={profileData.pinnedItems}
-          />
+          {skills.length > 0 ? <ProfileSkillsSection emptyText="No skills listed yet." skills={skills} /> : null}
 
           <ProfileActivity latestAttended={profileData.latestAttended} years={profileData.yearActivity} />
 
-          <section className="pb-2 pt-5">
-            <h2 className="text-4xl font-semibold tracking-tight text-ink sm:text-5xl">Hackathons attended</h2>
-            <div className="mt-4">
-              <AttendedHackathonsTable
-                emptyText="No hackathons attended yet."
-                readOnly
-                rows={profileData.attendedRows}
-              />
-            </div>
-          </section>
+          <ProfileSection aside={attendedAside} id="hackathons-attended" title="Hackathons attended">
+            <AttendedHackathonsTable
+              emptyText="No hackathons attended yet."
+              readOnly
+              rows={profileData.attendedRows}
+            />
+          </ProfileSection>
         </div>
       </div>
     </main>

@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { hackathonDates, hackathons, organizationMemberships, organizerClaims } from "@/lib/db/schema";
 import { adminHackathonQuery } from "@/lib/hackathons/admin-service";
+import { canManageHackathon } from "@/lib/hackathons/checkin-service";
 
 export type ManagedHackathonRow = Awaited<ReturnType<typeof listManagedHackathons>>[number];
 
@@ -16,32 +17,6 @@ export function serializeManagedHackathon(row: ManagedHackathonRow) {
     applicationClosesAt: row.applicationClosesAt?.toISOString() ?? null,
     acceptanceAt: row.acceptanceAt?.toISOString() ?? null,
   };
-}
-
-type SerializedManagedHackathon = ReturnType<typeof serializeManagedHackathon>;
-
-/**
- * Splits managed hackathons into current/upcoming vs past. An event is "past"
- * once its end date has elapsed; undated events stay under current.
- */
-export function splitManagedHackathons(rows: ManagedHackathonRow[], now = new Date()) {
-  const current: SerializedManagedHackathon[] = [];
-  const past: SerializedManagedHackathon[] = [];
-
-  for (const row of rows) {
-    const item = serializeManagedHackathon(row);
-    const ended = row.endsAt ? row.endsAt.getTime() < now.getTime() : false;
-    (ended ? past : current).push(item);
-  }
-
-  // Current events read best soonest-first; undated ones sink to the bottom.
-  current.sort((left, right) => {
-    if (!left.startsAt) return 1;
-    if (!right.startsAt) return -1;
-    return left.startsAt.localeCompare(right.startsAt);
-  });
-
-  return { current, past };
 }
 
 /**
@@ -83,4 +58,65 @@ export async function listManagedHackathons(input: { userId: string; role: strin
   return adminHackathonQuery()
     .where(or(...conditions))
     .orderBy(desc(hackathonDates.startsAt));
+}
+
+/* hackathons.id is a uuid column: anything else would make Postgres throw
+   instead of matching nothing, so a mistyped /organizer/<id> URL 404s. */
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * One hackathon for the organizer workspace (/organizer/[id]), serialized like
+ * the list, or null when it doesn't exist or the user may not manage it.
+ *
+ * Authorization is canManageHackathon(), the same check every
+ * /api/organizer/hackathons/[id] route runs, and the rule
+ * listManagedHackathons() applies in bulk: admins manage everything;
+ * organizers manage events of organizations they are an approved member of
+ * and events they hold an approved claim on; everyone else nothing. The check
+ * and the row read run in parallel; the row is discarded when the check fails.
+ */
+export async function getManagedHackathon(input: { userId: string; role: string; hackathonId: string }) {
+  if (input.role !== "admin" && input.role !== "organizer") {
+    return null;
+  }
+
+  if (!uuidPattern.test(input.hackathonId)) {
+    return null;
+  }
+
+  const [allowed, rows] = await Promise.all([
+    canManageHackathon(input),
+    adminHackathonQuery().where(eq(hackathons.id, input.hackathonId)).limit(1),
+  ]);
+  const [row] = rows;
+
+  return allowed && row ? serializeManagedHackathon(row) : null;
+}
+
+/* Mirrors the public detail page's visibility rule (lib/hackathons/detail-data.ts). */
+const publicDetailStatuses = ["upcoming", "live", "completed", "archived"] as const;
+
+/**
+ * The hackathon's public detail page path (/hackathons/<slug>), or null while
+ * the page would 404 (unpublished, or in a non-public status). Callers must
+ * have authorized the user for the hackathon first.
+ */
+export async function getManagedHackathonPublicPath(hackathonId: string) {
+  if (!uuidPattern.test(hackathonId)) {
+    return null;
+  }
+
+  const [row] = await db
+    .select({ slug: hackathons.slug })
+    .from(hackathons)
+    .where(
+      and(
+        eq(hackathons.id, hackathonId),
+        isNotNull(hackathons.publishedAt),
+        inArray(hackathons.status, publicDetailStatuses)
+      )
+    )
+    .limit(1);
+
+  return row ? `/hackathons/${row.slug}` : null;
 }

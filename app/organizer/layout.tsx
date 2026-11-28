@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { OrganizerSidebar } from "@/components/organizer/organizer-sidebar";
+import { OrganizerNav } from "@/components/organizer/shell/organizer-nav";
 import { getCurrentIdentity, isOrganizerRole } from "@/lib/auth";
 
 export default async function OrganizerLayout({ children }: { children: ReactNode }) {
@@ -16,11 +16,11 @@ export default async function OrganizerLayout({ children }: { children: ReactNod
   }
 
   return (
-    <main className="relative min-h-screen text-ink lg:flex">
-      <OrganizerSidebar />
-      <div className="relative z-10 min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
+    <div className="relative min-h-screen text-ink lg:flex">
+      <OrganizerNav />
+      <main className="relative z-10 min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
         <div className="mx-auto w-full max-w-6xl">{children}</div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
