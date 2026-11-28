@@ -515,7 +515,7 @@ export function HackathonSearch({
   );
 
   /* Blurbs and vote totals come in files of their own, after the catalog
-     (lib/hackathons/catalog-client.ts), and the votes are re-checked every
+     (lib/hackathons/catalog-client.ts), and an open tab re-checks them every
      minute: cards already on screen are filled in and rescored as they land.
      Cards the viewer's card-state answer covers keep that answer's live
      totals. */

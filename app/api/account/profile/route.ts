@@ -67,7 +67,7 @@ export async function PATCH(request: Request) {
     })
     .returning();
 
-  revalidatePublicProfiles();
+  revalidatePublicProfiles([context.userId]);
 
   return NextResponse.json({ data: profile });
 }

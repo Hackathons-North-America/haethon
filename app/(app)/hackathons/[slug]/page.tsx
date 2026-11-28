@@ -4,12 +4,25 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { HackathonDetailView } from "@/components/hackathon-detail-view";
-import { getCurrentUserId } from "@/lib/auth";
-import { getHackathonPageData, getHackathonViewerData } from "@/lib/hackathons/detail-data";
+import { getHackathonPageData } from "@/lib/hackathons/detail-data";
 
 /* The full-page detail view. Client-side navigation from the catalog or the
    My Hackathons board is intercepted by app/(app)/@panel and shown as a side
-   panel instead; this page renders on direct visits, shared links and reloads. */
+   panel instead; this page renders on direct visits, shared links and reloads.
+
+   Static (ISR) and the same for everyone, like /hackathons: it must not read
+   the request (no auth(), cookies() or headers()), and proxy.ts keeps document
+   requests for it out of Clerk's proxy, so a shared or Discord link is served
+   by the CDN without invoking a function. The viewer's vote and stage load in
+   the browser. Rebuilt at most every 10 minutes, and sooner when a write
+   calls revalidateHackathonCaches() (it inherits the detail cache tag through
+   getHackathonPageData()). Next requires the literal number here. */
+export const revalidate = 600;
+
+/* No hackathons are built at deploy time; each is generated on its first visit. */
+export function generateStaticParams() {
+  return [];
+}
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -31,12 +44,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function HackathonDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  // Public data (cached per slug) and the viewer's own state load together:
-  // the user id comes from the session token, so neither waits on the other.
-  const [pageData, viewer] = await Promise.all([
-    getHackathonPageData(slug),
-    getCurrentUserId().then((userId) => getHackathonViewerData(userId, slug)),
-  ]);
+  const pageData = await getHackathonPageData(slug);
 
   if (!pageData) {
     notFound();
@@ -53,7 +61,7 @@ export default async function HackathonDetailPage({ params }: PageProps) {
           Search
         </Link>
 
-        <HackathonDetailView data={pageData} viewer={viewer} />
+        <HackathonDetailView data={pageData} />
       </div>
     </main>
   );

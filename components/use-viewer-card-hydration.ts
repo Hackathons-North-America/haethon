@@ -9,7 +9,9 @@ import {
   type ViewerCardStateResponse,
 } from "@/lib/hackathons/viewer-card-state";
 
-type Listener = (states: Record<string, ViewerCardState>) => void;
+/* `signedIn`: whether the server saw a session. An answer to a request sent
+   on the remembered sign-in can come back signed out (and is re-asked). */
+type Listener = (states: Record<string, ViewerCardState>, signedIn: boolean) => void;
 
 type Batch = {
   ids: string[];
@@ -65,7 +67,7 @@ function createHydration(initialAuth: SignInState) {
       const body = (await response.json()) as ViewerCardStateResponse;
 
       for (const listener of listeners) {
-        listener(body.data);
+        listener(body.data, body.signedIn);
       }
 
       // Sent on the remembered sign-in and the server saw no session: most

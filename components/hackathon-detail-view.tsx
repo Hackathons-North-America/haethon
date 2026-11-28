@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import {
   ArrowUpRight,
   CalendarClock,
@@ -17,6 +16,12 @@ import {
 } from "lucide-react";
 
 import { AddToCalendarButton } from "@/components/add-to-calendar-button";
+import {
+  DetailStatusTracker,
+  DetailViewerStateProvider,
+  DetailVoteControl,
+  SignInToTrackLink,
+} from "@/components/hackathon-detail-viewer";
 import { DiscordGlyph } from "@/components/discord-glyph";
 import { HackathonStatusTracker } from "@/components/hackathon-status-tracker";
 import { HackathonVoteControl } from "@/components/hackathon-vote-control";
@@ -88,7 +93,10 @@ function Property({
 
 /* The hackathon's properties, description, actions and status tracker.
    Rendered by the full detail page and by the side panel that opens
-   over the catalog; `variant` only tightens sizing for the narrower panel. */
+   over the catalog; `variant` only tightens sizing for the narrower panel.
+   The panel passes the viewer it read on the server. The full page is static
+   and passes none: the viewer's vote and stage load in the browser
+   (components/hackathon-detail-viewer.tsx). */
 export function HackathonDetailView({
   data,
   variant = "page",
@@ -96,7 +104,7 @@ export function HackathonDetailView({
 }: {
   data: HackathonPageData;
   variant?: "page" | "panel";
-  viewer: HackathonViewerData;
+  viewer?: HackathonViewerData;
 }) {
   const { hackathon, tagRows, discordChannelLink } = data;
   const panel = variant === "panel";
@@ -110,7 +118,15 @@ export function HackathonDetailView({
     ...tagRows.map((tag) => tag.name),
   ].filter(Boolean) as string[];
 
-  return (
+  const voteProps = {
+    className: "ml-auto shrink-0 self-center",
+    closed: isVotingClosed(hackathon.endsAt),
+    hackathonId: hackathon.id,
+    hackathonName: hackathon.name,
+    size: "detail",
+  } as const;
+
+  const content = (
     <>
       <header className={`flex items-start gap-5 ${panel ? "" : "mt-8"}`}>
         <div
@@ -141,14 +157,11 @@ export function HackathonDetailView({
             <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">{hackathon.name}</h1>
           )}
         </div>
-        <HackathonVoteControl
-          className="ml-auto shrink-0 self-center"
-          closed={isVotingClosed(hackathon.endsAt)}
-          hackathonId={hackathon.id}
-          hackathonName={hackathon.name}
-          initialState={viewer.votes}
-          size="detail"
-        />
+        {viewer ? (
+          <HackathonVoteControl {...voteProps} initialState={viewer.votes} />
+        ) : (
+          <DetailVoteControl {...voteProps} publicVotes={data.publicVotes} />
+        )}
       </header>
 
       <section className="mt-8">
@@ -281,18 +294,17 @@ export function HackathonDetailView({
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-pine">Your status</h2>
         <p className="mt-2 text-sm text-ink/55">Track your interest, application, or plans to attend.</p>
         <div className="mt-4">
-          {viewer.userId ? (
+          {!viewer ? (
+            <DetailStatusTracker hackathonId={hackathon.id} hackathonName={hackathon.name} />
+          ) : viewer.userId ? (
             <HackathonStatusTracker hackathonId={hackathon.id} hackathonName={hackathon.name} initialStatus={viewer.trackedStatus} />
           ) : (
-            <Link
-              className="inline-flex min-h-10 items-center justify-center rounded-full px-5 text-sm font-medium text-ink transition-colors hover:bg-pine hover:text-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine"
-              href="/sign-in"
-            >
-              Sign in to track this hackathon
-            </Link>
+            <SignInToTrackLink />
           )}
         </div>
       </section>
     </>
   );
+
+  return viewer ? content : <DetailViewerStateProvider hackathonId={hackathon.id}>{content}</DetailViewerStateProvider>;
 }

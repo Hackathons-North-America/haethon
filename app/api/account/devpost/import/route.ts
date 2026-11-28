@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     });
 
     // Imports create wins and attendance shown on the shared profile page.
-    revalidatePublicProfiles();
+    revalidatePublicProfiles([context.userId]);
 
     return NextResponse.json({ data: summary });
   } catch (error) {

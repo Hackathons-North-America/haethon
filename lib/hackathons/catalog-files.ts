@@ -19,7 +19,7 @@ import {
    part a search waits for is as small as it can be.
 
    Each body carries a fingerprint of its content, and a fourth file
-   (…/versions) lists all three, regenerated every minute. An open tab asks
+   (…/versions) lists all three, regenerated every 10 minutes. An open tab asks
    for that one and re-downloads only the files whose fingerprint moved,
    which needs no ETag support from the server or the CDN. Both sides compute
    the fingerprint here, from the same cached data, so they agree. */
